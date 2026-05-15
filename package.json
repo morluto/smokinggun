@@ -1,0 +1,40 @@
+{
+  "name": "codex-complexity-optimizer",
+  "version": "0.1.1",
+  "description": "Codex skill for analyzing codebase complexity hotspots and safe performance optimizations.",
+  "license": "MIT",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kappaemme-git/codex-complexity-optimizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kappaemme-git/codex-complexity-optimizer/issues"
+  },
+  "homepage": "https://github.com/Kappaemme-git/codex-complexity-optimizer#readme",
+  "bin": {
+    "codex-complexity-optimizer": "scripts/install.js"
+  },
+  "scripts": {
+    "install-skill": "node scripts/install.js",
+    "postinstall": "node scripts/install.js --silent",
+    "pack:check": "npm pack --dry-run"
+  },
+  "files": [
+    "complexity-optimizer",
+    "scripts/install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "codex",
+    "codex-skill",
+    "complexity",
+    "performance",
+    "optimization",
+    "static-analysis"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}
