@@ -1,0 +1,54 @@
+name: Footgun release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:vp
+      - run: pnpm build
+      - run: pnpm evaluate:corpus
+      - run: pnpm test:package
+      - run: pnpm verify:release
+      - name: Pack release candidate
+        id: candidate
+        shell: bash
+        run: |
+          npm pack --ignore-scripts --json > candidate-pack.json
+          echo "integrity=$(node -e 'const p=require(\"./candidate-pack.json\")[0]; process.stdout.write(p.integrity)')" >> "$GITHUB_OUTPUT"
+          echo "tarball=$(node -e 'const p=require(\"./candidate-pack.json\")[0]; process.stdout.write(p.filename)')" >> "$GITHUB_OUTPUT"
+      - run: npm publish --provenance --access public
+      - name: Verify registry artifact
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          registry_integrity="$(npm view "footgun@${version}" dist.integrity --json)"
+          candidate_integrity='${{ steps.candidate.outputs.integrity }}'
+          if [ "\"${candidate_integrity}\"" != "$registry_integrity" ]; then
+            echo "registry integrity differs from the release candidate" >&2
+            exit 1
+          fi
+          npm view "footgun@${version}" version dist.integrity
+          npm pack "footgun@${version}" --ignore-scripts --pack-destination registry-artifact --json > registry-pack.json
+          cmp <(tar -tzf "${{ steps.candidate.outputs.tarball }}" | sort) <(tar -tzf "registry-artifact/footgun-${version}.tgz" | sort)
+          npm exec --yes --package="footgun@${version}" -- footgun doctor --format json

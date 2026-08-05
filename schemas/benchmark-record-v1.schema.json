@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.benchmark-record.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^bench_[a-f0-9]{16}$"
+    },
+    "tool": {
+      "type": "string",
+      "enum": [
+        "hyperfine",
+        "pyperf",
+        "google-benchmark",
+        "criterion",
+        "jmh"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "samplesMs": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "medianMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "meanMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "sourceUnit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rawArtifact": {
+      "type": "string"
+    },
+    "rawArtifactDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "metadata": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "tool",
+    "name",
+    "samplesMs",
+    "medianMs",
+    "meanMs",
+    "sourceUnit",
+    "metadata"
+  ],
+  "additionalProperties": false
+}

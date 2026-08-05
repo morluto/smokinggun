@@ -1,40 +1,94 @@
 {
-  "name": "codex-complexity-optimizer",
-  "version": "0.1.1",
-  "description": "Codex skill for analyzing codebase complexity hotspots and safe performance optimizations.",
+  "name": "footgun",
+  "version": "1.0.0",
+  "description": "Evidence-bearing local complexity scanner and investigation tool for Codex.",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Kappaemme-git/codex-complexity-optimizer.git"
+    "url": "git+https://github.com/Kappaemme-git/footgun.git"
   },
   "bugs": {
-    "url": "https://github.com/Kappaemme-git/codex-complexity-optimizer/issues"
+    "url": "https://github.com/Kappaemme-git/footgun/issues"
   },
-  "homepage": "https://github.com/Kappaemme-git/codex-complexity-optimizer#readme",
+  "homepage": "https://github.com/Kappaemme-git/footgun#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
-    "codex-complexity-optimizer": "scripts/install.js"
+    "footgun": "dist/bin/footgun.js"
   },
-  "scripts": {
-    "install-skill": "node scripts/install.js",
-    "postinstall": "node scripts/install.js --silent",
-    "pack:check": "npm pack --dry-run"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./protocol": "./dist/protocol/index.js",
+    "./package.json": "./package.json"
   },
   "files": [
-    "complexity-optimizer",
-    "scripts/install.js",
+    "dist",
+    "grammars",
+    "skill",
+    "schemas",
+    "grammar.lock.json",
     "README.md",
     "LICENSE"
   ],
   "keywords": [
     "codex",
-    "codex-skill",
     "complexity",
     "performance",
-    "optimization",
-    "static-analysis"
+    "static-analysis",
+    "sarif"
   ],
   "engines": {
-    "node": ">=16"
-  }
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "oclif": {
+    "bin": "footgun",
+    "dirname": "footgun",
+    "topicSeparator": " ",
+    "commands": {
+      "strategy": "pattern",
+      "target": "./dist/commands",
+      "globPatterns": [
+        "**/*.js"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/generate-schemas.mjs && node scripts/set-executable.mjs",
+    "clean": "node -e \"import('node:fs').then(({rmSync}) => rmSync('dist', {recursive: true, force: true}))\"",
+    "test": "vitest run",
+    "test:vp": "vp test run",
+    "test:cli": "node scripts/cli-smoke.mjs",
+    "test:package": "node scripts/package-e2e.mjs",
+    "evaluate:corpus": "node scripts/evaluate-corpus.mjs",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pack:check": "npm pack --dry-run --json",
+    "verify:release": "node scripts/verify-release.mjs",
+    "prepack": "npm run clean && npm run build"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.13.0",
+    "@oclif/core": "4.13.3",
+    "@scip-code/scip": "0.9.0",
+    "csv-parse": "7.0.2",
+    "execa": "10.0.1",
+    "pprof-format": "2.3.0",
+    "typescript": "5.9.3",
+    "web-tree-sitter": "0.26.11",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@fast-check/vitest": "0.4.1",
+    "@types/node": "24.13.3",
+    "fast-check": "4.9.0",
+    "verdaccio": "6.9.2",
+    "vite-plus": "0.2.8",
+    "vitest": "3.2.7"
+  },
+  "author": ""
 }

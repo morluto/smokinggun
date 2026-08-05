@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.cli-smoke-data/
+*.tsbuildinfo
+.vitest/
+coverage/

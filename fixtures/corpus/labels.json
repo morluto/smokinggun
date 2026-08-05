@@ -1,0 +1,18 @@
+[
+  {"language":"c","path":"c/positive.c","expectedStructural":["nested-or-callback-loop"],"expectedSemantic":[]},
+  {"language":"cpp","path":"cpp/positive.cpp","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"csharp","path":"csharp/Positive.cs","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"go","path":"go/positive.go","expectedStructural":["nested-or-callback-loop"],"expectedSemantic":[]},
+  {"language":"java","path":"java/Positive.java","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"javascript","path":"javascript/positive.js","expectedStructural":["membership-in-loop"],"expectedSemantic":["typescript-collection-operation-in-loop"]},
+  {"language":"javascript","path":"javascript/comments-and-strings.js","expectedStructural":[],"expectedSemantic":[]},
+  {"language":"kotlin","path":"kotlin/Positive.kt","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"php","path":"php/positive.php","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"python","path":"python/membership-in-loop.py","expectedStructural":["membership-in-loop"],"expectedSemantic":["python-collection-membership-in-loop"]},
+  {"language":"ruby","path":"ruby/positive.rb","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"rust","path":"rust/positive.rs","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"swift","path":"swift/Positive.swift","expectedStructural":["membership-in-loop"],"expectedSemantic":[]},
+  {"language":"typescript","path":"typescript/nested-scan.ts","expectedStructural":["membership-in-loop"],"expectedSemantic":["typescript-collection-operation-in-loop"]},
+  {"language":"typescript","path":"typescript/positive.ts","expectedStructural":["membership-in-loop"],"expectedSemantic":["typescript-collection-operation-in-loop"]},
+  {"language":"typescript","path":"typescript/negative.ts","expectedStructural":[],"expectedSemantic":[]}
+]

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.profile-summary.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^prof_[a-f0-9]{16}$"
+    },
+    "tool": {
+      "type": "string",
+      "const": "pprof"
+    },
+    "sourceArtifact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sampleTypes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "unit"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "sampleCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "locationCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "mappingCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "functionCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "topFunctions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "tool",
+    "sourceArtifact",
+    "sourceDigest",
+    "sampleTypes",
+    "sampleCount",
+    "locationCount",
+    "mappingCount",
+    "functionCount",
+    "topFunctions",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

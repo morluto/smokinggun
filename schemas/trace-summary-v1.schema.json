@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.trace-summary.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^trace_[a-f0-9]{16}$"
+    },
+    "tool": {
+      "type": "string",
+      "const": "perfetto"
+    },
+    "sourceArtifact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "tool",
+    "sourceArtifact",
+    "sourceDigest",
+    "columns",
+    "rows",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

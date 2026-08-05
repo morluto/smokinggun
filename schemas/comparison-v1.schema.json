@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.comparison.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^cmp_[a-f0-9]{16}$"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "measurement",
+        "scaling"
+      ]
+    },
+    "baseline": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workloadDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "behaviorValidated": {
+      "type": "boolean"
+    },
+    "improvement": {
+      "type": "boolean"
+    },
+    "baselineMedianMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "candidateMedianMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "deltaPercent": {
+      "type": "number"
+    },
+    "statisticalPolicy": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "median-improvement",
+            "non-overlapping-iqr"
+          ]
+        },
+        "minimumRelativeImprovement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "minimumRelativeImprovement"
+      ],
+      "additionalProperties": false
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number"
+          },
+          "baselineMedianMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "candidateMedianMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "deltaPercent": {
+            "type": "number"
+          },
+          "improvement": {
+            "type": "boolean"
+          },
+          "statisticalPolicy": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "median-improvement",
+                  "non-overlapping-iqr"
+                ]
+              },
+              "minimumRelativeImprovement": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "kind",
+              "minimumRelativeImprovement"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "value",
+          "baselineMedianMs",
+          "candidateMedianMs",
+          "deltaPercent",
+          "improvement",
+          "statisticalPolicy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "baselineModel": {
+      "type": "string",
+      "enum": [
+        "constant",
+        "logarithmic",
+        "linear",
+        "linearithmic",
+        "quadratic"
+      ]
+    },
+    "candidateModel": {
+      "type": "string",
+      "enum": [
+        "constant",
+        "logarithmic",
+        "linear",
+        "linearithmic",
+        "quadratic"
+      ]
+    },
+    "baselineDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidateDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "comparability": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "comparable",
+            "cross-machine",
+            "inconclusive"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "status",
+        "reasons"
+      ],
+      "additionalProperties": false
+    },
+    "promotion": {
+      "type": "string",
+      "enum": [
+        "eligible",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "promotionReasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "mode",
+    "baseline",
+    "candidate",
+    "workloadDigest",
+    "behaviorValidated",
+    "improvement"
+  ],
+  "additionalProperties": false
+}
