@@ -98,7 +98,7 @@
   "devDependencies": {
     "@changesets/cli": "2.31.1",
     "@types/node": "24.13.3",
-    "@vitest/coverage-v8": "3.2.7",
+    "@vitest/coverage-v8": "4.1.10",
     "fast-check": "4.9.0",
     "knip": "6.31.0",
     "oxfmt": "0.62.0",
@@ -106,7 +106,7 @@
     "simple-git-hooks": "2.13.1",
     "verdaccio": "6.9.2",
     "vite-plus": "0.2.8",
-    "vitest": "3.2.7"
+    "vitest": "4.1.10"
   },
   "author": ""
 }
