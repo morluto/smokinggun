@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.problem.v1"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "detail": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "recovery": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "code",
+    "message"
+  ],
+  "additionalProperties": false
+}

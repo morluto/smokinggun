@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.evidence.v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "static",
+        "estimate",
+        "measurement",
+        "benchmark",
+        "profile",
+        "trace",
+        "behavior",
+        "context",
+        "unknown"
+      ]
+    },
+    "claimClass": {
+      "type": "string",
+      "enum": [
+        "static-fact",
+        "theoretical-estimate",
+        "empirical-scaling",
+        "constant-factor",
+        "system-bottleneck",
+        "behavioral",
+        "unknown"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact": {
+      "type": "string"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "provenance": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "kind",
+    "summary"
+  ],
+  "additionalProperties": false
+}

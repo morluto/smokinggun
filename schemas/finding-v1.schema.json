@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "footgun.finding.v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^fg_[a-f0-9]{16}$"
+    },
+    "scanner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scannerVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ruleId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claimClass": {
+      "type": "string",
+      "enum": [
+        "static-fact",
+        "theoretical-estimate",
+        "empirical-scaling",
+        "constant-factor",
+        "system-bottleneck",
+        "behavioral",
+        "unknown"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "info"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "type-informed",
+        "verified",
+        "unknown"
+      ]
+    },
+    "status": {
+      "default": "unvalidated",
+      "type": "string",
+      "enum": [
+        "unvalidated",
+        "supported",
+        "measured",
+        "rejected",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "relatedFindings": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^fg_[a-f0-9]{16}$"
+      }
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suggestion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startLine": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "startColumn": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "endLine": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "endColumn": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "path",
+        "startLine",
+        "startColumn",
+        "endLine",
+        "endColumn"
+      ],
+      "additionalProperties": false
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidenceRecords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "footgun.evidence.v1"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "static",
+              "estimate",
+              "measurement",
+              "benchmark",
+              "profile",
+              "trace",
+              "behavior",
+              "context",
+              "unknown"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "id",
+          "kind",
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "thirdParty": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "complexity": {
+      "type": "object",
+      "properties": {
+        "current": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "scanner",
+    "scannerVersion",
+    "ruleId",
+    "severity",
+    "confidence",
+    "status",
+    "relatedFindings",
+    "message",
+    "suggestion",
+    "location",
+    "assumptions",
+    "evidence",
+    "complexity"
+  ],
+  "additionalProperties": false
+}

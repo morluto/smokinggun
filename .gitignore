@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.cli-smoke-data/
+*.tsbuildinfo
+.vitest/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Package artifacts
+*.tgz

@@ -1,0 +1,4 @@
+interface:
+  display_name: Complexity Optimizer
+  short_description: Find and validate complexity hotspots with Footgun.
+  default_prompt: Use $complexity-optimizer to scan this repository and report evidence, assumptions, unknown coverage, and the safest next validation step.

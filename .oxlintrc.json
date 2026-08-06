@@ -1,0 +1,8 @@
+{
+  "$schema": "https://oxc-project.github.io/schema/oxlint-config.schema.json",
+  "ignorePatterns": [
+    "fixtures/**",
+    "dist/**",
+    "coverage/**"
+  ]
+}

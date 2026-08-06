@@ -1,0 +1,49 @@
+import {gzipSync} from "node:zlib";
+import {expect, it} from "vitest";
+import {Function as PprofFunction, Location, Profile, Sample, StringTable, ValueType} from "pprof-format";
+import {importPerfettoSummary, importPerfettoTrace, importPprof} from "./profiles.js";
+
+it("decodes a gzip-compressed pprof profile through the maintained binding", () => {
+  const strings = new StringTable();
+  const type = strings.dedup("samples");
+  const unit = strings.dedup("count");
+  const name = strings.dedup("work");
+  const profile = new Profile({
+    stringTable: strings,
+    sampleType: [new ValueType({type, unit})],
+    function: [new PprofFunction({id: 1, name, systemName: name, filename: strings.dedup("fixture.ts"), startLine: 1})],
+    location: [new Location({id: 1, line: [{functionId: 1, line: 1, column: 1}]})],
+    sample: [new Sample({locationId: [1], value: [3]})],
+  });
+  const result = importPprof(gzipSync(profile.encode()), {sourceArtifact: "profile.pb.gz"});
+  expect("code" in result).toBe(false);
+  if ("code" in result) return;
+  expect(result.sampleCount).toBe(1);
+  expect(result.topFunctions[0]).toMatchObject({name: "work", value: 3, unit: "count"});
+});
+
+it("normalizes bounded Perfetto trace-processor rows", () => {
+  const result = importPerfettoSummary(
+    {columns: ["name", "duration"], rows: [{name: "main", duration: 12.5}]},
+    {sourceArtifact: "trace.pftrace"},
+  );
+  expect("code" in result).toBe(false);
+  if ("code" in result) return;
+  expect(result.columns).toEqual(["name", "duration"]);
+  expect(result.rows[0]?.duration).toBe(12.5);
+});
+
+it("imports raw Perfetto traces through an explicitly supplied trace processor", async () => {
+  const result = await importPerfettoTrace({
+    sourceArtifact: "trace.pftrace",
+    sourceDigest: "a".repeat(64),
+    tracePath: "trace.pftrace",
+    query: "SELECT name, dur FROM slice LIMIT 1",
+    executable: process.execPath,
+    executableArgs: ["-e", "process.stdout.write('name,dur\\nmain,12.5\\n')"],
+  });
+  expect("code" in result).toBe(false);
+  if ("code" in result) return;
+  expect(result.query).toContain("SELECT name");
+  expect(result.rows[0]).toMatchObject({name: "main", dur: 12.5});
+});
