@@ -23,7 +23,10 @@ it("decodes a gzip-compressed pprof profile through the maintained binding", () 
 });
 
 it("normalizes bounded Perfetto trace-processor rows", () => {
-  const result = importPerfettoSummary({columns: ["name", "duration"], rows: [{name: "main", duration: 12.5}]}, {sourceArtifact: "trace.pftrace"});
+  const result = importPerfettoSummary(
+    {columns: ["name", "duration"], rows: [{name: "main", duration: 12.5}]},
+    {sourceArtifact: "trace.pftrace"},
+  );
   expect("code" in result).toBe(false);
   if ("code" in result) return;
   expect(result.columns).toEqual(["name", "duration"]);

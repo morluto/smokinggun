@@ -1,7 +1,13 @@
 import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import * as ts from "typescript";
-import type {ContextIndexV1, ContextCallV1, ContextDefinitionV1, ContextReferenceV1, ProblemV1} from "../protocol/index.js";
+import type {
+  ContextIndexV1,
+  ContextCallV1,
+  ContextDefinitionV1,
+  ContextReferenceV1,
+  ProblemV1,
+} from "../protocol/index.js";
 import {comparePortable, isWithinRoot, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
 
@@ -14,7 +20,11 @@ export type TypeScriptIndexResult = {
 const supportedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
 /** Build a local, read-only TypeScript symbol/reference/call index without executing repository code. */
-export function buildTypeScriptIndex(root: string, files: ReadonlyArray<string>, signal?: AbortSignal): TypeScriptIndexResult {
+export function buildTypeScriptIndex(
+  root: string,
+  files: ReadonlyArray<string>,
+  signal?: AbortSignal,
+): TypeScriptIndexResult {
   const absoluteRoot = resolve(root);
   const sourcePaths = files.filter((path) => supportedExtensions.has(extensionOf(path))).map((path) => resolve(path));
   if (sourcePaths.length === 0) return {state: "unavailable", diagnostics: []};
@@ -59,13 +69,25 @@ export function buildTypeScriptIndex(root: string, files: ReadonlyArray<string>,
                 alias: aliasName(checker, symbol),
               });
             } else {
-              references.push({name: symbol.getName(), path: relativePath, line: location.line, column: location.column, resolved: symbol.getDeclarations()?.length !== 0, alias: aliasName(checker, symbol)});
+              references.push({
+                name: symbol.getName(),
+                path: relativePath,
+                line: location.line,
+                column: location.column,
+                resolved: symbol.getDeclarations()?.length !== 0,
+                alias: aliasName(checker, symbol),
+              });
             }
           }
         }
         if (ts.isCallExpression(node)) {
           const location = locationOf(sourceFile, node);
-          calls.push({callee: node.expression.getText(sourceFile), path: relativePath, line: location.line, column: location.column});
+          calls.push({
+            callee: node.expression.getText(sourceFile),
+            path: relativePath,
+            line: location.line,
+            column: location.column,
+          });
         }
         ts.forEachChild(node, visit);
       };
@@ -77,7 +99,10 @@ export function buildTypeScriptIndex(root: string, files: ReadonlyArray<string>,
     const index: ContextIndexV1 = {
       schemaVersion: "footgun.context-index.v1",
       tool: {name: "typescript", version: ts.version},
-      files: sourcePaths.filter((path) => isWithinRoot(absoluteRoot, path)).map((path) => portablePath(relative(absoluteRoot, path))).sort(comparePortable),
+      files: sourcePaths
+        .filter((path) => isWithinRoot(absoluteRoot, path))
+        .map((path) => portablePath(relative(absoluteRoot, path)))
+        .sort(comparePortable),
       definitions: definitions.sort(compareDefinitions),
       references: references.sort(compareReferences),
       calls: calls.sort(compareCalls),
@@ -95,16 +120,42 @@ export function buildTypeScriptIndex(root: string, files: ReadonlyArray<string>,
   } catch (cause: unknown) {
     return {
       state: "unavailable",
-      diagnostics: [{schemaVersion: "footgun.problem.v1", code: "typescript-index-failed", message: "TypeScript semantic indexing was unavailable.", detail: cause instanceof Error ? cause.message : "Unknown TypeScript compiler failure.", recovery: "Run the scan again after checking the TypeScript files and installed compiler."}],
+      diagnostics: [
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "typescript-index-failed",
+          message: "TypeScript semantic indexing was unavailable.",
+          detail: cause instanceof Error ? cause.message : "Unknown TypeScript compiler failure.",
+          recovery: "Run the scan again after checking the TypeScript files and installed compiler.",
+        },
+      ],
     };
   }
 }
 
 function isDeclarationName(node: ts.Identifier): boolean {
   const parent = node.parent;
-  if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) return parent.name === node || parent.propertyName === node;
-  if (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent) || ts.isEnumDeclaration(parent) || ts.isImportClause(parent) || ts.isNamespaceImport(parent)) return parent.name === node;
-  return (ts.isMethodDeclaration(parent) || ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent) || ts.isTypeParameterDeclaration(parent)) && parent.name === node;
+  if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent))
+    return parent.name === node || parent.propertyName === node;
+  if (
+    ts.isVariableDeclaration(parent) ||
+    ts.isParameter(parent) ||
+    ts.isFunctionDeclaration(parent) ||
+    ts.isClassDeclaration(parent) ||
+    ts.isInterfaceDeclaration(parent) ||
+    ts.isTypeAliasDeclaration(parent) ||
+    ts.isEnumDeclaration(parent) ||
+    ts.isImportClause(parent) ||
+    ts.isNamespaceImport(parent)
+  )
+    return parent.name === node;
+  return (
+    (ts.isMethodDeclaration(parent) ||
+      ts.isPropertyDeclaration(parent) ||
+      ts.isPropertySignature(parent) ||
+      ts.isTypeParameterDeclaration(parent)) &&
+    parent.name === node
+  );
 }
 
 function typeText(checker: ts.TypeChecker, node: ts.Node): string | undefined {
@@ -132,7 +183,8 @@ function locationOf(sourceFile: ts.SourceFile, node: ts.Node): {readonly line: n
 }
 
 function diagnosticToProblem(root: string, sourceFile: ts.SourceFile, diagnostic: ts.Diagnostic): ProblemV1 {
-  const location = diagnostic.start === undefined ? undefined : sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
+  const location =
+    diagnostic.start === undefined ? undefined : sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
   return {
     schemaVersion: "footgun.problem.v1",
     code: "typescript-parse-error",
@@ -149,13 +201,28 @@ function extensionOf(path: string): string {
 }
 
 function compareDefinitions(left: ContextDefinitionV1, right: ContextDefinitionV1): number {
-  return comparePortable(left.path, right.path) || left.line - right.line || left.column - right.column || comparePortable(left.name, right.name);
+  return (
+    comparePortable(left.path, right.path) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    comparePortable(left.name, right.name)
+  );
 }
 
 function compareReferences(left: ContextReferenceV1, right: ContextReferenceV1): number {
-  return comparePortable(left.path, right.path) || left.line - right.line || left.column - right.column || comparePortable(left.name, right.name);
+  return (
+    comparePortable(left.path, right.path) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    comparePortable(left.name, right.name)
+  );
 }
 
 function compareCalls(left: ContextCallV1, right: ContextCallV1): number {
-  return comparePortable(left.path, right.path) || left.line - right.line || left.column - right.column || comparePortable(left.callee, right.callee);
+  return (
+    comparePortable(left.path, right.path) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    comparePortable(left.callee, right.callee)
+  );
 }

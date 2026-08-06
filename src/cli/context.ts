@@ -30,7 +30,10 @@ export type RuntimeContext = {
   readonly stdout: NodeJS.WritableStream;
   readonly stderr: NodeJS.WritableStream;
   readonly artifacts: string;
-  readonly artifactStore: {readonly root: string; readonly put: (path: string, maxBytes?: number) => Promise<StoredArtifact>};
+  readonly artifactStore: {
+    readonly root: string;
+    readonly put: (path: string, maxBytes?: number) => Promise<StoredArtifact>;
+  };
   readonly scannerRegistry: () => ReadonlyArray<ScannerDescriptor>;
   readonly executionPolicy: {readonly network: "disabled"; readonly shell: false; readonly maxOutputBytes: number};
   readonly clock: {readonly now: () => number; readonly nowIso: () => string};
@@ -40,14 +43,32 @@ export type RuntimeContext = {
 export type ContextFailure = ProblemV1 & {_tag: "ContextFailure"; exitCode: 2};
 
 /** Compose parsed configuration and process boundaries for one command invocation. */
-export async function createRuntimeContext(flags: GlobalFlags, signal: AbortSignal, streams: Pick<RuntimeContext, "stdin" | "stdout" | "stderr"> = {stdin: process.stdin, stdout: process.stdout, stderr: process.stderr}): Promise<RuntimeContext | ContextFailure> {
+export async function createRuntimeContext(
+  flags: GlobalFlags,
+  signal: AbortSignal,
+  streams: Pick<RuntimeContext, "stdin" | "stdout" | "stderr"> = {
+    stdin: process.stdin,
+    stdout: process.stdout,
+    stderr: process.stderr,
+  },
+): Promise<RuntimeContext | ContextFailure> {
   const config = await loadConfig(flags);
   if (isConfigFailure(config)) return {...config, _tag: "ContextFailure", exitCode: 2};
   const artifacts = userDataDirectory();
   await mkdir(join(artifacts, "artifacts"), {recursive: true});
   const external = await loadExternalAdapters(config.adapters, config.cwd, signal);
   const artifactRoot = join(artifacts, "artifacts");
-  return {...streams, config, signal, artifacts, artifactStore: {root: artifactRoot, put: (path, maxBytes) => storeArtifact(path, artifactRoot, maxBytes)}, scannerRegistry: () => listScanners(external.descriptors), executionPolicy: {network: "disabled", shell: false, maxOutputBytes: 1_000_000}, clock: {now: () => Date.now(), nowIso: () => new Date().toISOString()}, processRunner: execa};
+  return {
+    ...streams,
+    config,
+    signal,
+    artifacts,
+    artifactStore: {root: artifactRoot, put: (path, maxBytes) => storeArtifact(path, artifactRoot, maxBytes)},
+    scannerRegistry: () => listScanners(external.descriptors),
+    executionPolicy: {network: "disabled", shell: false, maxOutputBytes: 1_000_000},
+    clock: {now: () => Date.now(), nowIso: () => new Date().toISOString()},
+    processRunner: execa,
+  };
 }
 
 export function isContextFailure(value: RuntimeContext | ContextFailure): value is ContextFailure {

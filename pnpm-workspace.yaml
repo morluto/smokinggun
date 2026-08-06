@@ -2,6 +2,12 @@ packages: []
 
 allowBuilds:
   esbuild: true
+  simple-git-hooks: true
+
+# pnpm 11 default is 1440 minutes (24h); keep it explicit and non-strict so a
+# brand-new release can still be installed when no mature version satisfies a range.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: false
 
 minimumReleaseAgeExclude:
   - '@voidzero-dev/vite-plus-core@0.2.8'

@@ -20,11 +20,13 @@ function toGenericSarif(value: unknown, human: string): Record<string, unknown> 
   return {
     version: "2.1.0",
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
-    runs: [{
-      tool: {driver: {name: "footgun", version: "1.0.0"}},
-      results: [],
-      invocations: [{executionSuccessful: true}],
-      properties: {message: human, value},
-    }],
+    runs: [
+      {
+        tool: {driver: {name: "footgun", version: "1.0.0"}},
+        results: [],
+        invocations: [{executionSuccessful: true}],
+        properties: {message: human, value},
+      },
+    ],
   };
 }

@@ -11,7 +11,9 @@ export type ScannerDescriptor = {
 };
 
 /** Return the installed scanner capabilities without probing the network. */
-export function listScanners(external: ReadonlyArray<ExternalScannerDescriptor> = []): ReadonlyArray<ScannerDescriptor> {
+export function listScanners(
+  external: ReadonlyArray<ExternalScannerDescriptor> = [],
+): ReadonlyArray<ScannerDescriptor> {
   return [
     {
       id: scannerId,

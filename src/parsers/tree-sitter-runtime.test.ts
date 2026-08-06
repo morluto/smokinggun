@@ -11,7 +11,10 @@ describe("pinned Tree-sitter runtime", () => {
   });
 
   it("reports syntax coverage rather than treating parse errors as success", async () => {
-    const valid = await parseWithTreeSitter(resolve("fixtures/corpus/typescript/nested-scan.ts"), "const value: string = 'ok';");
+    const valid = await parseWithTreeSitter(
+      resolve("fixtures/corpus/typescript/nested-scan.ts"),
+      "const value: string = 'ok';",
+    );
     const invalid = await parseWithTreeSitter("invalid.py", "def broken(:\n  return 1\n");
     expect(valid.status).toBe("complete");
     expect(invalid.status).toBe("partial");

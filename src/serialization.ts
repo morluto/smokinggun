@@ -10,6 +10,8 @@ export function stableJson(value: unknown): string {
     return encoded;
   }
   if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
-  const entries = Object.entries(value).filter(([, entry]) => entry !== undefined).sort(([left], [right]) => comparePortable(left, right));
+  const entries = Object.entries(value)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([left], [right]) => comparePortable(left, right));
   return "{" + entries.map(([key, entry]) => JSON.stringify(key) + ":" + stableJson(entry)).join(",") + "}";
 }

@@ -11,9 +11,14 @@ export type StoredArtifact = {
 };
 
 /** Copy a bounded local artifact into an immutable content-addressed store. */
-export async function storeArtifact(sourcePath: string, root: string, maxBytes = 100 * 1024 * 1024): Promise<StoredArtifact> {
+export async function storeArtifact(
+  sourcePath: string,
+  root: string,
+  maxBytes = 100 * 1024 * 1024,
+): Promise<StoredArtifact> {
   const linkInfo = await lstat(sourcePath);
-  if (linkInfo.isSymbolicLink() || !linkInfo.isFile()) throw new Error("Only regular, non-symlink files can be stored as artifacts.");
+  if (linkInfo.isSymbolicLink() || !linkInfo.isFile())
+    throw new Error("Only regular, non-symlink files can be stored as artifacts.");
   const info = await stat(sourcePath);
   if (info.size > maxBytes) throw new Error(`Artifact exceeds the ${maxBytes} byte limit.`);
   const bytes = await readFile(sourcePath);
@@ -24,7 +29,8 @@ export async function storeArtifact(sourcePath: string, root: string, maxBytes =
   await mkdir(directory, {recursive: true});
   try {
     const destinationInfo = await lstat(destination);
-    if (destinationInfo.isSymbolicLink() || !destinationInfo.isFile()) throw new Error("The content-addressed artifact destination is not a regular file.");
+    if (destinationInfo.isSymbolicLink() || !destinationInfo.isFile())
+      throw new Error("The content-addressed artifact destination is not a regular file.");
   } catch (cause: unknown) {
     if (!(cause instanceof Error && "code" in cause && cause.code === "ENOENT")) throw cause;
     const temporary = join(directory, `.${digest}.${randomUUID()}.tmp`);

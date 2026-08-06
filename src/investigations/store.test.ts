@@ -24,7 +24,9 @@ describe("investigation snapshots", () => {
     const latest = await loadLatestInvestigation(root, initial.id);
     expect(latest?.digest).toBe(secondDigest);
     expect(latest?.bundle.state).toBe("baseline-measured");
-    expect(await readFile(join(root, "investigations", initial.id, "snapshots", `${secondDigest}.json`), "utf8")).toContain("baseline-measured");
+    expect(
+      await readFile(join(root, "investigations", initial.id, "snapshots", `${secondDigest}.json`), "utf8"),
+    ).toContain("baseline-measured");
   });
 
   it("rejects state regressions and skipped validation stages", async () => {
@@ -40,8 +42,12 @@ describe("investigation snapshots", () => {
       diagnostics: [],
     };
     await recordInvestigationSnapshot(root, initial);
-    await expect(recordInvestigationSnapshot(root, {...initial, state: "reported" as const})).rejects.toThrow(/Invalid investigation transition/);
+    await expect(recordInvestigationSnapshot(root, {...initial, state: "reported" as const})).rejects.toThrow(
+      /Invalid investigation transition/,
+    );
     await recordInvestigationSnapshot(root, {...initial, state: "inventoried" as const});
-    await expect(recordInvestigationSnapshot(root, {...initial, state: "baseline-measured" as const})).rejects.toThrow(/Invalid investigation transition/);
+    await expect(recordInvestigationSnapshot(root, {...initial, state: "baseline-measured" as const})).rejects.toThrow(
+      /Invalid investigation transition/,
+    );
   });
 });

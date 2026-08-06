@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a bug in Footgun
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Footgun version
+      description: The version from `footgun --version` (or the package version)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The commands you ran and the machine-readable output you observed. Static scans should stay local and offline.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, pnpm version
+    validations:
+      required: false

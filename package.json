@@ -57,19 +57,32 @@
       ]
     }
   },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint && pnpm format:check && pnpm check:boundaries"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/generate-schemas.mjs && node scripts/set-executable.mjs",
+    "changeset": "changeset",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
     "clean": "node -e \"import('node:fs').then(({rmSync}) => rmSync('dist', {recursive: true, force: true}))\"",
-    "test": "vitest run",
-    "test:vp": "vp test run",
-    "test:cli": "node scripts/cli-smoke.mjs",
-    "test:package": "node scripts/package-e2e.mjs",
     "evaluate:corpus": "node scripts/evaluate-corpus.mjs",
+    "format": "oxfmt src scripts vitest.config.ts tsconfig.json",
+    "format:check": "oxfmt --check src scripts vitest.config.ts tsconfig.json",
+    "knip": "knip",
+    "lint": "oxlint",
+    "pack:check": "npm pack --dry-run --json",
+    "prepare": "simple-git-hooks",
+    "prepack": "npm run clean && npm run build",
+    "publish:packages": "changeset publish",
+    "test": "vitest run",
+    "test:cli": "node scripts/cli-smoke.mjs",
+    "test:coverage": "vitest run --coverage",
+    "test:package": "node scripts/package-e2e.mjs",
+    "test:vp": "vp test run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pack:check": "npm pack --dry-run --json",
     "verify:release": "node scripts/verify-release.mjs",
-    "prepack": "npm run clean && npm run build"
+    "version:packages": "changeset version"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.13.0",
@@ -83,9 +96,14 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@fast-check/vitest": "0.4.1",
+    "@changesets/cli": "2.31.1",
     "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "3.2.7",
     "fast-check": "4.9.0",
+    "knip": "6.31.0",
+    "oxfmt": "0.62.0",
+    "oxlint": "1.77.0",
+    "simple-git-hooks": "2.13.1",
     "verdaccio": "6.9.2",
     "vite-plus": "0.2.8",
     "vitest": "3.2.7"

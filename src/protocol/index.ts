@@ -46,24 +46,53 @@ const findingSchema = z.strictObject({
   language: z.string().min(1).optional(),
   kind: z.string().min(1).optional(),
   symbol: z.string().min(1).optional(),
-  claimClass: z.enum(["static-fact", "theoretical-estimate", "empirical-scaling", "constant-factor", "system-bottleneck", "behavioral", "unknown"]).optional(),
+  claimClass: z
+    .enum([
+      "static-fact",
+      "theoretical-estimate",
+      "empirical-scaling",
+      "constant-factor",
+      "system-bottleneck",
+      "behavioral",
+      "unknown",
+    ])
+    .optional(),
   severity: z.enum(["high", "medium", "low", "info"]),
   confidence: z.enum(["candidate", "type-informed", "verified", "unknown"]),
-  status: z.enum(["unvalidated", "supported", "measured", "rejected", "blocked", "inconclusive"]).default("unvalidated"),
+  status: z
+    .enum(["unvalidated", "supported", "measured", "rejected", "blocked", "inconclusive"])
+    .default("unvalidated"),
   relatedFindings: z.array(z.string().regex(/^fg_[a-f0-9]{16}$/)).default([]),
   message: z.string().min(1),
   suggestion: z.string().min(1),
   location: locationSchema,
   assumptions: z.array(z.string()),
   evidence: z.array(z.string()),
-  evidenceRecords: z.array(z.strictObject({
-    schemaVersion: version("footgun.evidence.v1"),
-    id: z.string().min(1),
-    kind: z.enum(["static", "estimate", "measurement", "benchmark", "profile", "trace", "behavior", "context", "unknown"]),
-    summary: z.string().min(1),
-    artifact: z.string().optional(),
-    digest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  })).optional(),
+  evidenceRecords: z
+    .array(
+      z.strictObject({
+        schemaVersion: version("footgun.evidence.v1"),
+        id: z.string().min(1),
+        kind: z.enum([
+          "static",
+          "estimate",
+          "measurement",
+          "benchmark",
+          "profile",
+          "trace",
+          "behavior",
+          "context",
+          "unknown",
+        ]),
+        summary: z.string().min(1),
+        artifact: z.string().optional(),
+        digest: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      }),
+    )
+    .optional(),
   thirdParty: z.record(z.string(), z.unknown()).optional(),
   complexity: z.strictObject({
     current: z.string().optional(),
@@ -84,7 +113,13 @@ const repositorySchema = z.strictObject({
 
 const inventorySchema = z.strictObject({
   schemaVersion: version("footgun.repository-inventory.v1"),
-  languages: z.array(z.strictObject({language: z.string().min(1), files: z.number().int().nonnegative(), extensions: z.array(z.string().min(1))})),
+  languages: z.array(
+    z.strictObject({
+      language: z.string().min(1),
+      files: z.number().int().nonnegative(),
+      extensions: z.array(z.string().min(1)),
+    }),
+  ),
   manifests: z.array(z.string().min(1)),
   packageManagers: z.array(z.string().min(1)),
   tests: z.array(z.string().min(1)),
@@ -143,7 +178,10 @@ const scanReportSchema = z.strictObject({
   tool: z.strictObject({name: z.literal("footgun"), version: z.string().min(1)}),
   repository: repositorySchema,
   inventory: inventorySchema.optional(),
-  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sourceDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   configDigest: z.string().regex(/^[a-f0-9]{64}$/),
   findings: z.array(findingSchema),
   coverage: z.array(coverageSchema),
@@ -169,7 +207,9 @@ const adapterManifestSchema = z.strictObject({
   outputKinds: z.array(z.string().min(1)).default([]),
   requirements: z.array(z.string().min(1)).default([]),
   sideEffects: z.array(z.enum(["read", "execute", "write", "network", "service", "resource"])).default(["execute"]),
-  determinism: z.enum(["deterministic", "seeded", "environment-sensitive", "nondeterministic"]).default("environment-sensitive"),
+  determinism: z
+    .enum(["deterministic", "seeded", "environment-sensitive", "nondeterministic"])
+    .default("environment-sensitive"),
   probeCommand: z.array(z.string()).min(1).optional(),
   configSchema: z.record(z.string(), z.unknown()).optional(),
   limits: z.strictObject({
@@ -187,10 +227,22 @@ const adapterRequestSchema = z.strictObject({
   operation: z.enum(["probe", "scan", "context", "benchmark", "profile", "trace"]).default("scan"),
   targets: z.array(z.string().min(1)).default([]),
   revision: z.string().nullable().default(null),
-  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  configDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sourceDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  configDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   requestedCapabilities: z.array(z.string().min(1)).default([]),
-  executionPolicy: z.strictObject({network: z.enum(["disabled", "explicit"]), shell: z.literal(false), maxOutputBytes: z.number().int().positive()}).default({network: "disabled", shell: false, maxOutputBytes: 1_000_000}),
+  executionPolicy: z
+    .strictObject({
+      network: z.enum(["disabled", "explicit"]),
+      shell: z.literal(false),
+      maxOutputBytes: z.number().int().positive(),
+    })
+    .default({network: "disabled", shell: false, maxOutputBytes: 1_000_000}),
 });
 
 const adapterResultSchema = z.strictObject({
@@ -202,10 +254,26 @@ const adapterResultSchema = z.strictObject({
   diagnostics: z.array(problemSchema),
   rawArtifacts: z.array(z.string()),
   rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
-  adapter: z.strictObject({id: z.string().min(1), version: z.string().min(1), command: z.array(z.string().min(1)), tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional()}).optional(),
-  requestDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  configDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  adapter: z
+    .strictObject({
+      id: z.string().min(1),
+      version: z.string().min(1),
+      command: z.array(z.string().min(1)),
+      tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional(),
+    })
+    .optional(),
+  requestDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  configDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  sourceDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   reproduction: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -218,11 +286,30 @@ const workloadSchema = z.strictObject({
   warmups: z.number().int().nonnegative(),
   repetitions: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
-  inputSizeParameterization: z.strictObject({name: z.string().min(1), values: z.array(z.number().finite()).min(1), commandIndex: z.number().int().nonnegative()}).optional(),
+  inputSizeParameterization: z
+    .strictObject({
+      name: z.string().min(1),
+      values: z.array(z.number().finite()).min(1),
+      commandIndex: z.number().int().nonnegative(),
+    })
+    .optional(),
   datasetDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
-  resourceLimits: z.strictObject({cpuMs: z.number().int().positive().optional(), memoryBytes: z.number().int().positive().optional(), maxProcesses: z.number().int().positive().optional()}).optional(),
-  runner: z.strictObject({runtime: z.enum(["docker", "podman", "bwrap", "nsjail"]), image: z.string().min(1).optional()}).optional(),
-  statisticalPolicy: z.strictObject({kind: z.enum(["median-improvement", "non-overlapping-iqr"]), minimumRelativeImprovement: z.number().nonnegative().max(1)}).default({kind: "median-improvement", minimumRelativeImprovement: 0}),
+  resourceLimits: z
+    .strictObject({
+      cpuMs: z.number().int().positive().optional(),
+      memoryBytes: z.number().int().positive().optional(),
+      maxProcesses: z.number().int().positive().optional(),
+    })
+    .optional(),
+  runner: z
+    .strictObject({runtime: z.enum(["docker", "podman", "bwrap", "nsjail"]), image: z.string().min(1).optional()})
+    .optional(),
+  statisticalPolicy: z
+    .strictObject({
+      kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+      minimumRelativeImprovement: z.number().nonnegative().max(1),
+    })
+    .default({kind: "median-improvement", minimumRelativeImprovement: 0}),
   requestedProfile: z.enum(["read-only", "local-exec", "service-exec", "container-exec", "candidate-write"]),
   expectedArtifacts: z.array(z.string().min(1)),
   behaviorChecks: z.array(z.string()),
@@ -244,11 +331,34 @@ const reproductionSchema = z.strictObject({
 const evidenceSchema = z.strictObject({
   schemaVersion: version("footgun.evidence.v1"),
   id: z.string().min(1),
-  kind: z.enum(["static", "estimate", "measurement", "benchmark", "profile", "trace", "behavior", "context", "unknown"]),
-  claimClass: z.enum(["static-fact", "theoretical-estimate", "empirical-scaling", "constant-factor", "system-bottleneck", "behavioral", "unknown"]).optional(),
+  kind: z.enum([
+    "static",
+    "estimate",
+    "measurement",
+    "benchmark",
+    "profile",
+    "trace",
+    "behavior",
+    "context",
+    "unknown",
+  ]),
+  claimClass: z
+    .enum([
+      "static-fact",
+      "theoretical-estimate",
+      "empirical-scaling",
+      "constant-factor",
+      "system-bottleneck",
+      "behavioral",
+      "unknown",
+    ])
+    .optional(),
   summary: z.string().min(1),
   artifact: z.string().optional(),
-  digest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  digest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   provenance: z.record(z.string(), z.string()).optional(),
 });
 
@@ -263,13 +373,27 @@ const measurementSchema = z.strictObject({
   medianMs: z.number().nonnegative(),
   meanMs: z.number().nonnegative(),
   quartiles: z.strictObject({q1Ms: z.number().nonnegative(), q3Ms: z.number().nonnegative()}),
-  statisticalPolicy: z.strictObject({kind: z.enum(["median-improvement", "non-overlapping-iqr"]), minimumRelativeImprovement: z.number().nonnegative().max(1)}),
+  statisticalPolicy: z.strictObject({
+    kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+    minimumRelativeImprovement: z.number().nonnegative().max(1),
+  }),
   reproduction: reproductionSchema,
   behaviorValidated: z.boolean(),
   executionProfile: z.enum(["read-only", "local-exec", "service-exec", "container-exec", "candidate-write"]),
   environment: z.strictObject({node: z.string(), platform: z.string(), arch: z.string()}),
-  isolation: z.strictObject({backend: z.enum(["host-process", "docker", "podman", "bwrap", "nsjail"]), controlsRequested: z.array(z.string()), controlsApplied: z.array(z.string()), downgradeReasons: z.array(z.string()), candidateWorkspace: z.string().optional(), runner: z.strictObject({runtime: z.enum(["docker", "podman", "bwrap", "nsjail"]), image: z.string().min(1).optional()}).optional()}),
-  behaviorChecks: z.array(z.strictObject({check: z.string().min(1), passed: z.boolean(), observed: z.string().optional()})).optional(),
+  isolation: z.strictObject({
+    backend: z.enum(["host-process", "docker", "podman", "bwrap", "nsjail"]),
+    controlsRequested: z.array(z.string()),
+    controlsApplied: z.array(z.string()),
+    downgradeReasons: z.array(z.string()),
+    candidateWorkspace: z.string().optional(),
+    runner: z
+      .strictObject({runtime: z.enum(["docker", "podman", "bwrap", "nsjail"]), image: z.string().min(1).optional()})
+      .optional(),
+  }),
+  behaviorChecks: z
+    .array(z.strictObject({check: z.string().min(1), passed: z.boolean(), observed: z.string().optional()}))
+    .optional(),
   artifact: z.string().optional(),
 });
 
@@ -283,7 +407,10 @@ const benchmarkRecordSchema = z.strictObject({
   meanMs: z.number().nonnegative(),
   sourceUnit: z.string().min(1),
   rawArtifact: z.string().optional(),
-  rawArtifactDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  rawArtifactDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   metadata: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).default({}),
 });
 
@@ -292,7 +419,10 @@ const benchmarkImportSchema = z.strictObject({
   tool: benchmarkRecordSchema.shape.tool,
   records: z.array(benchmarkRecordSchema).min(1),
   rawArtifact: z.string().optional(),
-  rawArtifactDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  rawArtifactDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
 });
 
 const profileSummarySchema = z.strictObject({
@@ -329,7 +459,10 @@ const scalingPointSchema = z.strictObject({
   medianMs: z.number().nonnegative(),
   meanMs: z.number().nonnegative(),
   quartiles: z.strictObject({q1Ms: z.number().nonnegative(), q3Ms: z.number().nonnegative()}),
-  statisticalPolicy: z.strictObject({kind: z.enum(["median-improvement", "non-overlapping-iqr"]), minimumRelativeImprovement: z.number().nonnegative().max(1)}),
+  statisticalPolicy: z.strictObject({
+    kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+    minimumRelativeImprovement: z.number().nonnegative().max(1),
+  }),
   timedOut: z.boolean(),
   behaviorValidated: z.boolean(),
   diagnostic: z.string().optional(),
@@ -369,13 +502,40 @@ const comparisonSchema = z.strictObject({
   baselineMedianMs: z.number().nonnegative().optional(),
   candidateMedianMs: z.number().nonnegative().optional(),
   deltaPercent: z.number().finite().optional(),
-  statisticalPolicy: z.strictObject({kind: z.enum(["median-improvement", "non-overlapping-iqr"]), minimumRelativeImprovement: z.number().nonnegative().max(1)}).optional(),
-  points: z.array(z.strictObject({value: z.number().finite(), baselineMedianMs: z.number().nonnegative(), candidateMedianMs: z.number().nonnegative(), deltaPercent: z.number().finite(), improvement: z.boolean(), statisticalPolicy: z.strictObject({kind: z.enum(["median-improvement", "non-overlapping-iqr"]), minimumRelativeImprovement: z.number().nonnegative().max(1)})})).optional(),
+  statisticalPolicy: z
+    .strictObject({
+      kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+      minimumRelativeImprovement: z.number().nonnegative().max(1),
+    })
+    .optional(),
+  points: z
+    .array(
+      z.strictObject({
+        value: z.number().finite(),
+        baselineMedianMs: z.number().nonnegative(),
+        candidateMedianMs: z.number().nonnegative(),
+        deltaPercent: z.number().finite(),
+        improvement: z.boolean(),
+        statisticalPolicy: z.strictObject({
+          kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+          minimumRelativeImprovement: z.number().nonnegative().max(1),
+        }),
+      }),
+    )
+    .optional(),
   baselineModel: scalingModelSchema.shape.name.optional(),
   candidateModel: scalingModelSchema.shape.name.optional(),
-  baselineDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  candidateDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  comparability: z.strictObject({status: z.enum(["comparable", "cross-machine", "inconclusive"]), reasons: z.array(z.string())}).optional(),
+  baselineDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  candidateDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  comparability: z
+    .strictObject({status: z.enum(["comparable", "cross-machine", "inconclusive"]), reasons: z.array(z.string())})
+    .optional(),
   promotion: z.enum(["eligible", "blocked", "inconclusive"]).optional(),
   promotionReasons: z.array(z.string()).optional(),
 });
@@ -383,10 +543,28 @@ const comparisonSchema = z.strictObject({
 const investigationSchema = z.strictObject({
   schemaVersion: version("footgun.investigation-bundle.v1"),
   id: z.string().regex(/^inv_[a-f0-9]{16}$/),
-  state: z.enum(["created", "inventoried", "scanned", "context-resolved", "measurement-planned", "baseline-measured", "candidate-compared", "behavior-validated", "reported", "blocked", "inconclusive", "unavailable", "cancelled", "failed"]),
+  state: z.enum([
+    "created",
+    "inventoried",
+    "scanned",
+    "context-resolved",
+    "measurement-planned",
+    "baseline-measured",
+    "candidate-compared",
+    "behavior-validated",
+    "reported",
+    "blocked",
+    "inconclusive",
+    "unavailable",
+    "cancelled",
+    "failed",
+  ]),
   root: z.string().min(1),
   repository: repositorySchema.optional(),
-  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sourceDigest: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   createdAt: z.string().datetime({offset: true}),
   findingIds: z.array(z.string().regex(/^fg_[a-f0-9]{16}$/)).optional(),
   callers: z.array(z.string()).default([]),

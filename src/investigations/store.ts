@@ -33,7 +33,11 @@ export async function loadLatestInvestigation(dataRoot: string, id: string): Pro
 export async function recordInvestigationSnapshot(dataRoot: string, bundle: InvestigationBundleV1): Promise<string> {
   const parsed = Protocol.investigation.parse(bundle);
   const latest = await loadLatestInvestigation(dataRoot, parsed.id);
-  if (latest !== undefined && latest.bundle.state !== parsed.state && !isAllowedTransition(latest.bundle.state, parsed.state)) {
+  if (
+    latest !== undefined &&
+    latest.bundle.state !== parsed.state &&
+    !isAllowedTransition(latest.bundle.state, parsed.state)
+  ) {
     throw new Error(`Invalid investigation transition from ${latest.bundle.state} to ${parsed.state}.`);
   }
   const digest = digestBundle(parsed);
@@ -46,7 +50,11 @@ export async function recordInvestigationSnapshot(dataRoot: string, bundle: Inve
   } catch (cause: unknown) {
     if (!isErrno(cause, "EEXIST")) throw cause;
   }
-  const pointer: InvestigationPointerV1 = {schemaVersion: "footgun.investigation-pointer.v1", bundleDigest: digest, updatedAt: new Date().toISOString()};
+  const pointer: InvestigationPointerV1 = {
+    schemaVersion: "footgun.investigation-pointer.v1",
+    bundleDigest: digest,
+    updatedAt: new Date().toISOString(),
+  };
   const pointerPath = join(directory, "latest.json");
   const temporary = `${pointerPath}.${randomUUID()}.tmp`;
   await writeFile(temporary, `${JSON.stringify(pointer, null, 2)}\n`, "utf8");
@@ -54,7 +62,13 @@ export async function recordInvestigationSnapshot(dataRoot: string, bundle: Inve
   return digest;
 }
 
-const terminalStates = new Set<InvestigationBundleV1["state"]>(["blocked", "inconclusive", "unavailable", "cancelled", "failed"]);
+const terminalStates = new Set<InvestigationBundleV1["state"]>([
+  "blocked",
+  "inconclusive",
+  "unavailable",
+  "cancelled",
+  "failed",
+]);
 
 function isAllowedTransition(from: InvestigationBundleV1["state"], to: InvestigationBundleV1["state"]): boolean {
   if (terminalStates.has(from)) return false;

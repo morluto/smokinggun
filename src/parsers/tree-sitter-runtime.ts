@@ -1,5 +1,3 @@
-import {createHash} from "node:crypto";
-import {readFile} from "node:fs/promises";
 import {createRequire} from "node:module";
 import {fileURLToPath} from "node:url";
 import {Language, Parser, type Node, type Tree} from "web-tree-sitter";
@@ -49,7 +47,8 @@ const languages = new Map<GrammarName, Promise<Language>>();
 /** Parse source with the pinned grammar when one is available. */
 export async function parseWithTreeSitter(path: string, source: string, signal?: AbortSignal): Promise<ParseCoverage> {
   const language = languageForPath(path);
-  if (language === undefined) return {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."};
+  if (language === undefined)
+    return {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."};
   try {
     await initialize(signal);
     const parser = new Parser();
@@ -63,20 +62,34 @@ export async function parseWithTreeSitter(path: string, source: string, signal?:
         },
       });
       if (tree === null) return {language, status: "unavailable", error: "Tree-sitter cancelled parsing."};
-      return tree.rootNode.hasError ? {language, status: "partial", error: "The grammar reported one or more syntax errors."} : {language, status: "complete"};
+      return tree.rootNode.hasError
+        ? {language, status: "partial", error: "The grammar reported one or more syntax errors."}
+        : {language, status: "complete"};
     } finally {
       tree?.delete();
       parser.delete();
     }
   } catch (cause: unknown) {
-    return {language, status: "unavailable", error: cause instanceof Error ? cause.message : "Tree-sitter parsing failed."};
+    return {
+      language,
+      status: "unavailable",
+      error: cause instanceof Error ? cause.message : "Tree-sitter parsing failed.",
+    };
   }
 }
 
 /** Inspect a parsed tree while its native resources are owned by this module. */
-export async function inspectWithTreeSitter<T>(path: string, source: string, inspect: (root: Node, language: string) => T, signal?: AbortSignal): Promise<TreeSitterInspection<T>> {
+export async function inspectWithTreeSitter<T>(
+  path: string,
+  source: string,
+  inspect: (root: Node, language: string) => T,
+  signal?: AbortSignal,
+): Promise<TreeSitterInspection<T>> {
   const language = languageForPath(path);
-  if (language === undefined) return {coverage: {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."}};
+  if (language === undefined)
+    return {
+      coverage: {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."},
+    };
   try {
     await initialize(signal);
     const parser = new Parser();
@@ -84,18 +97,28 @@ export async function inspectWithTreeSitter<T>(path: string, source: string, ins
     try {
       const grammar = await loadLanguage(language);
       parser.setLanguage(grammar);
-      tree = parser.parse(source, null, {progressCallback: () => {
-        if (signal?.aborted) throw new Error("Tree-sitter parsing cancelled.");
-      }});
+      tree = parser.parse(source, null, {
+        progressCallback: () => {
+          if (signal?.aborted) throw new Error("Tree-sitter parsing cancelled.");
+        },
+      });
       if (tree === null) return {coverage: {language, status: "unavailable", error: "Tree-sitter cancelled parsing."}};
-      const coverage: ParseCoverage = tree.rootNode.hasError ? {language, status: "partial", error: "The grammar reported one or more syntax errors."} : {language, status: "complete"};
+      const coverage: ParseCoverage = tree.rootNode.hasError
+        ? {language, status: "partial", error: "The grammar reported one or more syntax errors."}
+        : {language, status: "complete"};
       return tree.rootNode.hasError ? {coverage} : {coverage, value: inspect(tree.rootNode, language)};
     } finally {
       tree?.delete();
       parser.delete();
     }
   } catch (cause: unknown) {
-    return {coverage: {language, status: "unavailable", error: cause instanceof Error ? cause.message : "Tree-sitter inspection failed."}};
+    return {
+      coverage: {
+        language,
+        status: "unavailable",
+        error: cause instanceof Error ? cause.message : "Tree-sitter inspection failed.",
+      },
+    };
   }
 }
 
@@ -113,10 +136,28 @@ export async function probeTreeSitter(): Promise<ParserCapability> {
         // The probe reports the unavailable language through the aggregate reason.
       }
     }
-    if (available.length === 0) return {runtime: "available", grammars: "unavailable", languages: [], reason: "No pinned WASM grammar could be loaded."};
-    return {runtime: "available", grammars: available.length === Object.keys(grammarFiles).length ? "available" : "unavailable", languages: available, ...(available.length === Object.keys(grammarFiles).length ? {} : {reason: "One or more pinned WASM grammars could not be loaded."})};
+    if (available.length === 0)
+      return {
+        runtime: "available",
+        grammars: "unavailable",
+        languages: [],
+        reason: "No pinned WASM grammar could be loaded.",
+      };
+    return {
+      runtime: "available",
+      grammars: available.length === Object.keys(grammarFiles).length ? "available" : "unavailable",
+      languages: available,
+      ...(available.length === Object.keys(grammarFiles).length
+        ? {}
+        : {reason: "One or more pinned WASM grammars could not be loaded."}),
+    };
   } catch (cause: unknown) {
-    return {runtime: "unavailable", grammars: "unavailable", languages: [], reason: cause instanceof Error ? cause.message : "Tree-sitter runtime initialization failed."};
+    return {
+      runtime: "unavailable",
+      grammars: "unavailable",
+      languages: [],
+      reason: cause instanceof Error ? cause.message : "Tree-sitter runtime initialization failed.",
+    };
   }
 }
 
@@ -138,29 +179,48 @@ function loadLanguage(language: GrammarName): Promise<Language> {
 function languageForPath(path: string): GrammarName | undefined {
   const extension = path.slice(path.lastIndexOf(".")).toLowerCase();
   switch (extension) {
-    case ".c": case ".h": return "c";
-    case ".cc": case ".cpp": case ".cxx": case ".hpp": case ".hh": return "cpp";
-    case ".cs": return "csharp";
-    case ".go": return "go";
-    case ".java": return "java";
-    case ".kt": case ".kts": return "kotlin";
-    case ".js": case ".jsx": case ".mjs": case ".cjs": return "javascript";
-    case ".php": return "php";
-    case ".py": return "python";
-    case ".rb": return "ruby";
-    case ".rs": return "rust";
-    case ".swift": return "swift";
-    case ".tsx": return "tsx";
-    case ".ts": return "typescript";
-    default: return undefined;
+    case ".c":
+    case ".h":
+      return "c";
+    case ".cc":
+    case ".cpp":
+    case ".cxx":
+    case ".hpp":
+    case ".hh":
+      return "cpp";
+    case ".cs":
+      return "csharp";
+    case ".go":
+      return "go";
+    case ".java":
+      return "java";
+    case ".kt":
+    case ".kts":
+      return "kotlin";
+    case ".js":
+    case ".jsx":
+    case ".mjs":
+    case ".cjs":
+      return "javascript";
+    case ".php":
+      return "php";
+    case ".py":
+      return "python";
+    case ".rb":
+      return "ruby";
+    case ".rs":
+      return "rust";
+    case ".swift":
+      return "swift";
+    case ".tsx":
+      return "tsx";
+    case ".ts":
+      return "typescript";
+    default:
+      return undefined;
   }
 }
 
 function isGrammarName(value: string): value is GrammarName {
   return Object.hasOwn(grammarFiles, value);
-}
-
-/** Compute a digest for a shipped grammar file during release verification. */
-export async function grammarDigest(path: string): Promise<string> {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
 }

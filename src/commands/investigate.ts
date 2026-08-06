@@ -13,7 +13,14 @@ import {stableJson} from "../serialization.js";
 
 export default class Investigate extends BaseCommand {
   static override description = "Create a durable local investigation bundle from a scan.";
-  static override flags = {...globalFlags, finding: Flags.string({description: "Focus on one stable finding ID."}), "plan-only": Flags.boolean({description: "Create a measurement-planning bundle without executing workloads.", default: false})};
+  static override flags = {
+    ...globalFlags,
+    finding: Flags.string({description: "Focus on one stable finding ID."}),
+    "plan-only": Flags.boolean({
+      description: "Create a measurement-planning bundle without executing workloads.",
+      default: false,
+    }),
+  };
   static override args = {path: Args.string({description: "Repository or directory to investigate.", default: "."})};
 
   public async run(): Promise<void> {
@@ -22,8 +29,25 @@ export default class Investigate extends BaseCommand {
     try {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
       const finding = parsed.flags.finding;
-      if (finding !== undefined && !/^fg_[a-f0-9]{16}$/.test(finding)) this.emitProblem({schemaVersion: "footgun.problem.v1", code: "invalid-finding-id", message: "The investigation finding ID is not a stable Footgun finding ID.", recovery: "Pass an ID returned by `footgun scan <path> --format json`."}, 2, context);
-      const report = parsed.flags["plan-only"] ? undefined : await scanRepository(target, {configDigest: context.config.digest, excludes: context.config.exclude, maxFindings: context.config.maxFindings, signal: context.signal});
+      if (finding !== undefined && !/^fg_[a-f0-9]{16}$/.test(finding))
+        this.emitProblem(
+          {
+            schemaVersion: "footgun.problem.v1",
+            code: "invalid-finding-id",
+            message: "The investigation finding ID is not a stable Footgun finding ID.",
+            recovery: "Pass an ID returned by `footgun scan <path> --format json`.",
+          },
+          2,
+          context,
+        );
+      const report = parsed.flags["plan-only"]
+        ? undefined
+        : await scanRepository(target, {
+            configDigest: context.config.digest,
+            excludes: context.config.exclude,
+            maxFindings: context.config.maxFindings,
+            signal: context.signal,
+          });
       const digest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
       const id = `inv_${digest.slice(0, 16)}`;
       const directory = join(context.artifacts, "investigations", id);
@@ -35,16 +59,21 @@ export default class Investigate extends BaseCommand {
         id,
         state: "created",
         root: report?.repository.root ?? ".",
-        ...(report === undefined ? {callers: [], inputs: [], tests: [], workloads: [], assumptions: [], versions: {}} : {
-          repository: report.repository,
-          ...(report.sourceDigest === undefined ? {} : {sourceDigest: report.sourceDigest}),
-          callers: report.context?.calls.map((call) => `${call.callee} @ ${call.path}:${call.line}`) ?? [],
-          inputs: report.inventory?.manifests ?? [],
-          tests: report.inventory?.tests ?? [],
-          workloads: report.inventory?.benchmarks ?? [],
-          assumptions: report.assumptions,
-          versions: {footgun: report.tool.version, ...(report.context === undefined ? {} : {[report.context.tool.name]: report.context.tool.version})},
-        }),
+        ...(report === undefined
+          ? {callers: [], inputs: [], tests: [], workloads: [], assumptions: [], versions: {}}
+          : {
+              repository: report.repository,
+              ...(report.sourceDigest === undefined ? {} : {sourceDigest: report.sourceDigest}),
+              callers: report.context?.calls.map((call) => `${call.callee} @ ${call.path}:${call.line}`) ?? [],
+              inputs: report.inventory?.manifests ?? [],
+              tests: report.inventory?.tests ?? [],
+              workloads: report.inventory?.benchmarks ?? [],
+              assumptions: report.assumptions,
+              versions: {
+                footgun: report.tool.version,
+                ...(report.context === undefined ? {} : {[report.context.tool.name]: report.context.tool.version}),
+              },
+            }),
         createdAt: new Date().toISOString(),
         reports: [],
         evidence: [],
@@ -54,10 +83,30 @@ export default class Investigate extends BaseCommand {
       await recordInvestigationSnapshot(context.artifacts, createdBundle);
       const inventoriedBundle: InvestigationBundleV1 = {...createdBundle, state: "inventoried"};
       await recordInvestigationSnapshot(context.artifacts, inventoriedBundle);
-      const scannedBundle: InvestigationBundleV1 = report === undefined
-        ? {...inventoriedBundle, state: "measurement-planned"}
-        : {...inventoriedBundle, state: "scanned", reports: ["scan-report.json"], evidence: [{schemaVersion: "footgun.evidence.v1", id: `${id}:scan`, kind: "static", claimClass: "static-fact", summary: "Built-in structural scan", artifact: "scan-report.json", digest}], diagnostics: report.diagnostics};
-      const bundle: InvestigationBundleV1 = report?.context === undefined || scannedBundle.state !== "scanned" ? scannedBundle : {...scannedBundle, state: "context-resolved"};
+      const scannedBundle: InvestigationBundleV1 =
+        report === undefined
+          ? {...inventoriedBundle, state: "measurement-planned"}
+          : {
+              ...inventoriedBundle,
+              state: "scanned",
+              reports: ["scan-report.json"],
+              evidence: [
+                {
+                  schemaVersion: "footgun.evidence.v1",
+                  id: `${id}:scan`,
+                  kind: "static",
+                  claimClass: "static-fact",
+                  summary: "Built-in structural scan",
+                  artifact: "scan-report.json",
+                  digest,
+                },
+              ],
+              diagnostics: report.diagnostics,
+            };
+      const bundle: InvestigationBundleV1 =
+        report?.context === undefined || scannedBundle.state !== "scanned"
+          ? scannedBundle
+          : {...scannedBundle, state: "context-resolved"};
       const parsedBundle = Protocol.investigation.safeParse(bundle);
       if (!parsedBundle.success) throw new Error("Internal investigation bundle validation failed.");
       const bundlePath = join(directory, "bundle.json");
@@ -67,9 +116,28 @@ export default class Investigate extends BaseCommand {
       await printResult(bundle, `Investigation ${id}\nState: ${bundle.state}\nBundle: ${bundlePath}`, context);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
-      if (context.signal.aborted) this.emitProblem({schemaVersion: "footgun.problem.v1", code: "cancelled", message: "The investigation was cancelled.", recovery: "Rerun the investigation when the repository is available."}, 130, context);
+      if (context.signal.aborted)
+        this.emitProblem(
+          {
+            schemaVersion: "footgun.problem.v1",
+            code: "cancelled",
+            message: "The investigation was cancelled.",
+            recovery: "Rerun the investigation when the repository is available.",
+          },
+          130,
+          context,
+        );
       const message = cause instanceof Error ? cause.message : "Investigation failed.";
-      this.emitProblem({schemaVersion: "footgun.problem.v1", code: "investigation-failed", message, recovery: "Rerun with a readable local path."}, 1, context);
+      this.emitProblem(
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "investigation-failed",
+          message,
+          recovery: "Rerun with a readable local path.",
+        },
+        1,
+        context,
+      );
     }
   }
 }

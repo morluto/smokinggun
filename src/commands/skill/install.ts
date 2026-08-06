@@ -14,7 +14,11 @@ type FileDigest = {readonly relativePath: string; readonly digest: string};
 
 export default class SkillInstall extends BaseCommand {
   static override description = "Install the bundled Codex complexity-optimizer skill.";
-  static override flags = {...globalFlags, force: Flags.boolean({description: "Back up and replace an existing skill.", default: false}), "dry-run": Flags.boolean({description: "Show the destination and digest without writing.", default: false})};
+  static override flags = {
+    ...globalFlags,
+    force: Flags.boolean({description: "Back up and replace an existing skill.", default: false}),
+    "dry-run": Flags.boolean({description: "Show the destination and digest without writing.", default: false}),
+  };
   static override args = {};
 
   public async run(): Promise<void> {
@@ -27,10 +31,24 @@ export default class SkillInstall extends BaseCommand {
     const digest = await directoryDigest(source);
     const exists = await pathExists(destination);
     if (parsed.flags["dry-run"]) {
-      await this.emitStatus({schemaVersion: "footgun.skill-install.v1", destination, digest, dryRun: true, exists}, `Skill destination: ${destination}\nDigest: ${digest}\n${exists ? "Existing skill would require --force." : "Ready to install."}`, context);
+      await this.emitStatus(
+        {schemaVersion: "footgun.skill-install.v1", destination, digest, dryRun: true, exists},
+        `Skill destination: ${destination}\nDigest: ${digest}\n${exists ? "Existing skill would require --force." : "Ready to install."}`,
+        context,
+      );
       return;
     }
-    if (exists && !parsed.flags.force) this.emitProblem({schemaVersion: "footgun.problem.v1", code: "skill-destination-exists", message: `Skill destination already exists: ${destination}`, recovery: `Run \'footgun skill install --force\' to back it up before replacement.`}, 2, context);
+    if (exists && !parsed.flags.force)
+      this.emitProblem(
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "skill-destination-exists",
+          message: `Skill destination already exists: ${destination}`,
+          recovery: `Run 'footgun skill install --force' to back it up before replacement.`,
+        },
+        2,
+        context,
+      );
     await mkdir(dirname(destination), {recursive: true});
     const temporary = join(dirname(destination), `.complexity-optimizer.${randomUUID()}.tmp`);
     let backup: string | undefined;
@@ -47,7 +65,11 @@ export default class SkillInstall extends BaseCommand {
       const installedDigest = await directoryDigest(destination);
       if (installedDigest !== digest) throw new Error("Installed skill digest verification failed.");
       installed = true;
-      await this.emitStatus({schemaVersion: "footgun.skill-install.v1", destination, digest, dryRun: false, exists, backup}, `Installed $complexity-optimizer at ${destination}\nDigest: ${digest}${backup === undefined ? "" : `\nBackup: ${backup}`}`, context);
+      await this.emitStatus(
+        {schemaVersion: "footgun.skill-install.v1", destination, digest, dryRun: false, exists, backup},
+        `Installed $complexity-optimizer at ${destination}\nDigest: ${digest}${backup === undefined ? "" : `\nBackup: ${backup}`}`,
+        context,
+      );
     } catch (cause: unknown) {
       await rm(temporary, {recursive: true, force: true}).catch(() => undefined);
       let restoreFailure: string | undefined;
@@ -62,7 +84,16 @@ export default class SkillInstall extends BaseCommand {
         await rm(destination, {recursive: true, force: true}).catch(() => undefined);
       }
       const message = `${cause instanceof Error ? cause.message : "Skill installation failed."}${restoreFailure === undefined ? "" : ` Backup restoration also failed: ${restoreFailure}`}`;
-      this.emitProblem({schemaVersion: "footgun.problem.v1", code: "skill-install-failed", message, recovery: "Check CODEX_HOME permissions and rerun the install."}, 1, context);
+      this.emitProblem(
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "skill-install-failed",
+          message,
+          recovery: "Check CODEX_HOME permissions and rerun the install.",
+        },
+        1,
+        context,
+      );
     }
   }
 
@@ -87,9 +118,10 @@ async function copyDirectory(source: string, destination: string): Promise<void>
 }
 
 async function validateBundledSkill(source: string): Promise<void> {
-  const files = [...await filesIn(source)].sort(comparePortable);
+  const files = [...(await filesIn(source))].sort(comparePortable);
   const expected = ["SKILL.md", "agents/openai.yaml"];
-  if (files.length !== expected.length || files.some((file, index) => file !== expected[index])) throw new Error("Bundled skill contents do not match the Footgun skill contract.");
+  if (files.length !== expected.length || files.some((file, index) => file !== expected[index]))
+    throw new Error("Bundled skill contents do not match the Footgun skill contract.");
 }
 
 async function directoryDigest(directory: string): Promise<string> {
@@ -100,7 +132,10 @@ async function directoryDigest(directory: string): Promise<string> {
     const content = await readFile(path);
     entries.push({relativePath, digest: createHash("sha256").update(content).digest("hex")});
   }
-  const encoded = entries.sort((left, right) => comparePortable(left.relativePath, right.relativePath)).map((entry) => `${entry.relativePath}\0${entry.digest}`).join("\n");
+  const encoded = entries
+    .sort((left, right) => comparePortable(left.relativePath, right.relativePath))
+    .map((entry) => `${entry.relativePath}\0${entry.digest}`)
+    .join("\n");
   return createHash("sha256").update(encoded).digest("hex");
 }
 
@@ -110,7 +145,7 @@ async function filesIn(directory: string, prefix = ""): Promise<ReadonlyArray<st
   for (const entry of entries) {
     const relativePath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
     if (entry.isSymbolicLink()) throw new Error(`Skill contains an unsupported symlink: ${relativePath}`);
-    if (entry.isDirectory()) files.push(...await filesIn(join(directory, entry.name), relativePath));
+    if (entry.isDirectory()) files.push(...(await filesIn(join(directory, entry.name), relativePath)));
     else if (entry.isFile()) files.push(relativePath);
   }
   return files;

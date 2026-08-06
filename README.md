@@ -40,3 +40,14 @@ Static scans are read-only, offline, and do not execute repository code or modif
 ## About
 
 Footgun supports structural and semantic scanning, repository context, SARIF/SCIP and benchmark imports, and JSON, Markdown, SARIF, and terminal reports. Missing or failed coverage remains visible instead of being treated as a clean scan.
+
+## Development
+
+Requires Node 22+ and pnpm 11.20.0.
+
+```bash
+pnpm install
+pnpm typecheck && pnpm test && pnpm build
+```
+
+Quality gates: `pnpm lint` (oxlint), `pnpm format:check` (oxfmt), `pnpm knip`, `pnpm check:boundaries`, and `pnpm test:coverage`. Run `pnpm changeset` to record a release change intent. `pnpm test:cli` and `pnpm test:package` exercise the built package end-to-end.

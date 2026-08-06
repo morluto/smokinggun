@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    versioning-strategy: increase
+    groups:
+      tooling:
+        patterns:
+          - "oxlint"
+          - "oxfmt"
+          - "knip"
+          - "simple-git-hooks"
+          - "@changesets/*"
+          - "@vitest/*"
+          - "vitest"
+          - "vite-plus"
+    open-pull-requests-limit: 10
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5

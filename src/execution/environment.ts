@@ -1,10 +1,23 @@
 import {isAbsolute, relative} from "node:path";
 import {portablePath} from "../paths.js";
 
-const inheritedEnvironmentKeys = new Set(["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "SystemRoot", "ComSpec"]);
+const inheritedEnvironmentKeys = new Set([
+  "PATH",
+  "HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "SystemRoot",
+  "ComSpec",
+]);
 
 /** Provide only non-secret process settings unless a workload explicitly opts into full inheritance. */
-export function executionEnvironment(explicit: Readonly<Record<string, string>>, inheritAll: boolean): Record<string, string> {
+export function executionEnvironment(
+  explicit: Readonly<Record<string, string>>,
+  inheritAll: boolean,
+): Record<string, string> {
   const inherited: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && (inheritAll || inheritedEnvironmentKeys.has(key))) inherited[key] = value;
@@ -14,7 +27,10 @@ export function executionEnvironment(explicit: Readonly<Record<string, string>>,
 
 /** Redact secret-looking values before putting subprocess details into diagnostics. */
 export function redactSensitive(value: string): string {
-  return value.replace(/((?:token|password|passwd|secret|api[_-]?key|authorization)[=:\s]+)([^\s,]+)/gi, "$1[REDACTED]");
+  return value.replace(
+    /((?:token|password|passwd|secret|api[_-]?key|authorization)[=:\s]+)([^\s,]+)/gi,
+    "$1[REDACTED]",
+  );
 }
 
 /** Keep reproduction commands useful while removing host paths and secret-looking arguments. */
