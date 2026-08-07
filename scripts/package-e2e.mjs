@@ -16,7 +16,30 @@ const registryConfig = join(sandbox, "config.yaml");
 const storage = join(sandbox, "storage");
 const packageTarball = join(root, `${packageJson.name}-${packageJson.version}.tgz`);
 const password = "footgun-password";
-const config = `storage: ${storage}\nweb:\n  enable: false\nauth:\n  htpasswd:\n    file: ${join(sandbox, "htpasswd")}\nuplinks:\n  npmjs:\n    url: https://registry.npmjs.org/\npackages:\n  '**':\n    access: $all\n    publish: $all\n    unpublish: $all\n    proxy: npmjs\nlog:\n  type: stdout\n  format: pretty\n  level: warn\n`;
+const config = `storage: ${storage}
+web:
+  enable: false
+auth:
+  htpasswd:
+    file: ${join(sandbox, "htpasswd")}
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+packages:
+  '${packageJson.name}':
+    access: $all
+    publish: $all
+    unpublish: $all
+  '**':
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy: npmjs
+log:
+  type: stdout
+  format: pretty
+  level: warn
+`;
 
 await writeFile(registryConfig, config, "utf8");
 await writeFile(
@@ -97,6 +120,7 @@ try {
     "npx",
     [
       "--yes",
+      "--loglevel=error",
       `--package=${packageJson.name}@${packageJson.version}`,
       "--",
       "smokinggun",
@@ -115,6 +139,7 @@ try {
     "npx",
     [
       "--yes",
+      "--loglevel=error",
       `--package=${packageJson.name}@${packageJson.version}`,
       "--",
       "smokinggun",
