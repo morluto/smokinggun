@@ -19,4 +19,13 @@ describe("pinned Tree-sitter runtime", () => {
     expect(valid.status).toBe("complete");
     expect(invalid.status).toBe("partial");
   });
+
+  it("parses Rust raw identifiers used as bindings and references", async () => {
+    const coverage = await parseWithTreeSitter(
+      "raw-identifier.rs",
+      "fn main() { let raw = String::new(); let _borrowed = &raw; }",
+    );
+
+    expect(coverage).toEqual({language: "rust", status: "complete"});
+  });
 });
