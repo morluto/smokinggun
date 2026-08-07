@@ -42,6 +42,22 @@ it("uses immutable artifact digests in comparison identity", () => {
   expect(first.id).not.toBe(replacedCandidate.id);
 });
 
+it("blocks promotion when recorded Node runtimes differ", () => {
+  const baseline = scaling("base", [10, 20]);
+  const candidate = {...scaling("candidate", [8, 16]), environment: {node: "20", platform: "test", arch: "test"}};
+  const result = buildScalingComparison(
+    baseline,
+    candidate,
+    "baseline.json",
+    "candidate.json",
+    "b".repeat(64),
+    "c".repeat(64),
+  );
+  expect(result.comparability).toMatchObject({status: "cross-machine"});
+  expect(result.promotion).toBe("blocked");
+  expect(result.promotionReasons).toContain("cross-machine-results-not-comparable");
+});
+
 it("blocks scaling promotion when a point has an isolation downgrade", () => {
   const base = scaling("base", [10, 20]);
   const candidate = scaling("candidate", [5, 10]);
