@@ -31,6 +31,13 @@ export async function storeArtifact(
     const destinationInfo = await lstat(destination);
     if (destinationInfo.isSymbolicLink() || !destinationInfo.isFile())
       throw new Error("The content-addressed artifact destination is not a regular file.");
+    if (destinationInfo.size !== bytes.byteLength)
+      throw new Error("The content-addressed artifact destination does not match its digest.");
+    const existingDigest = createHash("sha256")
+      .update(await readFile(destination))
+      .digest("hex");
+    if (existingDigest !== digest)
+      throw new Error("The content-addressed artifact destination does not match its digest.");
   } catch (cause: unknown) {
     if (!(cause instanceof Error && "code" in cause && cause.code === "ENOENT")) throw cause;
     const temporary = join(directory, `.${digest}.${randomUUID()}.tmp`);
