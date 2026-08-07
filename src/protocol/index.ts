@@ -184,6 +184,13 @@ const scanReportSchema = z.strictObject({
     .optional(),
   configDigest: z.string().regex(/^[a-f0-9]{64}$/),
   findings: z.array(findingSchema),
+  findingSummary: z
+    .strictObject({
+      total: z.number().int().nonnegative(),
+      emitted: z.number().int().nonnegative(),
+      truncated: z.boolean(),
+    })
+    .optional(),
   coverage: z.array(coverageSchema),
   context: contextIndexSchema.optional(),
   diagnostics: z.array(problemSchema),

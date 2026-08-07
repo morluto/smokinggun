@@ -26,6 +26,24 @@ describe("repository scan seam", () => {
     }
   }, 30_000);
 
+  it("reports bounded findings while retaining the full policy set", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-limit-"));
+    try {
+      await writeFile(
+        join(root, "fixture.ts"),
+        "for (const item of items) { for (const other of items) values.includes(other); }\n",
+        "utf8",
+      );
+      const report = await scanRepository(root, {configDigest: "e".repeat(64), maxFindings: 1});
+      expect(report.findingSummary).toEqual({total: 3, emitted: 1, truncated: true});
+      expect(report.findings).toHaveLength(1);
+      expect(report.policyFindings).toHaveLength(3);
+      expect(JSON.parse(JSON.stringify(report))).not.toHaveProperty("policyFindings");
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("records repository inventory and invokes a configured adapter only through the versioned boundary", async () => {
     const root = await mkdtemp(join(tmpdir(), "footgun-scan-adapter-"));
     try {
