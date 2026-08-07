@@ -29,4 +29,20 @@ describe("standard benchmark importers", () => {
     const invalid = importBenchmark({benchmarks: []}, {tool: "jmh"});
     expect("code" in invalid && invalid.code).toBe("invalid-jmh");
   });
+
+  it("converts JMH throughput to milliseconds per operation", () => {
+    const result = importBenchmark(
+      [
+        {
+          benchmark: "Example.run",
+          mode: "thrpt",
+          primaryMetric: {score: 1000, scoreUnit: "ops/s"},
+        },
+      ],
+      {tool: "jmh"},
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.records[0]).toMatchObject({samplesMs: [1], medianMs: 1, sourceUnit: "ops/s"});
+  });
 });
