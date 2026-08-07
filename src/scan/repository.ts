@@ -551,7 +551,7 @@ async function repositoryIdentity(root: string): Promise<ScanReportV1["repositor
     reject: false,
     stdin: "ignore",
   });
-  const dirtyResult = await execa("git", ["status", "--porcelain", "--untracked-files=no"], {
+  const dirtyResult = await execa("git", ["status", "--porcelain", "--untracked-files=all"], {
     cwd: repositoryRoot,
     reject: false,
     stdin: "ignore",
