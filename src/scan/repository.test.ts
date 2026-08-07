@@ -49,6 +49,7 @@ describe("repository scan seam", () => {
         configDigest: "c".repeat(64),
         adapterManifests: [manifest],
         scanners: ["auto"],
+        allowAdapterExecution: true,
       });
       expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 1, extensions: [".ts"]});
       expect(report.findings.some((finding) => finding.scanner === "fixture-adapter")).toBe(true);

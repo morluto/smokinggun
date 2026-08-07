@@ -19,6 +19,10 @@ export default class Scan extends BaseCommand {
       description: "External adapter manifest path; repeat to configure adapters.",
       multiple: true,
     }),
+    "allow-adapter-execution": Flags.boolean({
+      description: "Authorize execution of explicitly configured external adapters.",
+      default: false,
+    }),
   };
   static override args = {path: Args.string({description: "Repository or directory to scan.", default: "."})};
 
@@ -38,6 +42,7 @@ export default class Scan extends BaseCommand {
         ...(scanner === undefined ? {} : {scanners: scanner}),
         ...(only === undefined ? {} : {only}),
         adapterManifests: [...context.config.adapters, ...(adapter ?? [])],
+        allowAdapterExecution: parsed.flags["allow-adapter-execution"],
       });
       const rendered = renderScanReport(report, context.config.format);
       await writeResult(rendered, context);

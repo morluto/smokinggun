@@ -43,6 +43,7 @@ export type ScanOptions = {
   readonly scanners?: ReadonlyArray<string>;
   readonly only?: ReadonlyArray<string>;
   readonly adapterManifests?: ReadonlyArray<string>;
+  readonly allowAdapterExecution?: boolean;
 };
 
 /** Scan one local repository without executing source code or contacting the network. */
@@ -202,6 +203,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     files,
     selectedScanners,
     options.signal,
+    options.allowAdapterExecution ?? false,
   );
   findings.push(...adapterRun.findings);
   parseDiagnostics.push(...adapterRun.diagnostics);
@@ -320,6 +322,7 @@ async function runConfiguredAdapters(
   files: ReadonlyArray<string>,
   selected: ReadonlySet<string> | undefined,
   signal?: AbortSignal,
+  allowAdapterExecution = false,
 ): Promise<{
   readonly findings: ReadonlyArray<FindingV1>;
   readonly coverage: ReadonlyArray<CoverageRecordV1>;
@@ -351,7 +354,7 @@ async function runConfiguredAdapters(
         })),
       rawArtifacts: [],
     };
-  const loaded = await loadExternalAdapters(manifestPaths, root, signal);
+  const loaded = await loadExternalAdapters(manifestPaths, root, signal, allowAdapterExecution);
   const findings: FindingV1[] = [];
   const coverage: CoverageRecordV1[] = [];
   const diagnostics: ProblemV1[] = [...loaded.diagnostics];
