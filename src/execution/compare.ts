@@ -134,7 +134,9 @@ export function buildMultiScalingComparison(
       candidate.points.every((point) => point.behaviorValidated),
     improvement,
     comparable: environmentsMatch(baseline.environment, candidate.environment),
-    downgradeReasons: [],
+    downgradeReasons: [...baseline.points, ...candidate.points].flatMap(
+      (point) => point.isolation?.downgradeReasons ?? ["isolation-evidence-missing"],
+    ),
     digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
   });
   return {

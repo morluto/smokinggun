@@ -9,6 +9,19 @@ type StoredInvestigation = {
   readonly digest: string;
 };
 
+const reportAttachableStates = new Set<InvestigationBundleV1["state"]>([
+  "scanned",
+  "context-resolved",
+  "measurement-planned",
+  "baseline-measured",
+  "candidate-compared",
+  "behavior-validated",
+]);
+
+export function canAttachReport(bundle: InvestigationBundleV1): boolean {
+  return reportAttachableStates.has(bundle.state);
+}
+
 /** Read the newest immutable investigation snapshot, falling back to its initial bundle. */
 export async function loadLatestInvestigation(dataRoot: string, id: string): Promise<StoredInvestigation | undefined> {
   const directory = investigationDirectory(dataRoot, id);

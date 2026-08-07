@@ -26,7 +26,9 @@ export function buildTypeScriptIndex(
   signal?: AbortSignal,
 ): TypeScriptIndexResult {
   const absoluteRoot = resolve(root);
+  const canonical = (path: string): string => (ts.sys.useCaseSensitiveFileNames ? path : path.toLowerCase());
   const sourcePaths = files.filter((path) => supportedExtensions.has(extensionOf(path))).map((path) => resolve(path));
+  const selectedPaths = new Set(sourcePaths.map(canonical));
   if (sourcePaths.length === 0) return {state: "unavailable", diagnostics: []};
   try {
     const program = ts.createProgram(sourcePaths, {
@@ -48,7 +50,12 @@ export function buildTypeScriptIndex(
 
     for (const sourceFile of program.getSourceFiles()) {
       signal?.throwIfAborted();
-      if (sourceFile.isDeclarationFile || !isWithinRoot(absoluteRoot, resolve(sourceFile.fileName))) continue;
+      if (
+        sourceFile.isDeclarationFile ||
+        !isWithinRoot(absoluteRoot, resolve(sourceFile.fileName)) ||
+        !selectedPaths.has(canonical(resolve(sourceFile.fileName)))
+      )
+        continue;
       const relativePath = portablePath(relative(absoluteRoot, sourceFile.fileName));
       const visit = (node: ts.Node): void => {
         signal?.throwIfAborted();

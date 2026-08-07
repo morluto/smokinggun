@@ -21,6 +21,7 @@ export function renderScanReport(report: ScanReportV1, format: OutputFormat): st
 
 /** Convert a scan report to SARIF while retaining SmokingGun evidence in properties. */
 export function toSarif(report: ScanReportV1): Record<string, unknown> {
+  const truncation = findingTruncation(report);
   return {
     version: "2.1.0",
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
@@ -83,6 +84,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
           coverage: report.coverage,
           nextAction: report.nextAction,
           filesModified: report.filesModified,
+          ...(truncation === undefined ? {} : {findingTruncation: truncation}),
         },
       },
     ],
@@ -90,6 +92,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
 }
 
 function renderMarkdown(report: ScanReportV1): string {
+  const truncation = findingTruncation(report);
   const lines = [
     "# SmokingGun scan",
     "",
@@ -98,6 +101,7 @@ function renderMarkdown(report: ScanReportV1): string {
     `Dirty: ${report.repository.dirty}`,
     `Configuration digest: \`${report.configDigest}\``,
     `Findings: ${report.findings.length}`,
+    ...(truncation === undefined ? [] : [`Finding output truncated: ${truncation.message}`]),
     ...(report.inventory === undefined
       ? []
       : [
@@ -156,10 +160,12 @@ function renderMarkdown(report: ScanReportV1): string {
 }
 
 function renderHuman(report: ScanReportV1): string {
+  const truncation = findingTruncation(report);
   const lines = [
     `SmokingGun scan: ${report.repository.root}`,
     `${report.findings.length} candidate${report.findings.length === 1 ? "" : "s"}; coverage ${report.coverage.map((entry) => entry.parseStatus).join(", ")}`,
     `Assumptions: ${report.assumptions.join("; ")}`,
+    ...(truncation === undefined ? [] : [truncation.message]),
   ];
   for (const finding of report.findings)
     lines.push(
@@ -168,6 +174,11 @@ function renderHuman(report: ScanReportV1): string {
   if (report.findings.length === 0) lines.push("No complexity candidates were found.");
   if (report.diagnostics.length > 0) lines.push(`Diagnostics: ${report.diagnostics.length}`);
   return `${lines.join("\n")}\n`;
+}
+
+function findingTruncation(report: ScanReportV1): {readonly message: string} | undefined {
+  const diagnostic = report.diagnostics.find((entry) => entry.code === "findings-truncated");
+  return diagnostic === undefined ? undefined : {message: diagnostic.message};
 }
 
 export function parseReportArtifact(

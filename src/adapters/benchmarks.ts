@@ -189,7 +189,9 @@ function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRe
     const rawData = arrayValue(metric.rawData)?.flatMap((group) => finiteArray(group) ?? []) ?? [];
     const score = finiteNumber(metric.score);
     const unit = metric.scoreUnit;
-    const mode = typeof entry.mode === "string" ? entry.mode : "unknown";
+    const declaredMode = typeof entry.mode === "string" ? entry.mode : undefined;
+    const throughputUnit = /^ops\/(s|sec|ms|us|µs|ns|min)$/i.test(unit);
+    const mode = declaredMode ?? (throughputUnit ? "thrpt" : "unknown");
     const values = rawData.length > 0 ? rawData : score === undefined ? [] : [score];
     const normalized =
       mode === "thrpt"

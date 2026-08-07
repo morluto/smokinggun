@@ -46,7 +46,7 @@ export async function storeArtifact(
 async function readRegularFile(path: string, maxBytes: number): Promise<Buffer> {
   let handle;
   try {
-    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   } catch (cause: unknown) {
     if (cause instanceof Error && "code" in cause && cause.code === "ELOOP")
       throw new Error("Only regular, non-symlink files can be stored as artifacts.");

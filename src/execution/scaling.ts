@@ -26,6 +26,12 @@ export async function measureScaling(
       "Provide a strict workload with an input-size parameterization.",
     );
   const workload = parsed.data;
+  if (workload.multiParameterization !== undefined)
+    return problem(
+      "scaling-profile-unavailable",
+      "A multi-parameter workload must use the multi-scaling runner.",
+      "Call measureMultiScaling for a multiParameterization descriptor.",
+    );
   const parameter = workload.inputSizeParameterization;
   if (parameter === undefined)
     return problem(
@@ -151,6 +157,13 @@ export async function measureMultiScaling(
       "A scaling command index is outside the declared command.",
       "Point every commandIndex at an existing argument.",
     );
+  const coordinateCount = design.coordinates === undefined ? cartesianCoordinateCount(design.parameters) : undefined;
+  if (coordinateCount !== undefined && coordinateCount > design.maxPoints)
+    return problem(
+      "scaling-points-limit-exceeded",
+      "The scaling coordinate plan exceeds maxPoints.",
+      "Reduce parameter values, provide explicit coordinates, or raise maxPoints up to 64.",
+    );
   const coordinates = design.coordinates ?? cartesianCoordinates(design.parameters);
   if (coordinates.length > design.maxPoints)
     return problem(
@@ -211,6 +224,7 @@ export async function measureMultiScaling(
         statisticalPolicy: measurement.statisticalPolicy,
         timedOut: false,
         behaviorValidated: measurement.behaviorValidated,
+        isolation: measurement.isolation,
         ...(measurement.behaviorValidated ? {} : {diagnostic: "behavior-check-failed"}),
       });
     }
@@ -253,6 +267,10 @@ function cartesianCoordinates(
       coordinates.flatMap((coordinate) => parameter.values.map((value) => ({...coordinate, [parameter.name]: value}))),
     [{}],
   );
+}
+
+function cartesianCoordinateCount(parameters: ReadonlyArray<{readonly values: ReadonlyArray<number>}>): number {
+  return parameters.reduce((count, parameter) => count * parameter.values.length, 1);
 }
 
 function appendCancelledPoints(

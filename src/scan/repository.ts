@@ -196,7 +196,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       };
   findings.push(...semantic.findings);
   parseDiagnostics.push(...semantic.diagnostics);
-  const repository = await repositoryIdentity(root);
+  const repository = await repositoryIdentity(root, files);
   const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
   const sourceDigest = sourceHasher.digest("hex");
   const adapterRun = await runConfiguredAdapters(
@@ -256,6 +256,16 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       path: portablePath(relative(pathRoot, path)),
       recovery: "Replace the symlink with a regular source file before scanning.",
     })),
+    ...(allFindings.length === policyFindings.length
+      ? []
+      : [
+          {
+            schemaVersion: "footgun.problem.v1" as const,
+            code: "findings-truncated",
+            message: `Emitted ${allFindings.length} of ${policyFindings.length} findings due to the configured limit.`,
+            recovery: "Increase maxFindings to review the remaining findings.",
+          },
+        ]),
   ];
   const parserRecords = [...parserCoverage.entries()]
     .sort(([left], [right]) => comparePortable(left, right))
@@ -263,10 +273,16 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       scanner: "footgun.tree-sitter",
       version: "0.26.11",
       language,
-      filesDiscovered: entry.discovered,
+      filesDiscovered:
+        entry.discovered + skippedSourceSymlinks.filter((file) => sourceLanguage(file) === language).length,
       filesAnalyzed: entry.analyzed,
       parseStatus: entry.unavailable > 0 ? "unavailable" : entry.partial > 0 ? "partial" : "complete",
-      skippedFiles: entry.skipped.sort(comparePortable),
+      skippedFiles: [
+        ...entry.skipped,
+        ...skippedSourceSymlinks
+          .filter((file) => sourceLanguage(file) === language)
+          .map((file) => portablePath(relative(pathRoot, file))),
+      ].sort(comparePortable),
       ...(entry.reasons.size === 0 ? {} : {reason: [...entry.reasons].sort(comparePortable).join(" ")}),
     }));
   const semanticCoverage: CoverageRecordV1 | undefined = analyzedFiles.some((file) => isTypeScriptPath(file))
@@ -305,11 +321,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     sourceDigest,
     configDigest: options.configDigest,
     findings: allFindings,
-    findingSummary: {
-      total: policyFindings.length,
-      emitted: allFindings.length,
-      truncated: allFindings.length < policyFindings.length,
-    },
     coverage: [
       coverage,
       ...parserRecords,
@@ -329,7 +340,9 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         : "Inspect the highest-ranked finding, resolve repository context, and declare behavior checks before measuring.",
     filesModified: [],
     rawArtifacts: [...adapterRun.rawArtifacts],
-    rawArtifactDigests: adapterRun.rawArtifactDigests,
+    ...(Object.keys(adapterRun.rawArtifactDigests).length === 0
+      ? {}
+      : {rawArtifactDigests: adapterRun.rawArtifactDigests}),
   };
   return Object.defineProperty(report, "policyFindings", {value: policyFindings}) as ScanRepositoryResult;
 }
@@ -578,7 +591,18 @@ function extensionOf(path: string): string {
   return index < 0 ? "" : path.slice(index);
 }
 
-async function repositoryIdentity(root: string): Promise<ScanReportV1["repository"]> {
+function sourceLanguage(path: string): string {
+  const extension = extensionOf(path).toLowerCase();
+  if (extension === ".py") return "python";
+  if ([".ts", ".tsx"].includes(extension)) return "typescript";
+  if ([".js", ".jsx", ".mjs", ".cjs"].includes(extension)) return "javascript";
+  return extension.slice(1);
+}
+
+async function repositoryIdentity(
+  root: string,
+  analyzedFiles: ReadonlyArray<string>,
+): Promise<ScanReportV1["repository"]> {
   const info = await stat(root);
   const repositoryRoot = info.isDirectory() ? root : resolve(root, "..");
   const revisionResult = await execa("git", ["rev-parse", "HEAD"], {
@@ -591,11 +615,25 @@ async function repositoryIdentity(root: string): Promise<ScanReportV1["repositor
     reject: false,
     stdin: "ignore",
   });
+  const ignoredAnalyzed = await execa(
+    "git",
+    [
+      "ls-files",
+      "--others",
+      "--ignored",
+      "--exclude-standard",
+      "--",
+      ...analyzedFiles.map((file) => relative(repositoryRoot, file)),
+    ],
+    {cwd: repositoryRoot, reject: false, stdin: "ignore"},
+  );
   return {
     // Portable reports must not leak the host checkout path.
     root: ".",
     revision: revisionResult.exitCode === 0 ? revisionResult.stdout.trim() || null : null,
-    dirty: dirtyResult.exitCode === 0 && dirtyResult.stdout.trim().length > 0,
+    dirty:
+      (dirtyResult.exitCode === 0 && dirtyResult.stdout.trim().length > 0) ||
+      (ignoredAnalyzed.exitCode === 0 && ignoredAnalyzed.stdout.trim().length > 0),
   };
 }
 

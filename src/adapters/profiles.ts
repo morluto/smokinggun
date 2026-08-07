@@ -88,7 +88,7 @@ export function importPprof(input: Uint8Array, options: ProfileImportOptions): P
       return problem(
         "pprof-decompressed-output-too-large",
         "The gzip-compressed pprof profile exceeds the decompressed output limit.",
-        "Use a pprof artifact whose decompressed size is at most 64 MiB.",
+        `Use a pprof artifact whose decompressed size is at most ${(options.maxDecompressedBytes ?? defaultMaxPprofDecompressedBytes) / (1024 * 1024)} MiB.`,
       );
     return problem(
       "pprof-decode-failed",

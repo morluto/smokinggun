@@ -75,7 +75,8 @@ export async function loadExternalAdapters(
       continue;
     }
     if (!allowExecution) {
-      const reason = "Adapter execution requires explicit authorization.";
+      const reason =
+        "Adapter execution requires explicit authorization; rerun with --allow-adapter-execution to probe it.";
       diagnostics.push(
         problem(
           "adapter-execution-required",

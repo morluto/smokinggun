@@ -175,7 +175,7 @@ const contextIndexSchema = z.strictObject({
 
 const scanReportSchema = z.strictObject({
   schemaVersion: version("footgun.scan-report.v1"),
-  tool: z.strictObject({name: z.literal("smokinggun"), version: z.string().min(1)}),
+  tool: z.strictObject({name: z.enum(["footgun", "smokinggun"]), version: z.string().min(1)}),
   repository: repositorySchema,
   inventory: inventorySchema.optional(),
   sourceDigest: z
@@ -184,13 +184,6 @@ const scanReportSchema = z.strictObject({
     .optional(),
   configDigest: z.string().regex(/^[a-f0-9]{64}$/),
   findings: z.array(findingSchema),
-  findingSummary: z
-    .strictObject({
-      total: z.number().int().nonnegative(),
-      emitted: z.number().int().nonnegative(),
-      truncated: z.boolean(),
-    })
-    .optional(),
   coverage: z.array(coverageSchema),
   context: contextIndexSchema.optional(),
   diagnostics: z.array(problemSchema),
@@ -199,7 +192,7 @@ const scanReportSchema = z.strictObject({
   nextAction: z.string().optional(),
   filesModified: z.array(z.string()).default([]),
   rawArtifacts: z.array(z.string()),
-  rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
+  rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
 });
 
 const adapterManifestSchema = z.strictObject({

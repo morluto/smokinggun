@@ -45,7 +45,8 @@ export default class Investigate extends BaseCommand {
         : await scanRepository(target, {
             configDigest: context.config.digest,
             excludes: context.config.exclude,
-            maxFindings: context.config.maxFindings,
+            maxFindings: Number.MAX_SAFE_INTEGER,
+            adapterManifests: context.config.adapters,
             signal: context.signal,
           });
       if (finding !== undefined) {
@@ -77,10 +78,10 @@ export default class Investigate extends BaseCommand {
       const directory = join(context.artifacts, "investigations", id);
       if (parsed.flags["plan-only"]) {
         const existing = await loadLatestInvestigation(context.artifacts, id);
-        if (existing !== undefined) {
+        if (existing !== undefined && !["created", "inventoried"].includes(existing.bundle.state)) {
           await printResult(
             existing.bundle,
-            `Investigation ${id}\nState: ${existing.bundle.state}\nBundle: ${join(directory, "bundle.json")}`,
+            `Investigation ${id}\nState: ${existing.bundle.state}\nBundle: ${join(directory, "snapshots", `${existing.digest}.json`)}`,
             context,
           );
           return;

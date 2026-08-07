@@ -8,7 +8,7 @@ export {importPprof, importPerfettoSummary} from "./adapters/profiles.js";
 export {runSubprocessAdapter} from "./adapters/subprocess.js";
 export {loadExternalAdapters} from "./scanners/external.js";
 export {measureWorkload, parseMeasurement, parseMeasurementArtifact} from "./execution/measure.js";
-export {measureScaling} from "./execution/scaling.js";
+export {measureMultiScaling, measureScaling} from "./execution/scaling.js";
 export {importScip} from "./context/scip.js";
 export {buildTypeScriptIndex} from "./context/index.js";
 export {scanPythonSemantic} from "./scanners/python-semantic.js";

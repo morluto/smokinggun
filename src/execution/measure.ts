@@ -52,16 +52,25 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       "This runner does not silently collapse an input-size series into one measurement.",
       "Measure one declared input point at a time or use a scaling-capable runner.",
     );
+  if (workload.multiParameterization !== undefined)
+    return problem(
+      "scaling-profile-unavailable",
+      "This runner does not silently collapse a multi-parameter series into one measurement.",
+      "Use measureMultiScaling for a declared multi-parameter scaling plan.",
+    );
   if (
     workload.resourceLimits?.cpuMs !== undefined ||
     workload.resourceLimits?.memoryBytes !== undefined ||
     workload.resourceLimits?.maxProcesses !== undefined
   )
-    return problem(
-      "resource-limit-unavailable",
-      "The available runners cannot enforce every requested CPU, memory, or process limit.",
-      "Use a runner with resource-limit support and remove an unsupported limit only when that control is acceptable.",
-    );
+    if (workload.requestedProfile === "container-exec" && workload.resourceLimits?.cpuMs === undefined) {
+      // Docker and Podman apply memory and process controls in the container runner.
+    } else
+      return problem(
+        "resource-limit-unavailable",
+        "The available runners cannot enforce every requested CPU, memory, or process limit.",
+        "Use a runner with resource-limit support and remove an unsupported limit only when that control is acceptable.",
+      );
   const cwd = resolve(options.root, workload.cwd);
   const root = resolve(options.root);
   if (!isWithinRoot(root, cwd))

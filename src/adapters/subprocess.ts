@@ -1,6 +1,6 @@
 import {isAbsolute, relative, resolve} from "node:path";
 import {constants} from "node:fs";
-import {open, realpath} from "node:fs/promises";
+import {lstat, open, realpath} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
 import {Protocol, type AdapterResultV1, type ProblemV1} from "../protocol/index.js";
@@ -133,6 +133,13 @@ async function checkArtifacts(
   root: string,
   maxArtifactBytes: number,
 ): Promise<ProblemV1 | undefined> {
+  for (const artifact of Object.keys(result.rawArtifactDigests))
+    if (!result.rawArtifacts.includes(artifact))
+      return problem(
+        "artifact-digest-undeclared",
+        "An adapter declared a digest for an artifact it did not return.",
+        "Return digests only for rawArtifacts entries.",
+      );
   const realRoot = await realpath(root).catch(() => resolve(root));
   for (const artifact of result.rawArtifacts) {
     if (isAbsolute(artifact))
@@ -161,7 +168,9 @@ async function checkArtifacts(
         "An adapter artifact resolves outside the repository boundary or does not exist.",
         "Keep artifacts inside the declared repository/artifact root.",
       );
-    const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => undefined);
+    const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(
+      () => undefined,
+    );
     if (handle === undefined)
       return problem(
         "artifact-invalid",
@@ -169,6 +178,12 @@ async function checkArtifacts(
         "Return regular files below the repository artifact boundary.",
       );
     try {
+      if ((await lstat(resolved)).isSymbolicLink())
+        return problem(
+          "artifact-invalid",
+          "An adapter artifact is not a regular file or is a symlink.",
+          "Return regular files below the repository artifact boundary.",
+        );
       const info = await handle.stat();
       if (!info.isFile())
         return problem(

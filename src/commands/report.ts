@@ -11,7 +11,7 @@ import {importPerfettoSummary, importPerfettoTrace, importPprof} from "../adapte
 import {printResult} from "../cli/command-output.js";
 import {createHash} from "node:crypto";
 import type {RuntimeContext} from "../cli/context.js";
-import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
+import {canAttachReport, loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
 import {comparePortable} from "../paths.js";
 import {resolve} from "node:path";
 import {z} from "zod";
@@ -45,6 +45,10 @@ export default class Report extends BaseCommand {
           const investigation = await loadLatestInvestigation(context.artifacts, parsed.flags.investigation);
           if (investigation === undefined)
             throw new Error(`Investigation ${parsed.flags.investigation} does not exist.`);
+          if (!canAttachReport(investigation.bundle))
+            throw new Error(
+              `Investigation ${parsed.flags.investigation} is in ${investigation.bundle.state} state and cannot accept reports.`,
+            );
         } catch (cause: unknown) {
           this.emitProblem(
             {
@@ -206,6 +210,7 @@ async function recordReportedArtifact(
   if (investigationId === undefined) return;
   const stored = await loadLatestInvestigation(context.artifacts, investigationId);
   if (stored === undefined) return;
+  if (!canAttachReport(stored.bundle)) throw new Error(`Investigation ${investigationId} cannot accept reports.`);
   const claimClass =
     kind === "benchmark"
       ? ("constant-factor" as const)

@@ -35,7 +35,7 @@ describe("repository scan seam", () => {
         "utf8",
       );
       const report = await scanRepository(root, {configDigest: "e".repeat(64), maxFindings: 1});
-      expect(report.findingSummary).toEqual({total: 3, emitted: 1, truncated: true});
+      expect(report.diagnostics).toContainEqual(expect.objectContaining({code: "findings-truncated"}));
       expect(report.findings).toHaveLength(1);
       expect(report.policyFindings).toHaveLength(3);
       expect(JSON.parse(JSON.stringify(report))).not.toHaveProperty("policyFindings");

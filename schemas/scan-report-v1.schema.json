@@ -11,7 +11,10 @@
       "properties": {
         "name": {
           "type": "string",
-          "const": "smokinggun"
+          "enum": [
+            "footgun",
+            "smokinggun"
+          ]
         },
         "version": {
           "type": "string",
@@ -389,30 +392,6 @@
         "additionalProperties": false
       }
     },
-    "findingSummary": {
-      "type": "object",
-      "properties": {
-        "total": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "emitted": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "truncated": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "total",
-        "emitted",
-        "truncated"
-      ],
-      "additionalProperties": false
-    },
     "coverage": {
       "type": "array",
       "items": {
@@ -765,7 +744,6 @@
       }
     },
     "rawArtifactDigests": {
-      "default": {},
       "type": "object",
       "propertyNames": {
         "type": "string"
@@ -787,8 +765,7 @@
     "timings",
     "assumptions",
     "filesModified",
-    "rawArtifacts",
-    "rawArtifactDigests"
+    "rawArtifacts"
   ],
   "additionalProperties": false
 }
