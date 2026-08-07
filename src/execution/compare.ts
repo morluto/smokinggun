@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
-import type {ComparisonV1, MeasurementV1, ScalingAnalysisV1} from "../protocol/index.js";
+import type {ComparisonV1, MeasurementV1, ScalingAnalysisV1, ScalingAnalysisV2} from "../protocol/index.js";
 
 export function buildMeasurementComparison(
   baseline: MeasurementV1,
@@ -99,6 +99,60 @@ export function buildScalingComparison(
     ...(baseline.points[0] === undefined ? {} : {statisticalPolicy: baseline.points[0].statisticalPolicy}),
     ...(baseline.selectedModel === undefined ? {} : {baselineModel: baseline.selectedModel}),
     ...(candidate.selectedModel === undefined ? {} : {candidateModel: candidate.selectedModel}),
+  };
+}
+
+export function buildMultiScalingComparison(
+  baseline: ScalingAnalysisV2,
+  candidate: ScalingAnalysisV2,
+  baselinePath: string,
+  candidatePath: string,
+  baselineDigest?: string,
+  candidateDigest?: string,
+): ComparisonV1 {
+  const points = baseline.points.map((point, index) => {
+    const other = candidate.points[index];
+    const deltaPercent = point.medianMs === 0 ? 0 : (((other?.medianMs ?? 0) - point.medianMs) / point.medianMs) * 100;
+    return {
+      value: point.value,
+      coordinates: point.coordinates,
+      baselineMedianMs: point.medianMs,
+      candidateMedianMs: other?.medianMs ?? 0,
+      deltaPercent,
+      improvement:
+        other !== undefined &&
+        isImprovement(point.medianMs, other.medianMs, point.quartiles, other.quartiles, point.statisticalPolicy),
+      statisticalPolicy: point.statisticalPolicy,
+    };
+  });
+  const improvement = points.length > 0 && points.every((point) => point.improvement);
+  const reasons = promotionReasons({
+    behaviorValidated:
+      baseline.points.every((point) => point.behaviorValidated) &&
+      candidate.points.every((point) => point.behaviorValidated),
+    improvement,
+    comparable: environmentsMatch(baseline.environment, candidate.environment),
+    downgradeReasons: [],
+    digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
+  });
+  return {
+    schemaVersion: "footgun.comparison.v1",
+    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest),
+    mode: "scaling",
+    baseline: baselinePath,
+    candidate: candidatePath,
+    workloadDigest: baseline.workloadDigest,
+    behaviorValidated:
+      baseline.points.every((point) => point.behaviorValidated) &&
+      candidate.points.every((point) => point.behaviorValidated),
+    improvement,
+    comparability: comparability(baseline.environment, candidate.environment),
+    promotion: promotionStatus(reasons),
+    promotionReasons: reasons,
+    ...(baselineDigest === undefined ? {} : {baselineDigest}),
+    ...(candidateDigest === undefined ? {} : {candidateDigest}),
+    points,
+    ...(baseline.points[0] === undefined ? {} : {statisticalPolicy: baseline.points[0].statisticalPolicy}),
   };
 }
 

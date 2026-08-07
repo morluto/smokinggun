@@ -4,6 +4,7 @@ import {
   Protocol,
   type ProblemV1,
   type ScalingAnalysisV1,
+  type ScalingAnalysisV2,
   type ScalingModelV1,
   type ScalingPointV1,
 } from "../protocol/index.js";
@@ -111,6 +112,167 @@ export async function measureScaling(
     environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
     limitations,
   };
+}
+
+/** Measure a bounded two-parameter coordinate plan without fitting a multivariate model. */
+export async function measureMultiScaling(
+  input: unknown,
+  options: MeasurementOptions,
+): Promise<ScalingAnalysisV2 | ProblemV1> {
+  const parsed = Protocol.workload.safeParse(input);
+  if (!parsed.success)
+    return problem(
+      "invalid-workload",
+      "The workload is not a valid WorkloadV1 descriptor.",
+      "Provide a strict workload.",
+    );
+  const workload = parsed.data;
+  const design = workload.multiParameterization;
+  if (design === undefined)
+    return problem(
+      "scaling-parameters-missing",
+      "The workload does not declare a multi-parameter scaling plan.",
+      "Add multiParameterization.",
+    );
+  const names = design.parameters.map((parameter) => parameter.name);
+  if (
+    new Set(names).size !== names.length ||
+    new Set(design.parameters.map((parameter) => parameter.commandIndex)).size !== names.length
+  )
+    return problem(
+      "scaling-parameters-invalid",
+      "Scaling parameter names and command indexes must be distinct.",
+      "Declare distinct names and commandIndex values.",
+    );
+  if (design.parameters.some((parameter) => parameter.commandIndex >= workload.command.length))
+    return problem(
+      "scaling-command-index-invalid",
+      "A scaling command index is outside the declared command.",
+      "Point every commandIndex at an existing argument.",
+    );
+  const coordinates = design.coordinates ?? cartesianCoordinates(design.parameters);
+  if (coordinates.length > design.maxPoints)
+    return problem(
+      "scaling-points-limit-exceeded",
+      "The scaling coordinate plan exceeds maxPoints.",
+      "Reduce parameter values, provide explicit coordinates, or raise maxPoints up to 64.",
+    );
+  if (
+    coordinates.some(
+      (coordinate) =>
+        !names.every((name) => Number.isFinite(coordinate[name])) ||
+        Object.keys(coordinate).some((name) => !names.includes(name)),
+    )
+  )
+    return problem(
+      "scaling-coordinates-invalid",
+      "Every coordinate must contain exactly the declared numeric parameter names.",
+      "Provide complete named coordinates.",
+    );
+  const {inputSizeParameterization: _single, multiParameterization: _multi, ...baseWorkload} = workload;
+  const points: ScalingAnalysisV2["points"] = [];
+  for (const [index, coordinate] of coordinates.entries()) {
+    if (options.signal?.aborted) {
+      appendCancelledPoints(points, coordinates.slice(index), workload.statisticalPolicy);
+      break;
+    }
+    const command = [...workload.command];
+    for (const parameter of design.parameters) command[parameter.commandIndex] = String(coordinate[parameter.name]);
+    const measurement = await measureWorkload({...baseWorkload, command}, options);
+    if ("code" in measurement) {
+      points.push({
+        value: points.length,
+        coordinates: coordinate,
+        status: measurement.code === "measurement-timeout" ? "timed-out" : "failed",
+        samplesMs: [],
+        medianMs: 0,
+        meanMs: 0,
+        quartiles: {q1Ms: 0, q3Ms: 0},
+        statisticalPolicy: workload.statisticalPolicy,
+        timedOut: measurement.code === "measurement-timeout",
+        behaviorValidated: false,
+        diagnostic: measurement.code,
+      });
+      if (measurement.code === "measurement-cancelled") {
+        points[points.length - 1] = {...points[points.length - 1]!, status: "cancelled", diagnostic: measurement.code};
+        appendCancelledPoints(points, coordinates.slice(index + 1), workload.statisticalPolicy);
+        break;
+      }
+    } else {
+      points.push({
+        value: points.length,
+        coordinates: coordinate,
+        status: "complete",
+        samplesMs: measurement.samplesMs,
+        medianMs: measurement.medianMs,
+        meanMs: measurement.meanMs,
+        quartiles: measurement.quartiles,
+        statisticalPolicy: measurement.statisticalPolicy,
+        timedOut: false,
+        behaviorValidated: measurement.behaviorValidated,
+        ...(measurement.behaviorValidated ? {} : {diagnostic: "behavior-check-failed"}),
+      });
+    }
+  }
+  const workloadDigest = createHash("sha256").update(stableJson(workload)).digest("hex");
+  const coordinatesDigest = createHash("sha256").update(stableJson(coordinates)).digest("hex");
+  const id = `scale_${createHash("sha256").update(`${workloadDigest}\0${coordinatesDigest}\0${Date.now()}`).digest("hex").slice(0, 16)}`;
+  const root = resolve(options.root);
+  const cwd = resolve(root, workload.cwd);
+  return {
+    schemaVersion: "footgun.scaling.v2",
+    id,
+    workloadDigest,
+    parameters: names,
+    coordinatesDigest,
+    points,
+    reproduction: {
+      command: redactCommand(workload.command, root),
+      cwd: portablePath(relative(root, cwd) || "."),
+      environmentKeys: Object.keys(executionEnvironment(workload.environment, workload.inheritEnvironment)).sort(),
+      timeoutMs: workload.timeoutMs,
+      warmups: workload.warmups,
+      repetitions: workload.repetitions,
+      expectedArtifacts: workload.expectedArtifacts.map((artifact) => portablePath(artifact)).sort(),
+      datasetDigests: workload.datasetDigests,
+    },
+    environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
+    limitations: [
+      "This bounded coordinate grid does not claim a multivariate asymptotic law.",
+      ...(points.some((point) => point.status !== "complete") ? ["One or more coordinates did not complete."] : []),
+    ],
+  };
+}
+
+function cartesianCoordinates(
+  parameters: ReadonlyArray<{readonly name: string; readonly values: ReadonlyArray<number>}>,
+): Array<Record<string, number>> {
+  return parameters.reduce<Array<Record<string, number>>>(
+    (coordinates, parameter) =>
+      coordinates.flatMap((coordinate) => parameter.values.map((value) => ({...coordinate, [parameter.name]: value}))),
+    [{}],
+  );
+}
+
+function appendCancelledPoints(
+  points: ScalingAnalysisV2["points"],
+  coordinates: ReadonlyArray<Record<string, number>>,
+  statisticalPolicy: ScalingAnalysisV2["points"][number]["statisticalPolicy"],
+): void {
+  for (const coordinate of coordinates)
+    points.push({
+      value: points.length,
+      coordinates: coordinate,
+      status: "cancelled",
+      samplesMs: [],
+      medianMs: 0,
+      meanMs: 0,
+      quartiles: {q1Ms: 0, q3Ms: 0},
+      statisticalPolicy,
+      timedOut: false,
+      behaviorValidated: false,
+      diagnostic: "measurement-cancelled",
+    });
 }
 
 function fitModels(points: ReadonlyArray<ScalingPointV1>): ScalingModelV1[] {

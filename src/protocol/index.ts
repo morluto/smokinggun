@@ -293,6 +293,22 @@ const workloadSchema = z.strictObject({
       commandIndex: z.number().int().nonnegative(),
     })
     .optional(),
+  multiParameterization: z
+    .strictObject({
+      parameters: z
+        .array(
+          z.strictObject({
+            name: z.string().min(1),
+            values: z.array(z.number().finite()).min(1),
+            commandIndex: z.number().int().nonnegative(),
+          }),
+        )
+        .min(2)
+        .max(2),
+      coordinates: z.array(z.record(z.string(), z.number().finite())).min(1).optional(),
+      maxPoints: z.number().int().positive().max(64),
+    })
+    .optional(),
   datasetDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
   resourceLimits: z
     .strictObject({
@@ -490,6 +506,25 @@ const scalingSchema = z.strictObject({
   artifact: z.string().optional(),
 });
 
+const multiScalingPointSchema = scalingPointSchema.omit({status: true}).extend({
+  status: z.enum(["complete", "timed-out", "failed", "cancelled"]),
+  coordinates: z.record(z.string(), z.number().finite()),
+});
+
+const multiScalingSchema = z.strictObject({
+  schemaVersion: version("footgun.scaling.v2"),
+  id: z.string().regex(/^scale_[a-f0-9]{16}$/),
+  investigation: z.string().optional(),
+  workloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  parameters: z.array(z.string().min(1)).min(2).max(2),
+  coordinatesDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  points: z.array(multiScalingPointSchema).min(1),
+  reproduction: reproductionSchema,
+  environment: z.strictObject({node: z.string(), platform: z.string(), arch: z.string()}),
+  limitations: z.array(z.string()),
+  artifact: z.string().optional(),
+});
+
 const comparisonSchema = z.strictObject({
   schemaVersion: version("footgun.comparison.v1"),
   id: z.string().regex(/^cmp_[a-f0-9]{16}$/),
@@ -512,6 +547,7 @@ const comparisonSchema = z.strictObject({
     .array(
       z.strictObject({
         value: z.number().finite(),
+        coordinates: z.record(z.string(), z.number().finite()).optional(),
         baselineMedianMs: z.number().nonnegative(),
         candidateMedianMs: z.number().nonnegative(),
         deltaPercent: z.number().finite(),
@@ -608,6 +644,7 @@ export type TraceSummaryV1 = z.infer<typeof traceSummarySchema>;
 export type ScalingPointV1 = z.infer<typeof scalingPointSchema>;
 export type ScalingModelV1 = z.infer<typeof scalingModelSchema>;
 export type ScalingAnalysisV1 = z.infer<typeof scalingSchema>;
+export type ScalingAnalysisV2 = z.infer<typeof multiScalingSchema>;
 export type ComparisonV1 = z.infer<typeof comparisonSchema>;
 export type InvestigationBundleV1 = z.infer<typeof investigationSchema>;
 export type InvestigationPointerV1 = z.infer<typeof investigationPointerSchema>;
@@ -632,6 +669,7 @@ export const Protocol = {
   profileSummary: profileSummarySchema,
   traceSummary: traceSummarySchema,
   scaling: scalingSchema,
+  multiScaling: multiScalingSchema,
   comparison: comparisonSchema,
   investigation: investigationSchema,
   investigationPointer: investigationPointerSchema,
