@@ -137,7 +137,7 @@ export function buildMultiScalingComparison(
   });
   return {
     schemaVersion: "footgun.comparison.v1",
-    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest),
+    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
     mode: "scaling",
     baseline: baselinePath,
     candidate: candidatePath,
