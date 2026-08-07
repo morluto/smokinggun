@@ -1,5 +1,6 @@
 import {spawn} from "node:child_process";
-import {access, chmod, mkdtemp, rm, writeFile} from "node:fs/promises";
+import {createHash} from "node:crypto";
+import {access, chmod, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 
@@ -59,6 +60,12 @@ try {
     investigation.stderr.length !== 0
   )
     throw new Error("investigation lifecycle contract failed");
+  const storedScan = await readFile(
+    join(root, ".cli-smoke-data", "investigations", investigationValue.id, "scan-report.json"),
+  );
+  const storedScanDigest = createHash("sha256").update(storedScan).digest("hex");
+  if (investigationValue.evidence[0]?.digest !== storedScanDigest)
+    throw new Error("investigation scan evidence digest must match its stored artifact");
 
   const firstPlan = await run([
     entry,

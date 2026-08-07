@@ -48,8 +48,8 @@ export default class Investigate extends BaseCommand {
             maxFindings: context.config.maxFindings,
             signal: context.signal,
           });
-      const digest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
-      const id = `inv_${digest.slice(0, 16)}`;
+      const investigationDigest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
+      const id = `inv_${investigationDigest.slice(0, 16)}`;
       const directory = join(context.artifacts, "investigations", id);
       if (parsed.flags["plan-only"]) {
         const existing = await loadLatestInvestigation(context.artifacts, id);
@@ -64,7 +64,11 @@ export default class Investigate extends BaseCommand {
       }
       await mkdir(directory, {recursive: true});
       const reportPath = join(directory, "scan-report.json");
-      if (report !== undefined) await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+      const reportBytes =
+        report === undefined ? undefined : Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8");
+      const reportDigest =
+        reportBytes === undefined ? undefined : createHash("sha256").update(reportBytes).digest("hex");
+      if (reportBytes !== undefined) await writeFile(reportPath, reportBytes);
       const createdBundle: InvestigationBundleV1 = {
         schemaVersion: "footgun.investigation-bundle.v1",
         id,
@@ -109,7 +113,7 @@ export default class Investigate extends BaseCommand {
                   claimClass: "static-fact",
                   summary: "Built-in structural scan",
                   artifact: "scan-report.json",
-                  digest,
+                  digest: reportDigest,
                 },
               ],
               diagnostics: report.diagnostics,
