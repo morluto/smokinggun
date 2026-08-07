@@ -26,17 +26,21 @@ The current verifier reports:
 - all 14 pinned grammars present.
 
 The packed tarball was published to a temporary local Verdaccio registry and
-installed into a consumer directory outside the checkout. npm install twice,
-npm exec, offline npm exec, global installation, scanner listing, doctor, and
-skill installation all succeeded; doctor loaded all 14 grammars.
+installed into a consumer directory outside the checkout. npm installation,
+npx execution from outside the checkout, global installation, scanner listing,
+and doctor all succeeded; doctor loaded all 14 grammars. The packed skill was
+present at `skills/footgun/SKILL.md`, and no agent directory was created during
+npm installation.
 
-## Skill installation
+## Skill distribution
 
-footgun skill install is explicit, validates bundled files and symlink
-boundaries, refuses an existing destination unless --force is supplied,
-supports dry runs, backs up the exact destination before replacement, writes
-through a temporary directory, and verifies the installed digest. Failure
-handling restores the backup when replacement cannot complete.
+The optional skill is installed with the shared Skills CLI:
+
+```bash
+npx skills add https://github.com/morluto/footgun --skill footgun
+```
+
+Footgun does not modify agent configuration or silently install packages.
 
 ## External release gate
 

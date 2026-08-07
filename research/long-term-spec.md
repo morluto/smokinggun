@@ -1,4 +1,4 @@
-# Footgun / Complexity Optimizer long-term specification
+# Footgun long-term specification
 
 Status: design target; no implementation is implied by this document.
 
@@ -6,9 +6,9 @@ This project has two deliberately separate names and responsibilities:
 
 | Surface | Name | Responsibility |
 | --- | --- | --- |
-| npm package | `footgun` | Distribute the CLI, scanner backends, adapters, and Codex skill |
+| npm package | `footgun` | Distribute the CLI, scanner backends, adapters, and agent skill |
 | CLI command | `footgun` | Run scans, combine scanner results, and produce reports |
-| Codex skill | `$complexity-optimizer` | Teach Codex when and how to use `footgun` |
+| Agent skill | `$footgun` | Teach compatible agent hosts when and how to use `footgun` |
 | repository/product | Footgun | Own the complete project and its research corpus |
 
 The scanner is the primary product. The skill is a thin distribution and
@@ -21,7 +21,7 @@ multiple static-analysis and, later, runtime-analysis backends. It generates
 optimization candidates and explains the evidence behind them. It does not
 claim to prove arbitrary program complexity or guarantee a universal speedup.
 
-The core product must remain useful without Codex:
+The core product must remain useful without an agent host:
 
 ```bash
 npx footgun scan .
@@ -38,7 +38,7 @@ footgun scanners list
 footgun report
 ```
 
-The skill adds agent guidance, not a second implementation. A Codex session
+The skill adds agent guidance, not a second implementation. An agent session
 should be able to invoke the CLI, inspect its structured output, read relevant
 source context, and write a report without reimplementing scanner behavior in
 prompt instructions.
@@ -87,13 +87,13 @@ footgun doctor            Check runtime, parser, and optional-tool availability
 
 `scan` is the first-class path. `investigate`, `measure`, and `compare` extend
 the scanner into an evidence workflow without moving that responsibility into
-the Codex skill.
+the agent skill.
 
 Illustrative options:
 
 ```bash
 footgun scan . --scanner auto --format json
-footgun scan . --scanner python-ast --max-findings 80
+footgun scan . --scanner python-semantic --max-findings 80
 footgun scan . --only language:typescript --exclude test,dist
 footgun investigate . --finding F-014 --plan-only
 footgun measure . --workload ./benchmarks/import-users.json --execute
@@ -160,7 +160,7 @@ an artifact, but it is not required for downstream consumers.
 ```json
 {
   "id": "F-014",
-  "scanner": "python-ast",
+  "scanner": "python-semantic",
   "scanner_version": "1.0.0",
   "language": "python",
   "location": {
@@ -424,27 +424,25 @@ footgun/
     scanners/
     adapters/
     reports/
-  skill/
-    SKILL.md
-    agents/openai.yaml
-    references/
+  skills/
+    footgun/
+      SKILL.md
   package.json
 ```
 
-The package’s public binary is `footgun`. Skill installation is explicit:
+The package’s public binary is `footgun`. Skill distribution is explicit:
 
 ```bash
-npx footgun skill install
+npx skills add https://github.com/morluto/footgun --skill footgun
 ```
 
-The package should not silently overwrite an existing skill directory during
-ordinary installation. Upgrades must either preserve local changes, detect
-unexpected files, or provide an explicit recovery path.
+The package must not modify an agent directory during ordinary npm
+installation. The shared Skills CLI owns placement, conflict handling, and
+updates.
 
-## Codex skill contract
+## Agent skill contract
 
-`$complexity-optimizer` should remain concise and procedural. It should tell
-Codex:
+`$footgun` should remain concise and procedural. It should tell an agent:
 
 1. establish repository scope and available tools;
 2. run `footgun scan` for a first pass;
@@ -464,7 +462,7 @@ skill’s interpretation rules must use the same normalized finding vocabulary.
 
 The CLI must support both machine and human consumers:
 
-- stable JSON for scripts and Codex;
+- stable JSON for scripts and compatible agents;
 - Markdown for repository reports;
 - concise terminal summaries for interactive use;
 - raw artifacts for detailed scanner or profiler inspection.
@@ -524,7 +522,7 @@ The complete product needs additional validation layers:
 - behavior tests covering empty inputs, duplicates, ordering, mutation, errors,
   permissions, pagination, caching, and cancellation;
 - package tests from the packed npm artifact, not only the source checkout;
-- skill forward tests using realistic Codex prompts.
+- skill discovery tests using a real Skills CLI in a temporary project.
 
 No optimization recommendation is considered validated unless the applicable
 behavior and measurement gates pass or the report explicitly states the gap.
@@ -533,11 +531,11 @@ behavior and measurement gates pass or the report explicitly states the gap.
 
 ### Foundation
 
-- Establish `footgun` package and `$complexity-optimizer` skill names.
+- Establish `footgun` package and `$footgun` skill names.
 - Expose the `footgun` binary.
 - Define the normalized finding schema and coverage states.
 - Remove destructive or implicit package installation behavior.
-- Add packed-artifact and isolated-skill installation tests.
+- Add packed-artifact and isolated Skills CLI discovery tests.
 
 ### Scanner core
 

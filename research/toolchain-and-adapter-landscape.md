@@ -3,8 +3,8 @@
 Research pass: 2026-08-05.
 
 This pass focused on the pieces that determine whether Footgun can support
-many languages through one `footgun` CLI while keeping `$complexity-optimizer`
-as a thin Codex skill. It used current Context7 documentation, DeepWiki
+many languages through one `footgun` CLI while keeping `$footgun`
+as a thin, host-neutral agent skill. It used current Context7 documentation, DeepWiki
 repository views, and the available GitContribute corpus.
 
 ## Findings at a glance
@@ -301,4 +301,4 @@ validation of concrete decisions:
 
 There is no current need to research MCP architecture further. The target is a
 `footgun` CLI distributed in the `footgun` npm package, with
-`$complexity-optimizer` teaching Codex how to invoke and interpret it.
+`$footgun` teaching compatible agent hosts how to invoke and interpret it.

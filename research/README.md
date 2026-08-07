@@ -2,7 +2,7 @@
 
 This directory records the release audit, literature review, scanner evaluation,
 hybrid architecture, roadmap, and validation design for the
-`$complexity-optimizer` skill and the `footgun` CLI.
+`$footgun` skill and the `footgun` CLI.
 
 The conclusion is intentionally conservative: static analysis generates
 candidates, but it is not evidence that a change improves a real workload.
@@ -34,7 +34,7 @@ npm pack --dry-run --json
 See the individual reports for the evidence and decisions:
 
 - [Comprehensive research report](comprehensive-report.md)
-- [Footgun / Complexity Optimizer long-term specification](long-term-spec.md)
+- [Footgun long-term specification](long-term-spec.md)
 - [Research log](research-log.md)
 - [Release and package integrity](release-integrity.md)
 - [Literature matrix](literature-matrix.md)
