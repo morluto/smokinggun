@@ -11,7 +11,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "const": "footgun"
+          "const": "smokinggun"
         },
         "version": {
           "type": "string",

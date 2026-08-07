@@ -1,6 +1,7 @@
 import {shouldPrint, writeResult} from "./output.js";
 import type {RuntimeContext} from "./context.js";
 import type {OutputFormat} from "../config.js";
+import {toolIdentity} from "../tool-identity.js";
 
 export async function printResult(value: unknown, human: string, context: RuntimeContext): Promise<void> {
   const rendered = renderCommandResult(value, human, context.config.format);
@@ -22,7 +23,7 @@ function toGenericSarif(value: unknown, human: string): Record<string, unknown> 
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
     runs: [
       {
-        tool: {driver: {name: "footgun", version: "1.0.0"}},
+        tool: {driver: toolIdentity},
         results: [],
         invocations: [{executionSuccessful: true}],
         properties: {message: human, value},

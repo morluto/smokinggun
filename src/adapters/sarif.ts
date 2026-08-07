@@ -5,6 +5,7 @@ import {z} from "zod";
 import type {ScanReportV1, FindingV1, ProtocolProblemV1} from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
+import {toolIdentity} from "../tool-identity.js";
 
 const sarifLocation = z.looseObject({
   physicalLocation: z
@@ -148,7 +149,7 @@ export function importSarif(
   const analyzedPaths = new Set(findings.map((finding) => finding.location.path));
   return {
     schemaVersion: "footgun.scan-report.v1",
-    tool: {name: "footgun", version: "1.0.0"},
+    tool: toolIdentity,
     repository: {root: ".", revision: null, dirty: false},
     configDigest,
     findings,
