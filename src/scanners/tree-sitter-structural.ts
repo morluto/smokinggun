@@ -56,10 +56,10 @@ function collectFindings(root: Node, path: string): ReadonlyArray<FindingV1> {
           path,
           node.startPosition.row + 1,
           "nested-or-callback-loop",
-          "high",
+          "medium",
           "Tree-sitter found an iterative region inside another iterative region.",
           "Check whether indexing, grouping, batching, or a single-pass algorithm can remove repeated scans.",
-          ["the inner iteration count depends on an outer iteration"],
+          ["input bounds, runtime frequency, and dependency between the iterations are unknown"],
         ),
       );
     if (

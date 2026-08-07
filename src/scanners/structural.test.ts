@@ -9,6 +9,10 @@ describe("structural scanner", () => {
     );
     expect(result.parseStatus).toBe("complete");
     expect(result.findings.map((finding) => finding.ruleId)).toEqual(["nested-or-callback-loop", "repeated-scan"]);
+    expect(result.findings[0]).toMatchObject({
+      severity: "medium",
+      assumptions: ["input bounds, runtime frequency, and dependency between the iterations are unknown"],
+    });
   });
 
   it("deduplicates a finding with the same stable location and rule", () => {
