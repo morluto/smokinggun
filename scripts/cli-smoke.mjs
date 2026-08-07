@@ -60,6 +60,35 @@ try {
   )
     throw new Error("investigation lifecycle contract failed");
 
+  const firstPlan = await run([
+    entry,
+    "investigate",
+    "fixtures/corpus/typescript",
+    "--plan-only",
+    "--format",
+    "json",
+    "--non-interactive",
+  ]);
+  const secondPlan = await run([
+    entry,
+    "investigate",
+    "fixtures/corpus/typescript",
+    "--plan-only",
+    "--format",
+    "json",
+    "--non-interactive",
+  ]);
+  const firstPlanValue = JSON.parse(firstPlan.stdout);
+  const secondPlanValue = JSON.parse(secondPlan.stdout);
+  if (
+    firstPlan.code !== 0 ||
+    secondPlan.code !== 0 ||
+    firstPlanValue.id !== secondPlanValue.id ||
+    firstPlanValue.state !== "measurement-planned" ||
+    secondPlanValue.state !== "measurement-planned"
+  )
+    throw new Error("plan-only investigations must be repeatable");
+
   const scanArtifact = join(sandbox, "scan-report.json");
   await writeFile(scanArtifact, scan.stdout, "utf8");
   const renderedReport = await run([entry, "report", scanArtifact, "--format", "json"]);
