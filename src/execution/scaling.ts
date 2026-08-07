@@ -73,6 +73,7 @@ export async function measureScaling(
       statisticalPolicy: measurement.statisticalPolicy,
       timedOut: false,
       behaviorValidated: measurement.behaviorValidated,
+      isolation: measurement.isolation,
       ...(measurement.behaviorValidated ? {} : {diagnostic: "behavior-check-failed"}),
     });
   }

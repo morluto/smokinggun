@@ -489,6 +489,7 @@ const scalingPointSchema = z.strictObject({
   }),
   timedOut: z.boolean(),
   behaviorValidated: z.boolean(),
+  isolation: measurementSchema.shape.isolation.optional(),
   diagnostic: z.string().optional(),
 });
 
