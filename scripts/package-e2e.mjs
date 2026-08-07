@@ -1,8 +1,8 @@
-import {execFile, spawn} from "node:child_process";
 import {createHash} from "node:crypto";
-import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
+import {execFile, spawn} from "node:child_process";
+import {access, mkdir, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
-import {join, resolve} from "node:path";
+import {join} from "node:path";
 import {createServer} from "node:net";
 import {promisify} from "node:util";
 
@@ -29,7 +29,11 @@ await writeFile(
   `registry=${registry}\n//127.0.0.1:${registryPort}/:_auth=${Buffer.from(`footgun:${password}`).toString("base64")}\nalways-auth=true\n`,
   "utf8",
 );
-await run("npm", ["pack", "--ignore-scripts", "--pack-destination", root], {cwd: root, maxBuffer: 1_000_000});
+await run("npm", ["pack", "--ignore-scripts", "--pack-destination", root], {
+  cwd: root,
+  maxBuffer: 1_000_000,
+});
+
 let registryProcess;
 try {
   registryProcess = await startRegistry();
@@ -37,78 +41,70 @@ try {
     cwd: sandbox,
     maxBuffer: 1_000_000,
   });
+
+  const target = join(sandbox, "target");
+  await mkdir(target, {recursive: true});
+  await writeFile(
+    join(target, "example.js"),
+    "const values = [1, 2, 3];\nfor (const value of values) console.log(value);\n",
+    "utf8",
+  );
+
   const consumer = join(sandbox, "consumer");
+  const home = join(sandbox, "home");
+  const npmCache = join(sandbox, "npm-cache");
+  const consumerEnv = {
+    ...process.env,
+    HOME: home,
+    XDG_CONFIG_HOME: join(home, ".config"),
+    XDG_DATA_HOME: join(home, ".local", "share"),
+    npm_config_cache: npmCache,
+  };
   await run(
     "npm",
-    [
-      "install",
-      "--prefix",
-      consumer,
-      `${packageJson.name}@${packageJson.version}`,
-      "--registry",
-      registry,
-      "--ignore-scripts",
-    ],
-    {cwd: sandbox, maxBuffer: 1_000_000},
+    ["install", "--prefix", consumer, `${packageJson.name}@${packageJson.version}`, "--registry", registry],
+    {cwd: sandbox, env: consumerEnv, maxBuffer: 1_000_000},
   );
-  await run(
-    "npm",
-    [
-      "install",
-      "--prefix",
-      consumer,
-      `${packageJson.name}@${packageJson.version}`,
-      "--registry",
-      registry,
-      "--ignore-scripts",
-    ],
-    {cwd: sandbox, maxBuffer: 1_000_000},
+
+  const installedManifest = JSON.parse(
+    await readFile(join(consumer, "node_modules", packageJson.name, "package.json"), "utf8"),
   );
+  if (installedManifest.scripts?.postinstall !== undefined)
+    throw new Error("packed package defines a postinstall script");
+  for (const agentDirectory of [".claude", ".cursor", ".agents", "skills"]) {
+    if (await pathExists(join(home, agentDirectory)))
+      throw new Error(`package install wrote agent directory ${agentDirectory}`);
+  }
+
   const executable = join(consumer, "node_modules", ".bin", "footgun");
   const doctor = await run(executable, ["doctor", "--format", "json", "--non-interactive"], {
     cwd: sandbox,
+    env: consumerEnv,
     maxBuffer: 1_000_000,
   });
   const doctorValue = JSON.parse(doctor.stdout);
   if (doctorValue.schemaVersion !== "footgun.doctor.v1")
     throw new Error("packed consumer doctor returned an unexpected document");
-  const codexHome = join(sandbox, "codex-home");
-  const skill = await run(executable, ["skill", "install", "--format", "json"], {
-    cwd: sandbox,
-    env: {...process.env, CODEX_HOME: codexHome},
-    maxBuffer: 1_000_000,
-  });
-  const skillValue = JSON.parse(skill.stdout);
-  if (skillValue.schemaVersion !== "footgun.skill-install.v1")
-    throw new Error("packed consumer skill install returned an unexpected document");
-  const installedSkill = join(codexHome, "skills", "complexity-optimizer", "SKILL.md");
-  const installedText = await readFile(installedSkill, "utf8");
-  if (!installedText.includes("footgun scan")) throw new Error("packed consumer installed an incomplete skill");
-  const conflict = await run(
-    "node",
-    [
-      "-e",
-      `const {execFile}=require('node:child_process');execFile(${JSON.stringify(executable)}, ['skill','install','--format','json'], {env: process.env}, (error, stdout, stderr) => { process.stdout.write(JSON.stringify({code: error?.code ?? 0, stdout, stderr})); });`,
-    ],
-    {cwd: sandbox, env: {...process.env, CODEX_HOME: codexHome}, maxBuffer: 1_000_000},
+
+  const skillText = await readFile(
+    join(consumer, "node_modules", packageJson.name, "skills", "footgun", "SKILL.md"),
+    "utf8",
   );
-  const conflictValue = JSON.parse(conflict.stdout);
-  if (conflictValue.code !== 2 || JSON.parse(conflictValue.stdout).code !== "skill-destination-exists")
-    throw new Error("packed consumer skill conflict protection failed");
-  const forced = await run(executable, ["skill", "install", "--force", "--format", "json"], {
-    cwd: sandbox,
-    env: {...process.env, CODEX_HOME: codexHome},
-    maxBuffer: 1_000_000,
-  });
-  const forcedValue = JSON.parse(forced.stdout);
-  if (forcedValue.schemaVersion !== "footgun.skill-install.v1" || typeof forcedValue.backup !== "string")
-    throw new Error("packed consumer skill backup flow failed");
-  if (!(await readFile(join(forcedValue.backup, "SKILL.md"), "utf8")).includes("footgun scan"))
-    throw new Error("packed consumer skill backup was not preserved");
-  const npxDoctor = await run(
-    "npm",
+  if (!skillText.includes("footgun scan ."))
+    throw new Error("packed consumer contains an incomplete or host-specific skill");
+
+  const npxScan = await run(
+    "npx",
+    ["--yes", `--package=${packageJson.name}@${packageJson.version}`, "--", "footgun", "scan", ".", "--format", "json"],
+    {cwd: target, env: {...consumerEnv, npm_config_registry: registry}, maxBuffer: 1_000_000},
+  );
+  const scan = JSON.parse(npxScan.stdout);
+  if (scan.schemaVersion !== "footgun.scan-report.v1" || npxScan.stderr.length !== 0)
+    throw new Error("npx did not run the packed CLI against a project outside the checkout");
+
+  const scanners = await run(
+    "npx",
     [
-      "exec",
       "--yes",
       `--package=${packageJson.name}@${packageJson.version}`,
       "--",
@@ -118,29 +114,11 @@ try {
       "--format",
       "json",
     ],
-    {cwd: sandbox, env: {...process.env, npm_config_registry: registry}, maxBuffer: 1_000_000},
+    {cwd: sandbox, env: {...consumerEnv, npm_config_registry: registry}, maxBuffer: 1_000_000},
   );
-  const scanners = JSON.parse(npxDoctor.stdout);
-  if (scanners.schemaVersion !== "footgun.scanners.v1")
-    throw new Error("npm exec did not invoke the packed registry artifact");
-  const offline = await run(
-    "npm",
-    [
-      "exec",
-      "--offline",
-      "--yes",
-      `--package=${packageJson.name}@${packageJson.version}`,
-      "--",
-      "footgun",
-      "scanners",
-      "list",
-      "--format",
-      "json",
-    ],
-    {cwd: sandbox, env: {...process.env, npm_config_registry: registry}, maxBuffer: 1_000_000},
-  );
-  if (JSON.parse(offline.stdout).schemaVersion !== "footgun.scanners.v1")
-    throw new Error("offline npm exec did not reuse the cached package");
+  const scannerValue = JSON.parse(scanners.stdout);
+  if (scannerValue.schemaVersion !== "footgun.scanners.v1") throw new Error("npx did not invoke the packed artifact");
+
   const globalPrefix = join(sandbox, "global");
   await run(
     "npm",
@@ -152,24 +130,26 @@ try {
       `${packageJson.name}@${packageJson.version}`,
       "--registry",
       registry,
-      "--ignore-scripts",
     ],
-    {cwd: sandbox, maxBuffer: 1_000_000},
+    {cwd: sandbox, env: consumerEnv, maxBuffer: 1_000_000},
   );
-  const globalDoctor = await run(join(globalPrefix, "bin", "footgun"), ["scanners", "list", "--format", "json"], {
+  const globalScanners = await run(join(globalPrefix, "bin", "footgun"), ["scanners", "list", "--format", "json"], {
     cwd: sandbox,
+    env: consumerEnv,
     maxBuffer: 1_000_000,
   });
-  if (JSON.parse(globalDoctor.stdout).schemaVersion !== "footgun.scanners.v1")
+  if (JSON.parse(globalScanners.stdout).schemaVersion !== "footgun.scanners.v1")
     throw new Error("global install did not invoke the packed registry artifact");
+
   console.log(
     JSON.stringify({
       registry,
       package: `${packageJson.name}@${packageJson.version}`,
-      scannerCount: scanners.scanners.length,
-      skill: installedSkill,
-      offline: true,
+      scannerCount: scannerValue.scanners.length,
+      npxScan: true,
       global: true,
+      skill: "skills/footgun/SKILL.md",
+      agentDirectoriesCreated: false,
     }),
   );
 } finally {
@@ -182,7 +162,7 @@ try {
 }
 
 async function startRegistry() {
-  const executable = resolve(root, "node_modules/.bin/verdaccio");
+  const executable = join(root, "node_modules", ".bin", "verdaccio");
   const child = spawn(executable, ["--config", registryConfig, "--listen", registry], {
     cwd: root,
     stdio: ["ignore", "pipe", "pipe"],
@@ -217,4 +197,13 @@ async function freePort() {
   if (address === null || typeof address === "string")
     throw new Error("Could not determine an ephemeral registry port.");
   return address.port;
+}
+
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

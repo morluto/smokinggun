@@ -4,20 +4,29 @@ Local complexity scanner and optimization evidence tool for software-engineering
 
 Footgun finds algorithmic complexity and performance hotspots, explains the evidence behind them, and helps agents test whether an optimization is worthwhile.
 
-## Install
+## Install the CLI
 
 ```bash
 npm install -g footgun
-footgun skill install
 ```
 
-The skill is installed explicitly into:
+Or run a command without a global install:
 
-```text
-${CODEX_HOME:-~/.codex}/skills/complexity-optimizer
+```bash
+npx footgun scan .
 ```
 
-## Use
+## Install the agent skill
+
+The optional `footgun` skill teaches compatible agent hosts how to use the CLI. Install it with the shared Skills CLI:
+
+```bash
+npx skills add https://github.com/morluto/footgun --skill footgun
+```
+
+The Skills CLI owns skill placement, conflict handling, and updates. Footgun does not modify agent configuration or install skills itself.
+
+## Use the CLI
 
 Scan a repository:
 
@@ -25,12 +34,6 @@ Scan a repository:
 footgun scan .
 footgun scan . --format markdown
 footgun scan . --format sarif --output footgun.sarif
-```
-
-Ask an agent:
-
-```text
-Use $complexity-optimizer to inspect this repository and report the most valuable optimization opportunities.
 ```
 
 Reports include the hotspot, supporting evidence, estimated impact, coverage, assumptions, risks, and tests or measurements needed next.

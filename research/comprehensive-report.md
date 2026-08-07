@@ -15,7 +15,7 @@ The shipped package provides:
 - an ESM 'footgun' executable on Node 22.18 or newer;
 - oclif commands for scanning, investigation, measurement, comparison,
   reporting, capability checks, explanations, SCIP context import, scanner
-  discovery, and explicit skill installation;
+  discovery, and an optional shared Skills CLI skill;
 - strict Zod contracts for findings, coverage, adapters, workloads, evidence,
   measurements, investigations, and typed problems;
 - pinned Tree-sitter WASM grammars for Python, JavaScript, TypeScript, JSX,
@@ -36,7 +36,7 @@ The shipped package provides:
   checks before comparison promotion.
 
 Static scans read local files only. They do not execute repository source,
-modify source files, contact the network, or install the Codex skill
+modify source files or contact the network
 implicitly. Workload execution requires an explicit descriptor and --execute.
 
 ## Evidence and limits

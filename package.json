@@ -1,7 +1,7 @@
 {
   "name": "footgun",
   "version": "1.0.0",
-  "description": "Evidence-bearing local complexity scanner and investigation tool for Codex.",
+  "description": "Evidence-bearing local complexity scanner and investigation tool for software-engineering agents.",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -28,14 +28,14 @@
   "files": [
     "dist",
     "grammars",
-    "skill",
+    "skills/footgun",
     "schemas",
     "grammar.lock.json",
     "README.md",
     "LICENSE"
   ],
   "keywords": [
-    "codex",
+    "agents",
     "complexity",
     "performance",
     "static-analysis",

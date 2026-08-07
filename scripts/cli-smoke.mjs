@@ -189,17 +189,6 @@ try {
   )
     throw new Error("SCIP unavailable contract failed");
 
-  const skillHome = join(sandbox, "codex-home");
-  const skill = await run([entry, "skill", "install", "--dry-run", "--format", "json"], {CODEX_HOME: skillHome});
-  const skillValue = JSON.parse(skill.stdout);
-  if (
-    skill.code !== 0 ||
-    skillValue.schemaVersion !== "footgun.skill-install.v1" ||
-    skillValue.dryRun !== true ||
-    skill.stderr.length !== 0
-  )
-    throw new Error("skill dry-run contract failed");
-
   console.log(
     JSON.stringify({
       scanFindings: report.findings.length,

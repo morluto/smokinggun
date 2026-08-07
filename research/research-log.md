@@ -50,5 +50,5 @@ The current local run passes 17 test files and 36 tests under Vitest and Vite+,
 the CLI smoke contract, the content-digested multi-language corpus evaluation,
 release verification, and the packed-consumer
 Verdaccio test. The packed test covers repeated install, npm exec, offline npm
-exec, global installation, scanner listing, doctor, and explicit skill install
+exec, global installation, scanner listing, doctor, and packed skill discovery
 from outside the checkout.

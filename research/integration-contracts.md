@@ -17,7 +17,7 @@ The recommendation is deliberately layered. `footgun` should have a small,
 versioned host-owned adapter contract, import established interchange formats
 where they already exist, use local indexing as a universal fallback, and
 preserve raw evidence alongside normalized summaries. The
-`$complexity-optimizer` skill should interpret those artifacts; it should not
+`$footgun` skill should interpret those artifacts; it should not
 become a second plugin runtime or evidence format.
 
 ## 1. Scanner and adapter plugin contract

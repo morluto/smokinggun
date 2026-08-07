@@ -41,11 +41,15 @@ if (pack !== undefined) {
   for (const required of [
     "dist/bin/footgun.js",
     "grammar.lock.json",
-    "skill/SKILL.md",
+    "skills/footgun/SKILL.md",
     ...schemaFiles.map((file) => `schemas/${file}`),
   ]) {
     if (!paths.includes(required)) failures.push(`missing packed path ${required}`);
   }
+  if (paths.some((path) => path.startsWith("skill/") || path.startsWith("skill\\")))
+    failures.push("legacy skill directory is still packed");
+  if (paths.some((path) => path.startsWith("skills/") && path.includes("/agents/")))
+    failures.push("host-specific skill metadata is packed");
   if (pack.size > 12_000_000) failures.push(`compressed package exceeds 12 MB (${pack.size})`);
   if (pack.unpackedSize > 40_000_000) failures.push(`unpacked package exceeds 40 MB (${pack.unpackedSize})`);
   if (failures.length === 0) {

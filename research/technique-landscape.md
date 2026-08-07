@@ -278,7 +278,7 @@ Semgrep-produced structural matches, repository call/test discovery, and
 profiling/benchmark artifacts. The report then joins evidence without
 pretending that a syntax match is a proof.
 
-This is the best fit for an npm-distributed Codex skill: it preserves an
+This is the best fit for an npm-distributed agent skill: it preserves an
 offline first pass, supports repositories that cannot build, and creates a
 clear path to stronger evidence when the host has the relevant toolchain.
 
