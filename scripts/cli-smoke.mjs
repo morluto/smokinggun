@@ -1,5 +1,5 @@
 import {spawn} from "node:child_process";
-import {chmod, mkdtemp, rm, writeFile} from "node:fs/promises";
+import {access, chmod, mkdtemp, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 
@@ -140,6 +140,38 @@ try {
     selectedScanner.stderr.length !== 0
   )
     throw new Error("explicit scanner selection coverage contract failed");
+
+  const adapterProbeMarker = join(sandbox, "adapter-probe-marker");
+  await writeFile(join(sandbox, "fixture.ts"), "export const value = 1;\n", "utf8");
+  await writeFile(join(sandbox, "smokinggun.config.json"), JSON.stringify({adapters: ["adapter.json"]}), "utf8");
+  await writeFile(
+    join(sandbox, "adapter.json"),
+    JSON.stringify({
+      schemaVersion: "footgun.adapter-manifest.v1",
+      id: "untrusted-adapter",
+      version: "1.0.0",
+      command: [
+        process.execPath,
+        "-e",
+        `require('node:fs').writeFileSync(${JSON.stringify(adapterProbeMarker)}, 'executed')`,
+      ],
+      capabilities: ["static-scan"],
+      limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+    }),
+    "utf8",
+  );
+  const untrustedAdapter = await run([entry, "scan", ".", "--cwd", sandbox, "--format", "json"]);
+  const untrustedAdapterValue = JSON.parse(untrustedAdapter.stdout);
+  const adapterProbeRan = await access(adapterProbeMarker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    untrustedAdapter.code !== 0 ||
+    adapterProbeRan ||
+    !untrustedAdapterValue.diagnostics.some((diagnostic) => diagnostic.code === "adapter-execution-required")
+  )
+    throw new Error("repository-configured adapters must not execute during static scans");
 
   let rawTrace = false;
   if (process.platform !== "win32") {

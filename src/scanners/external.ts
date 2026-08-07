@@ -26,6 +26,7 @@ export async function loadExternalAdapters(
   paths: ReadonlyArray<string>,
   root: string,
   signal?: AbortSignal,
+  allowExecution = false,
 ): Promise<{
   readonly adapters: ReadonlyArray<LoadedExternalAdapter>;
   readonly descriptors: ReadonlyArray<ExternalScannerDescriptor>;
@@ -71,6 +72,30 @@ export async function loadExternalAdapters(
         manifestPath: inputPath,
         reason: detail,
       });
+      continue;
+    }
+    if (!allowExecution) {
+      const reason = "Adapter execution requires explicit authorization.";
+      diagnostics.push(
+        problem(
+          "adapter-execution-required",
+          `Adapter ${parsed.data.id} was not probed or executed.`,
+          reason,
+          inputPath,
+        ),
+      );
+      const descriptor: ExternalScannerDescriptor = {
+        id: parsed.data.id,
+        version: parsed.data.version,
+        kind: "adapter",
+        capabilities: parsed.data.capabilities,
+        availability: "unavailable",
+        manifestPath: inputPath,
+        ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+        reason,
+      };
+      descriptors.push(descriptor);
+      adapters.push({manifest: parsed.data, path: inputPath, descriptor});
       continue;
     }
     if (parsed.data.sideEffects.includes("network")) {

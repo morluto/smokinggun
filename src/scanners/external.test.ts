@@ -1,4 +1,4 @@
-import {mkdtemp, rm, writeFile} from "node:fs/promises";
+import {access, mkdtemp, rm, writeFile} from "node:fs/promises";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -22,9 +22,35 @@ it("blocks network-capable adapters before capability probing", async () => {
       }),
       "utf8",
     );
-    const result = await loadExternalAdapters([manifest], root);
+    const result = await loadExternalAdapters([manifest], root, undefined, true);
     expect(result.descriptors[0]?.availability).toBe("unavailable");
     expect(result.diagnostics[0]?.code).toBe("adapter-network-blocked");
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+it("does not execute adapter probes without explicit authorization", async () => {
+  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-policy-"));
+  try {
+    const marker = join(root, "marker");
+    const manifest = join(root, "adapter.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        schemaVersion: "footgun.adapter-manifest.v1",
+        id: "untrusted-adapter",
+        version: "1.0.0",
+        command: [execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`],
+        capabilities: ["static-scan"],
+        limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+      }),
+      "utf8",
+    );
+    const result = await loadExternalAdapters([manifest], root);
+    expect(result.descriptors[0]?.availability).toBe("unavailable");
+    expect(result.diagnostics[0]?.code).toBe("adapter-execution-required");
+    await expect(access(marker)).rejects.toMatchObject({code: "ENOENT"});
   } finally {
     await rm(root, {recursive: true, force: true});
   }
