@@ -71,4 +71,33 @@ describe("SARIF import boundary", () => {
     const malformed = importSarif({version: "2.0.0", runs: []}, "/repo", "a".repeat(64));
     expect("code" in malformed && malformed.code).toBe("invalid-sarif");
   });
+
+  it("counts unique result locations as analyzed files", () => {
+    const result = importSarif(
+      {
+        version: "2.1.0",
+        runs: [
+          {
+            tool: {driver: {name: "tool"}},
+            results: [
+              {
+                message: {text: "first"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/example.ts"}, region: {startLine: 1}}}],
+              },
+              {
+                message: {text: "second"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/example.ts"}, region: {startLine: 2}}}],
+              },
+            ],
+          },
+        ],
+      },
+      "/repo",
+      "a".repeat(64),
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.findings).toHaveLength(2);
+    expect(result.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
+  });
 });
