@@ -25,9 +25,10 @@ if (process.platform !== "win32") {
   if (binInfo === undefined || (binInfo.mode & 0o111) === 0) failures.push("dist/bin/footgun.js is not executable");
 }
 
-// execFile cannot resolve PATHEXT on Windows; npm lives there as npm.cmd.
+// Windows requires the shell to execute npm.cmd; Unix can invoke npm directly.
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
-const {stdout} = await run(npmCmd, ["pack", "--dry-run", "--json", "--ignore-scripts"], {encoding: "utf8"});
+const npmOptions = process.platform === "win32" ? {encoding: "utf8", shell: true} : {encoding: "utf8"};
+const {stdout} = await run(npmCmd, ["pack", "--dry-run", "--json", "--ignore-scripts"], npmOptions);
 // npm pack may print lifecycle-script output (e.g. simple-git-hooks) ahead of the JSON document.
 const jsonStart = stdout.match(/^\[(?=\s*\{)/m);
 if (jsonStart === null) failures.push("npm pack --dry-run produced no parseable JSON");
