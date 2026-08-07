@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {constants} from "node:fs";
-import {mkdir, open, rename, rm, writeFile} from "node:fs/promises";
+import {lstat, mkdir, open, rename, rm, writeFile} from "node:fs/promises";
 import {basename, join} from "node:path";
 import {randomUUID} from "node:crypto";
 
@@ -53,6 +53,8 @@ async function readRegularFile(path: string, maxBytes: number): Promise<Buffer> 
     throw cause;
   }
   try {
+    if ((await lstat(path)).isSymbolicLink())
+      throw new Error("Only regular, non-symlink files can be stored as artifacts.");
     const info = await handle.stat();
     if (!info.isFile()) throw new Error("Only regular, non-symlink files can be stored as artifacts.");
     if (info.size > maxBytes) throw new Error(`Artifact exceeds the ${maxBytes} byte limit.`);
