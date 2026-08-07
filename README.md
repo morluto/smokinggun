@@ -1,8 +1,8 @@
 # SmokingGun
 
-Local complexity scanner and optimization evidence tool for software-engineering agents.
+Optimization evidence for agents: find complexity hotspots and test whether a proposed change is worth making.
 
-SmokingGun finds algorithmic complexity and performance hotspots, explains the evidence behind them, and helps agents test whether an optimization is worthwhile.
+It keeps static findings, estimates, and measurements distinct so agents can decide what to investigate next.
 
 ## Install the agent skill
 
