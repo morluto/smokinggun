@@ -145,6 +145,7 @@ export function importSarif(
       left.location.startLine - right.location.startLine ||
       comparePortable(left.id, right.id),
   );
+  const analyzedPaths = new Set(findings.map((finding) => finding.location.path));
   return {
     schemaVersion: "footgun.scan-report.v1",
     tool: {name: "footgun", version: "1.0.0"},
@@ -156,11 +157,14 @@ export function importSarif(
         scanner: "footgun.sarif-import",
         version: "1.0.0",
         language: "mixed",
-        filesDiscovered: new Set(findings.map((finding) => finding.location.path)).size,
-        filesAnalyzed: findings.length,
+        filesDiscovered: analyzedPaths.size,
+        filesAnalyzed: analyzedPaths.size,
         parseStatus: "complete",
         skippedFiles: [],
-        reason: scannerNames.length === 0 ? "SARIF contained no runs." : `Imported ${scannerNames.join(", ")}.`,
+        reason:
+          scannerNames.length === 0
+            ? "SARIF contained no runs."
+            : `Imported ${scannerNames.join(", ")}; file coverage reflects unique result locations.`,
       },
     ],
     diagnostics,
