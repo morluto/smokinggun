@@ -4,6 +4,7 @@ import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-comm
 import type {RuntimeContext} from "../cli/context.js";
 import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
+import {stableJson} from "../serialization.js";
 import {mkdir, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {writeResult} from "../cli/output.js";
@@ -11,8 +12,14 @@ import {renderCommandResult} from "../cli/command-output.js";
 import {parseMeasurementArtifact} from "../execution/measure.js";
 import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
 import {comparePortable} from "../paths.js";
-import {Protocol, type ComparisonV1, type MeasurementV1, type ScalingAnalysisV1} from "../protocol/index.js";
-import {buildMeasurementComparison, buildScalingComparison} from "../execution/compare.js";
+import {
+  Protocol,
+  type ComparisonV1,
+  type MeasurementV1,
+  type ScalingAnalysisV1,
+  type ScalingAnalysisV2,
+} from "../protocol/index.js";
+import {buildMeasurementComparison, buildMultiScalingComparison, buildScalingComparison} from "../execution/compare.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -71,6 +78,18 @@ export default class Compare extends BaseCommand {
         );
       if (baseline.schemaVersion === "footgun.scaling.v1" && candidate.schemaVersion === "footgun.scaling.v1") {
         await this.compareScaling(
+          baseline,
+          candidate,
+          parsed.args.baseline,
+          parsed.args.candidate,
+          digest(baselineBytes),
+          digest(candidateBytes),
+          context,
+        );
+        return;
+      }
+      if (baseline.schemaVersion === "footgun.scaling.v2" && candidate.schemaVersion === "footgun.scaling.v2") {
+        await this.compareMultiScaling(
           baseline,
           candidate,
           parsed.args.baseline,
@@ -223,11 +242,95 @@ export default class Compare extends BaseCommand {
     );
   }
 
+  private async compareMultiScaling(
+    baseline: ScalingAnalysisV2,
+    candidate: ScalingAnalysisV2,
+    baselinePath: string,
+    candidatePath: string,
+    baselineDigest: string,
+    candidateDigest: string,
+    context: RuntimeContext,
+  ): Promise<void> {
+    const baselineCoordinates = baseline.points.map((point) => point.coordinates);
+    const candidateCoordinates = candidate.points.map((point) => point.coordinates);
+    const computedBaselineCoordinatesDigest = createHash("sha256")
+      .update(stableJson(baselineCoordinates))
+      .digest("hex");
+    const computedCandidateCoordinatesDigest = createHash("sha256")
+      .update(stableJson(candidateCoordinates))
+      .digest("hex");
+    if (
+      baseline.coordinatesDigest !== computedBaselineCoordinatesDigest ||
+      candidate.coordinatesDigest !== computedCandidateCoordinatesDigest ||
+      computedBaselineCoordinatesDigest !== computedCandidateCoordinatesDigest ||
+      stableJson(baselineCoordinates) !== stableJson(candidateCoordinates) ||
+      baseline.parameters.join("\0") !== candidate.parameters.join("\0")
+    )
+      this.emitProblem(
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "scaling-points-mismatch",
+          message: "Baseline and candidate scaling artifacts do not use the same named coordinate grid.",
+          recovery: "Measure both artifacts from the same immutable multi-parameter workload descriptor.",
+        },
+        2,
+        context,
+      );
+    if (
+      baseline.points.some(
+        (point, index) =>
+          point.statisticalPolicy.kind !== candidate.points[index]?.statisticalPolicy.kind ||
+          point.statisticalPolicy.minimumRelativeImprovement !==
+            candidate.points[index]?.statisticalPolicy.minimumRelativeImprovement,
+      )
+    )
+      this.emitProblem(
+        {
+          schemaVersion: "footgun.problem.v1",
+          code: "statistical-policy-mismatch",
+          message: "Baseline and candidate scaling coordinates use different statistical policies.",
+          recovery: "Measure both artifacts from the same immutable multi-parameter workload descriptor and policy.",
+        },
+        2,
+        context,
+      );
+    if (
+      !baseline.points.every((point) => point.behaviorValidated) ||
+      !candidate.points.every((point) => point.behaviorValidated)
+    )
+      this.emitActionRequired(
+        {
+          schemaVersion: "footgun.action-required.v1",
+          reason: "behavior-validation-required",
+          explanation: "The scaling artifacts do not establish behavioral equivalence at every coordinate.",
+          recoveryCommands: [
+            "Add explicit behavior checks to WorkloadV1, validate every coordinate, then rerun measure and compare.",
+          ],
+        },
+        context,
+      );
+    const result = buildMultiScalingComparison(
+      baseline,
+      candidate,
+      baselinePath,
+      candidatePath,
+      baselineDigest,
+      candidateDigest,
+    );
+    await this.storeComparison(result, context, baseline, candidate);
+    const improved = result.points?.filter((point) => point.improvement).length ?? 0;
+    await this.writeComparison(
+      result,
+      `Multi-parameter scaling comparison\nParameters: ${baseline.parameters.join(", ")}\nImproved coordinates: ${improved}/${result.points?.length ?? 0}`,
+      context,
+    );
+  }
+
   private async storeComparison(
     result: ComparisonV1,
     context: RuntimeContext,
-    baseline: MeasurementV1 | ScalingAnalysisV1,
-    candidate: MeasurementV1 | ScalingAnalysisV1,
+    baseline: MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2,
+    candidate: MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2,
   ): Promise<void> {
     const validated = Protocol.comparison.parse(result);
     const directory = join(context.artifacts, "comparisons");

@@ -71,6 +71,66 @@
       ],
       "additionalProperties": false
     },
+    "multiParameterization": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "minItems": 2,
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "values": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "commandIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "name",
+              "values",
+              "commandIndex"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coordinates": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "maxPoints": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "parameters",
+        "maxPoints"
+      ],
+      "additionalProperties": false
+    },
     "datasetDigests": {
       "default": {},
       "type": "object",

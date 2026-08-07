@@ -22,6 +22,7 @@ const schemas = {
   "profile-summary-v1": Protocol.profileSummary,
   "trace-summary-v1": Protocol.traceSummary,
   "scaling-v1": Protocol.scaling,
+  "scaling-v2": Protocol.multiScaling,
   "comparison-v1": Protocol.comparison,
   "investigation-bundle-v1": Protocol.investigation,
   "investigation-pointer-v1": Protocol.investigationPointer,

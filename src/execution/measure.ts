@@ -6,6 +6,7 @@ import {
   type MeasurementV1,
   type ProblemV1,
   type ScalingAnalysisV1,
+  type ScalingAnalysisV2,
   type WorkloadV1,
 } from "../protocol/index.js";
 import {executeWorkload} from "./runner.js";
@@ -321,7 +322,11 @@ export function parseMeasurement(input: unknown): MeasurementV1 | ProblemV1 {
       );
 }
 
-export function parseMeasurementArtifact(input: unknown): MeasurementV1 | ScalingAnalysisV1 | ProblemV1 {
+export function parseMeasurementArtifact(
+  input: unknown,
+): MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2 | ProblemV1 {
+  const multiScaling = Protocol.multiScaling.safeParse(input);
+  if (multiScaling.success) return multiScaling.data;
   const scaling = Protocol.scaling.safeParse(input);
   if (scaling.success) return scaling.data;
   const measurement = Protocol.measurement.safeParse(input);
