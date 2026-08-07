@@ -189,14 +189,24 @@ function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRe
     const rawData = arrayValue(metric.rawData)?.flatMap((group) => finiteArray(group) ?? []) ?? [];
     const score = finiteNumber(metric.score);
     const unit = metric.scoreUnit;
-    const normalized = (rawData.length > 0 ? rawData : score === undefined ? [] : [score]).map((value) =>
-      convertToMilliseconds(value, unit),
-    );
-    if (normalized.length > 0)
+    const mode = typeof entry.mode === "string" ? entry.mode : "unknown";
+    const values = rawData.length > 0 ? rawData : score === undefined ? [] : [score];
+    const normalized =
+      mode === "thrpt"
+        ? values.map((value) => convertThroughputToMilliseconds(value, unit))
+        : values.map((value) => convertToMilliseconds(value, unit));
+    if (normalized.some((value) => value === undefined))
+      return problem(
+        "unsupported-jmh-throughput-unit",
+        `JMH throughput unit ${unit} cannot be normalized as milliseconds per operation.`,
+        "Use a positive ops/s, ops/ms, ops/us, ops/ns, or ops/min score, or export a time-per-operation JMH mode.",
+      );
+    const samplesMs = normalized.filter((value): value is number => value !== undefined);
+    if (samplesMs.length > 0)
       records.push(
-        makeRecord(options, entry.benchmark, normalized, metric.scoreUnit, {
+        makeRecord(options, entry.benchmark, samplesMs, metric.scoreUnit, {
           index,
-          mode: typeof entry.mode === "string" ? entry.mode : "unknown",
+          mode,
           ...(rawData.length === 0 ? {summaryOnly: true} : {}),
         }),
       );
@@ -252,11 +262,23 @@ function makeRecord(
 
 function convertToMilliseconds(value: number, unit: string): number {
   const normalized = unit.toLowerCase();
+  if (normalized === "ms" || normalized === "milliseconds" || normalized === "ms/op") return value;
   if (normalized === "ns" || normalized === "nanoseconds" || normalized === "ns/op") return value / 1_000_000;
   if (normalized === "us" || normalized === "µs" || normalized === "microseconds" || normalized === "us/op")
     return value / 1_000;
   if (normalized === "s" || normalized === "seconds" || normalized === "s/op") return value * 1000;
   return value;
+}
+
+function convertThroughputToMilliseconds(value: number, unit: string): number | undefined {
+  if (value <= 0) return undefined;
+  const normalized = unit.toLowerCase();
+  if (normalized === "ops/s" || normalized === "ops/sec") return 1000 / value;
+  if (normalized === "ops/ms") return 1 / value;
+  if (normalized === "ops/us" || normalized === "ops/µs") return 1 / (value * 1000);
+  if (normalized === "ops/ns") return 1 / (value * 1_000_000);
+  if (normalized === "ops/min") return 60_000 / value;
+  return undefined;
 }
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {
