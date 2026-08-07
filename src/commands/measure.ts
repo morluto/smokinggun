@@ -74,7 +74,6 @@ export default class Measure extends BaseCommand {
       await mkdir(directory, {recursive: true});
       const path = join(directory, `${id}.json`);
       await writeFile(path, `${JSON.stringify(storedMeasurement, null, 2)}\n`, "utf8");
-      const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const measurementDigest = createHash("sha256").update(stableJson(storedMeasurement)).digest("hex");
       const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const nextBundle = {
