@@ -23,3 +23,17 @@ it("stores regular artifacts by digest and rejects symlink inputs", async () => 
     await rm(root, {recursive: true, force: true});
   }
 });
+
+it("rejects an existing artifact path whose bytes do not match its digest", async () => {
+  const root = await mkdtemp(join(tmpdir(), "footgun-artifact-store-"));
+  try {
+    const source = join(root, "report.json");
+    const store = join(root, "store");
+    await writeFile(source, "expected", "utf8");
+    const expected = await storeArtifact(source, store);
+    await writeFile(join(store, "sha256", expected.digest), "corrupt!", "utf8");
+    await expect(storeArtifact(source, store)).rejects.toThrow(/does not match its digest/);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
