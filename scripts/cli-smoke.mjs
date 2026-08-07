@@ -85,6 +85,24 @@ try {
   )
     throw new Error("report SARIF contract failed");
 
+  const invalidReportInvestigation = await run([
+    entry,
+    "report",
+    scanArtifact,
+    "--investigation",
+    "not-an-id",
+    "--format",
+    "json",
+  ]);
+  const invalidReportInvestigationValue = JSON.parse(invalidReportInvestigation.stdout);
+  if (
+    invalidReportInvestigation.code !== 2 ||
+    invalidReportInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
+    invalidReportInvestigationValue.code !== "investigation-unavailable" ||
+    invalidReportInvestigation.stderr.length !== 0
+  )
+    throw new Error("report must validate an investigation before emitting its artifact");
+
   const baselineArtifact = join(sandbox, "baseline.json");
   const candidateArtifact = join(sandbox, "candidate.json");
   await writeFile(baselineArtifact, JSON.stringify(measurement("a", 10)), "utf8");
