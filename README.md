@@ -20,11 +20,13 @@ The Skills CLI owns skill placement, conflict handling, and updates. SmokingGun 
 npm install -g smokinggun
 ```
 
-Or run a command without a global install:
+Or bootstrap one scan without a global install:
 
 ```bash
-npx smokinggun scan .
+npx --yes --package=smokinggun -- smokinggun scan .
 ```
+
+This command may contact the npm registry. SmokingGun requires Node 22.18 or later.
 
 ## Use the CLI
 

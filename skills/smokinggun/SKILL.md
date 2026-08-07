@@ -15,19 +15,22 @@ Run the first action from the repository under review:
 smokinggun scan .
 ```
 
-If the `smokinggun` command is unavailable, show the user one of these explicit installation choices and wait for them to run it:
+If the `smokinggun` command is unavailable, do not treat that as a scan with no findings. Tell the user that SmokingGun could not be run and ask for authorization to use one of these recovery paths:
 
 ```bash
-npm install -g smokinggun
+npx --yes --package=smokinggun -- smokinggun scan .
 ```
 
-Or run one command without a global install:
+This is a one-command bootstrap: it may contact the npm registry, but it does not alter the repository or create a global installation. After the user authorizes it, run the exact command from the repository under review.
+
+Or, for a reusable installation:
 
 ```bash
-npx smokinggun scan .
+npm install --global smokinggun
+smokinggun scan .
 ```
 
-Do not install npm packages implicitly. `npx` is an explicit, user-visible bootstrap path and may contact the npm registry when the user runs it.
+Do not install npm packages implicitly. If either recovery path fails, report the exact command and its diagnostic, keep SmokingGun coverage as unknown, and suggest checking Node 22.18+ and registry access. Do not substitute a failed or unavailable scan with an unsupported performance claim.
 
 ## Interpret evidence carefully
 

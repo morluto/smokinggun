@@ -113,8 +113,14 @@ try {
     join(consumer, "node_modules", packageJson.name, "skills", "smokinggun", "SKILL.md"),
     "utf8",
   );
-  if (!skillText.includes("smokinggun scan ."))
-    throw new Error("packed consumer contains an incomplete or host-specific skill");
+  for (const requiredRecoveryInstruction of [
+    "npx --yes --package=smokinggun -- smokinggun scan .",
+    "npm install --global smokinggun",
+    "keep SmokingGun coverage as unknown",
+  ]) {
+    if (!skillText.includes(requiredRecoveryInstruction))
+      throw new Error(`packed consumer skill is missing recovery instruction: ${requiredRecoveryInstruction}`);
+  }
 
   const npxScan = await run(
     "npx",
