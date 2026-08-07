@@ -101,4 +101,22 @@ describe("repository scan seam", () => {
       await rm(root, {recursive: true, force: true});
     }
   });
+
+  it("keeps TypeScript semantic findings within the selected --only files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-only-"));
+    try {
+      await writeFile(join(root, "a.ts"), 'import {run} from "./b"; export {run};\n', "utf8");
+      await writeFile(
+        join(root, "b.ts"),
+        "export function run(values: string[]) { for (const value of values) fetch(value); }\n",
+        "utf8",
+      );
+      const report = await scanRepository(root, {configDigest: "d".repeat(64), only: ["a.ts"]});
+      expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 1, extensions: [".ts"]});
+      expect(report.findings.every((finding) => finding.location.path === "a.ts")).toBe(true);
+      expect(report.context?.files).toEqual(["a.ts"]);
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
 });
