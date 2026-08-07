@@ -161,7 +161,7 @@ export function buildMultiScalingComparison(
 type Environment = {readonly node: string; readonly platform: string; readonly arch: string};
 
 function environmentsMatch(left: Environment, right: Environment): boolean {
-  return left.platform === right.platform && left.arch === right.arch;
+  return left.node === right.node && left.platform === right.platform && left.arch === right.arch;
 }
 
 function comparability(
@@ -171,7 +171,9 @@ function comparability(
   if (environmentsMatch(left, right)) return {status: "comparable", reasons: []};
   return {
     status: "cross-machine",
-    reasons: [`Environment differs: ${left.platform}/${left.arch} versus ${right.platform}/${right.arch}.`],
+    reasons: [
+      `Environment differs: Node ${left.node} on ${left.platform}/${left.arch} versus Node ${right.node} on ${right.platform}/${right.arch}.`,
+    ],
   };
 }
 
