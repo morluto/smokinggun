@@ -22,6 +22,14 @@ it("decodes a gzip-compressed pprof profile through the maintained binding", () 
   expect(result.topFunctions[0]).toMatchObject({name: "work", value: 3, unit: "count"});
 });
 
+it("rejects pprof gzip output above the configured decompressed size limit", () => {
+  const result = importPprof(gzipSync(Buffer.alloc(256)), {
+    sourceArtifact: "oversized.pb.gz",
+    maxDecompressedBytes: 64,
+  });
+  expect("code" in result && result.code).toBe("pprof-decompressed-output-too-large");
+});
+
 it("normalizes bounded Perfetto trace-processor rows", () => {
   const result = importPerfettoSummary(
     {columns: ["name", "duration"], rows: [{name: "main", duration: 12.5}]},

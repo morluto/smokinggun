@@ -11,8 +11,11 @@ import {stableJson} from "../serialization.js";
 export type ProfileImportOptions = {
   readonly sourceArtifact: string;
   readonly maxFunctions?: number;
+  readonly maxDecompressedBytes?: number;
   readonly sourceDigest?: string;
 };
+
+const defaultMaxPprofDecompressedBytes = 64 * 1024 * 1024;
 
 export type PerfettoTraceOptions = ProfileImportOptions & {
   readonly tracePath: string;
@@ -28,7 +31,9 @@ export type PerfettoTraceOptions = ProfileImportOptions & {
 export function importPprof(input: Uint8Array, options: ProfileImportOptions): ProfileSummaryV1 | ProblemV1 {
   try {
     const sourceDigest = createHash("sha256").update(input).digest("hex");
-    const profile = Profile.decode(gunzipSync(input));
+    const profile = Profile.decode(
+      gunzipSync(input, {maxOutputLength: options.maxDecompressedBytes ?? defaultMaxPprofDecompressedBytes}),
+    );
     const strings = profile.stringTable.strings;
     const sampleTypes = profile.sampleType.map((sampleType) => ({
       type: stringAt(strings, numberValue(sampleType.type)),
@@ -79,12 +84,22 @@ export function importPprof(input: Uint8Array, options: ProfileImportOptions): P
           "Check the profile producer and pprof-format compatibility.",
         );
   } catch (cause: unknown) {
+    if (isDecompressionLimitError(cause))
+      return problem(
+        "pprof-decompressed-output-too-large",
+        "The gzip-compressed pprof profile exceeds the decompressed output limit.",
+        "Use a pprof artifact whose decompressed size is at most 64 MiB.",
+      );
     return problem(
       "pprof-decode-failed",
       "The artifact is not a readable gzip-compressed pprof Profile.",
       cause instanceof Error ? cause.message : "Check the pprof artifact and retry.",
     );
   }
+}
+
+function isDecompressionLimitError(cause: unknown): boolean {
+  return cause instanceof Error && "code" in cause && cause.code === "ERR_BUFFER_TOO_LARGE";
 }
 
 /** Normalize bounded JSON rows emitted by Perfetto trace-processor queries. */
