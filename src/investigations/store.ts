@@ -29,6 +29,13 @@ export async function loadLatestInvestigation(dataRoot: string, id: string): Pro
   return {bundle, digest: digestBundle(bundle)};
 }
 
+/** Load an existing investigation or fail before a command performs dependent work. */
+export async function requireLatestInvestigation(dataRoot: string, id: string): Promise<StoredInvestigation> {
+  const investigation = await loadLatestInvestigation(dataRoot, id);
+  if (investigation === undefined) throw new Error(`Investigation ${id} does not exist.`);
+  return investigation;
+}
+
 /** Store a content-addressed bundle snapshot and atomically advance its pointer. */
 export async function recordInvestigationSnapshot(dataRoot: string, bundle: InvestigationBundleV1): Promise<string> {
   const parsed = Protocol.investigation.parse(bundle);

@@ -258,6 +258,48 @@ try {
   if (action.code !== 2 || actionValue.schemaVersion !== "footgun.action-required.v1" || action.stderr.length !== 0)
     throw new Error("action-required exit contract failed");
 
+  const marker = join(sandbox, "invalid-investigation-marker");
+  const workload = join(sandbox, "invalid-investigation-workload.json");
+  await writeFile(
+    workload,
+    JSON.stringify({
+      schemaVersion: "footgun.workload.v1",
+      command: [process.execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`],
+      cwd: ".",
+      environment: {},
+      inheritEnvironment: false,
+      warmups: 0,
+      repetitions: 1,
+      timeoutMs: 2_000,
+      requestedProfile: "local-exec",
+      expectedArtifacts: [],
+      behaviorChecks: ["exit-code:0"],
+    }),
+    "utf8",
+  );
+  const invalidInvestigation = await run([
+    entry,
+    "measure",
+    "not-an-id",
+    "--workload",
+    workload,
+    "--execute",
+    "--format",
+    "json",
+  ]);
+  const invalidInvestigationValue = JSON.parse(invalidInvestigation.stdout);
+  const markerExists = await access(marker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    invalidInvestigation.code !== 1 ||
+    invalidInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
+    invalidInvestigationValue.code !== "measurement-failed" ||
+    markerExists
+  )
+    throw new Error("invalid investigation must fail before executing the workload");
+
   const missingContext = await run([
     entry,
     "context",

@@ -2,7 +2,7 @@ import {mkdtemp, readFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
-import {loadLatestInvestigation, recordInvestigationSnapshot} from "./store.js";
+import {loadLatestInvestigation, recordInvestigationSnapshot, requireLatestInvestigation} from "./store.js";
 
 describe("investigation snapshots", () => {
   it("advances through content-addressed snapshots", async () => {
@@ -49,5 +49,13 @@ describe("investigation snapshots", () => {
     await expect(recordInvestigationSnapshot(root, {...initial, state: "baseline-measured" as const})).rejects.toThrow(
       /Invalid investigation transition/,
     );
+  });
+
+  it("rejects missing investigations after validating their IDs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-investigation-"));
+    await expect(requireLatestInvestigation(root, "inv_0123456789abcdef")).rejects.toThrow(
+      "Investigation inv_0123456789abcdef does not exist.",
+    );
+    await expect(requireLatestInvestigation(root, "not-an-id")).rejects.toThrow("Invalid investigation ID.");
   });
 });
