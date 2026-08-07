@@ -48,6 +48,30 @@ export default class Investigate extends BaseCommand {
             maxFindings: context.config.maxFindings,
             signal: context.signal,
           });
+      if (finding !== undefined) {
+        if (report === undefined)
+          this.emitProblem(
+            {
+              schemaVersion: "footgun.problem.v1",
+              code: "finding-validation-required",
+              message: "A focused investigation requires a scan that can validate the finding ID.",
+              recovery: "Rerun without --plan-only or omit --finding.",
+            },
+            2,
+            context,
+          );
+        if (!report.findings.some((candidate) => candidate.id === finding))
+          this.emitProblem(
+            {
+              schemaVersion: "footgun.problem.v1",
+              code: "finding-not-found",
+              message: "The requested finding ID is not present in this scan report.",
+              recovery: "Pass a finding ID from this repository's current scan output.",
+            },
+            2,
+            context,
+          );
+      }
       const investigationDigest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
       const id = `inv_${investigationDigest.slice(0, 16)}`;
       const directory = join(context.artifacts, "investigations", id);
