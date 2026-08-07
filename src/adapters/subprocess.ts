@@ -1,5 +1,6 @@
 import {isAbsolute, relative, resolve} from "node:path";
-import {lstat, realpath, stat} from "node:fs/promises";
+import {constants} from "node:fs";
+import {open, realpath} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
 import {Protocol, type AdapterResultV1, type ProblemV1} from "../protocol/index.js";
@@ -147,13 +148,6 @@ async function checkArtifacts(
         "An adapter artifact escapes the repository boundary.",
         "Keep artifacts inside the declared repository/artifact root.",
       );
-    const linkInfo = await lstat(resolved).catch(() => undefined);
-    if (linkInfo?.isSymbolicLink())
-      return problem(
-        "artifact-invalid",
-        "An adapter artifact is a symlink and cannot be treated as immutable evidence.",
-        "Return a regular file below the repository artifact boundary.",
-      );
     const actual = await realpath(resolved).catch(() => undefined);
     const relativeActual = actual === undefined ? undefined : relative(realRoot, actual);
     if (
@@ -167,19 +161,47 @@ async function checkArtifacts(
         "An adapter artifact resolves outside the repository boundary or does not exist.",
         "Keep artifacts inside the declared repository/artifact root.",
       );
-    const info = await stat(actual).catch(() => undefined);
-    if (linkInfo === undefined || info === undefined || !info.isFile())
+    const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => undefined);
+    if (handle === undefined)
       return problem(
         "artifact-invalid",
         "An adapter artifact is not a regular file or is a symlink.",
         "Return regular files below the repository artifact boundary.",
       );
-    if (info.size > maxArtifactBytes)
-      return problem(
-        "artifact-too-large",
-        "An adapter artifact exceeds its declared size limit.",
-        "Reduce the artifact or increase the manifest limit deliberately.",
-      );
+    try {
+      const info = await handle.stat();
+      if (!info.isFile())
+        return problem(
+          "artifact-invalid",
+          "An adapter artifact is not a regular file or is a symlink.",
+          "Return regular files below the repository artifact boundary.",
+        );
+      if (info.size > maxArtifactBytes)
+        return problem(
+          "artifact-too-large",
+          "An adapter artifact exceeds its declared size limit.",
+          "Reduce the artifact or increase the manifest limit deliberately.",
+        );
+      const declaredDigest = result.rawArtifactDigests[artifact];
+      if (declaredDigest !== undefined) {
+        const bytes = await handle.readFile();
+        if (bytes.byteLength > maxArtifactBytes)
+          return problem(
+            "artifact-too-large",
+            "An adapter artifact exceeds its declared size limit.",
+            "Reduce the artifact or increase the manifest limit deliberately.",
+          );
+        const actualDigest = createHash("sha256").update(bytes).digest("hex");
+        if (actualDigest !== declaredDigest)
+          return problem(
+            "artifact-digest-mismatch",
+            "An adapter artifact does not match its declared SHA-256 digest.",
+            "Regenerate the artifact and return its exact digest.",
+          );
+      }
+    } finally {
+      await handle.close();
+    }
   }
   return undefined;
 }

@@ -317,6 +317,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         : "Inspect the highest-ranked finding, resolve repository context, and declare behavior checks before measuring.",
     filesModified: [],
     rawArtifacts: [...adapterRun.rawArtifacts],
+    rawArtifactDigests: adapterRun.rawArtifactDigests,
   };
   return Object.defineProperty(report, "policyFindings", {value: policyFindings}) as ScanRepositoryResult;
 }
@@ -336,6 +337,7 @@ async function runConfiguredAdapters(
   readonly coverage: ReadonlyArray<CoverageRecordV1>;
   readonly diagnostics: ReadonlyArray<ProblemV1>;
   readonly rawArtifacts: ReadonlyArray<string>;
+  readonly rawArtifactDigests: Readonly<Record<string, string>>;
 }> {
   const builtin = new Set([
     "auto",
@@ -361,12 +363,14 @@ async function runConfiguredAdapters(
           recovery: "Configure an adapter manifest or select a built-in scanner ID.",
         })),
       rawArtifacts: [],
+      rawArtifactDigests: {},
     };
   const loaded = await loadExternalAdapters(manifestPaths, root, signal, allowAdapterExecution);
   const findings: FindingV1[] = [];
   const coverage: CoverageRecordV1[] = [];
   const diagnostics: ProblemV1[] = [...loaded.diagnostics];
   const rawArtifacts: string[] = [];
+  const rawArtifactDigests: Record<string, string> = {};
   const configuredIds = new Set(loaded.adapters.map((adapter) => adapter.manifest.id));
   for (const descriptor of loaded.descriptors) {
     if (descriptor.availability !== "invalid") continue;
@@ -476,6 +480,7 @@ async function runConfiguredAdapters(
     );
     diagnostics.push(...result.diagnostics);
     rawArtifacts.push(...result.rawArtifacts);
+    Object.assign(rawArtifactDigests, result.rawArtifactDigests);
     if (result.state !== "complete" && result.state !== "partial")
       diagnostics.push({
         schemaVersion: "footgun.problem.v1",
@@ -484,7 +489,13 @@ async function runConfiguredAdapters(
         recovery: "Inspect the adapter diagnostics and rerun with a compatible capability.",
       });
   }
-  return {findings, coverage, diagnostics, rawArtifacts: [...new Set(rawArtifacts)].sort(comparePortable)};
+  return {
+    findings,
+    coverage,
+    diagnostics,
+    rawArtifacts: [...new Set(rawArtifacts)].sort(comparePortable),
+    rawArtifactDigests,
+  };
 }
 
 async function collectFiles(

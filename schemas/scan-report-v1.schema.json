@@ -763,6 +763,17 @@
       "items": {
         "type": "string"
       }
+    },
+    "rawArtifactDigests": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
     }
   },
   "required": [
@@ -776,7 +787,8 @@
     "timings",
     "assumptions",
     "filesModified",
-    "rawArtifacts"
+    "rawArtifacts",
+    "rawArtifactDigests"
   ],
   "additionalProperties": false
 }
