@@ -57,8 +57,10 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const rootInfo = await stat(root);
   const pathRoot = rootInfo.isDirectory() ? root : resolve(root, "..");
   const excludes = new Set([...defaultExcludes, ...(options.excludes ?? [])]);
-  const discoveredFiles = await collectFiles(root, excludes, options.signal);
+  const discovered = await collectFiles(root, excludes, options.signal);
+  const discoveredFiles = discovered.files;
   const files = discoveredFiles.filter((file) => matchesOnlyFilter(file, options.only));
+  const skippedSourceSymlinks = discovered.symlinks.filter((file) => matchesOnlyFilter(file, options.only));
   const selectedScanners = normalizeScannerSelection(options.scanners);
   const runStructural =
     selectedScanners === undefined ||
@@ -217,22 +219,25 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     scanner: scannerId,
     version: scannerVersion,
     language: "mixed",
-    filesDiscovered: files.length,
+    filesDiscovered: files.length + skippedSourceSymlinks.length,
     filesAnalyzed: runStructural ? analyzed : 0,
     parseStatus: !runStructural
       ? "unavailable"
       : files.length > 0 && analyzed === 0
         ? "unavailable"
-        : partial
+        : partial || skippedSourceSymlinks.length > 0
           ? "partial"
           : "complete",
-    skippedFiles: (!runStructural ? files.map((file) => portablePath(relative(pathRoot, file))) : skippedFiles).sort(
-      comparePortable,
-    ),
+    skippedFiles: (!runStructural
+      ? files.map((file) => portablePath(relative(pathRoot, file)))
+      : [...skippedFiles, ...skippedSourceSymlinks.map((file) => portablePath(relative(pathRoot, file)))]
+    ).sort(comparePortable),
     ...(partialReason === undefined
       ? !runStructural
         ? {reason: "Structural scanner was not selected."}
-        : {}
+        : skippedSourceSymlinks.length > 0
+          ? {reason: "Source symlinks were skipped to preserve the repository boundary."}
+          : {}
       : {reason: partialReason}),
   };
   const diagnostics: ProblemV1[] = [
@@ -243,6 +248,13 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       message: `Skipped ${path} because it could not be read.`,
       path,
       recovery: "Check file permissions and rerun the scan.",
+    })),
+    ...skippedSourceSymlinks.map((path): ProblemV1 => ({
+      schemaVersion: "footgun.problem.v1",
+      code: "symlink-skipped",
+      message: `Skipped source symlink ${portablePath(relative(pathRoot, path))}.`,
+      path: portablePath(relative(pathRoot, path)),
+      recovery: "Replace the symlink with a regular source file before scanning.",
     })),
   ];
   const parserRecords = [...parserCoverage.entries()]
@@ -502,11 +514,12 @@ async function collectFiles(
   root: string,
   excludes: ReadonlySet<string>,
   signal?: AbortSignal,
-): Promise<ReadonlyArray<string>> {
+): Promise<{readonly files: ReadonlyArray<string>; readonly symlinks: ReadonlyArray<string>}> {
   const files: string[] = [];
+  const symlinks: string[] = [];
   const rootInfo = await stat(root);
-  if (rootInfo.isFile()) return isSupportedExtension(extensionOf(root)) ? [root] : [];
-  if (!rootInfo.isDirectory()) return [];
+  if (rootInfo.isFile()) return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], symlinks};
+  if (!rootInfo.isDirectory()) return {files, symlinks};
   const visit = async (directory: string): Promise<void> => {
     signal?.throwIfAborted();
     const entries = await readdir(directory, {withFileTypes: true});
@@ -515,14 +528,17 @@ async function collectFiles(
       signal?.throwIfAborted();
       if (excludes.has(entry.name)) continue;
       const path = resolve(directory, entry.name);
-      if (entry.isSymbolicLink()) continue;
+      if (entry.isSymbolicLink()) {
+        if (isSupportedExtension(extensionOf(path))) symlinks.push(path);
+        continue;
+      }
       if (entry.isDirectory()) {
         await visit(path);
       } else if (entry.isFile() && isSupportedExtension(extensionOf(path))) files.push(path);
     }
   };
   await visit(root);
-  return files;
+  return {files, symlinks};
 }
 
 function normalizeScannerSelection(values: ReadonlyArray<string> | undefined): ReadonlySet<string> | undefined {

@@ -1,4 +1,4 @@
-import {mkdtemp, rm, writeFile} from "node:fs/promises";
+import {mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
 import {execFileSync} from "node:child_process";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
@@ -115,6 +115,20 @@ describe("repository scan seam", () => {
       expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 1, extensions: [".ts"]});
       expect(report.findings.every((finding) => finding.location.path === "a.ts")).toBe(true);
       expect(report.context?.files).toEqual(["a.ts"]);
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("reports skipped source symlinks as incomplete coverage", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-symlink-"));
+    try {
+      await writeFile(join(root, "normal.ts"), "export const value = 1;\n", "utf8");
+      await symlink("normal.ts", join(root, "linked.ts"));
+      const report = await scanRepository(root, {configDigest: "d".repeat(64)});
+      expect(report.coverage[0]).toMatchObject({filesDiscovered: 2, filesAnalyzed: 1, parseStatus: "partial"});
+      expect(report.coverage[0]?.skippedFiles).toContain("linked.ts");
+      expect(report.diagnostics).toContainEqual(expect.objectContaining({code: "symlink-skipped", path: "linked.ts"}));
     } finally {
       await rm(root, {recursive: true, force: true});
     }
