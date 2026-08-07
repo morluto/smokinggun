@@ -168,6 +168,7 @@ export function importSarif(
     assumptions: ["Imported third-party SARIF results are evidence references, not independent SmokingGun findings."],
     filesModified: [],
     rawArtifacts: rawArtifact === undefined ? [] : [rawArtifact],
+    rawArtifactDigests: {},
   };
 }
 

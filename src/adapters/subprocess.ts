@@ -1,5 +1,5 @@
 import {isAbsolute, relative, resolve} from "node:path";
-import {lstat, realpath, stat} from "node:fs/promises";
+import {lstat, readFile, realpath, stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
 import {Protocol, type AdapterResultV1, type ProblemV1} from "../protocol/index.js";
@@ -180,6 +180,18 @@ async function checkArtifacts(
         "An adapter artifact exceeds its declared size limit.",
         "Reduce the artifact or increase the manifest limit deliberately.",
       );
+    const declaredDigest = result.rawArtifactDigests[artifact];
+    if (declaredDigest !== undefined) {
+      const actualDigest = createHash("sha256")
+        .update(await readFile(actual))
+        .digest("hex");
+      if (actualDigest !== declaredDigest)
+        return problem(
+          "artifact-digest-mismatch",
+          "An adapter artifact does not match its declared SHA-256 digest.",
+          "Regenerate the artifact and return its exact digest.",
+        );
+    }
   }
   return undefined;
 }

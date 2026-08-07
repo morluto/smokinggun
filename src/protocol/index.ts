@@ -192,6 +192,7 @@ const scanReportSchema = z.strictObject({
   nextAction: z.string().optional(),
   filesModified: z.array(z.string()).default([]),
   rawArtifacts: z.array(z.string()),
+  rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
 });
 
 const adapterManifestSchema = z.strictObject({
