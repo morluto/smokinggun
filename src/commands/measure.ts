@@ -7,7 +7,7 @@ import {measureWorkload} from "../execution/measure.js";
 import {measureMultiScaling, measureScaling} from "../execution/scaling.js";
 import {writeResult} from "../cli/output.js";
 import {renderCommandResult} from "../cli/command-output.js";
-import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
+import {recordInvestigationSnapshot, requireLatestInvestigation} from "../investigations/store.js";
 import {createHash} from "node:crypto";
 import {comparePortable} from "../paths.js";
 import type {MeasurementV1, ScalingAnalysisV1, ScalingAnalysisV2} from "../protocol/index.js";
@@ -39,6 +39,7 @@ export default class Measure extends BaseCommand {
       );
     }
     try {
+      await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const raw = await readFile(parsed.flags.workload, "utf8");
       const workload: unknown = JSON.parse(raw);
       const measurement =
@@ -73,34 +74,32 @@ export default class Measure extends BaseCommand {
       await mkdir(directory, {recursive: true});
       const path = join(directory, `${id}.json`);
       await writeFile(path, `${JSON.stringify(storedMeasurement, null, 2)}\n`, "utf8");
-      const investigation = await loadLatestInvestigation(context.artifacts, parsed.args.investigation);
-      if (investigation !== undefined) {
-        const measurementDigest = createHash("sha256").update(stableJson(storedMeasurement)).digest("hex");
-        const nextBundle = {
-          ...investigation.bundle,
-          state: "baseline-measured" as const,
-          reports: [...new Set([...investigation.bundle.reports, `../measurements/${id}.json`])].sort(comparePortable),
-          evidence: [
-            ...investigation.bundle.evidence,
-            {
-              schemaVersion: "footgun.evidence.v1" as const,
-              id: `${parsed.args.investigation}:measurement:${id}`,
-              kind: "measurement" as const,
-              claimClass:
-                measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
-                  ? ("empirical-scaling" as const)
-                  : ("constant-factor" as const),
-              summary:
-                measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
-                  ? "Parameterized scaling measurement"
-                  : "Repeated local workload measurement",
-              artifact: `../measurements/${id}.json`,
-              digest: measurementDigest,
-            },
-          ],
-        };
-        await recordInvestigationSnapshot(context.artifacts, nextBundle);
-      }
+      const measurementDigest = createHash("sha256").update(stableJson(storedMeasurement)).digest("hex");
+      const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
+      const nextBundle = {
+        ...investigation.bundle,
+        state: "baseline-measured" as const,
+        reports: [...new Set([...investigation.bundle.reports, `../measurements/${id}.json`])].sort(comparePortable),
+        evidence: [
+          ...investigation.bundle.evidence,
+          {
+            schemaVersion: "footgun.evidence.v1" as const,
+            id: `${parsed.args.investigation}:measurement:${id}`,
+            kind: "measurement" as const,
+            claimClass:
+              measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
+                ? ("empirical-scaling" as const)
+                : ("constant-factor" as const),
+            summary:
+              measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
+                ? "Parameterized scaling measurement"
+                : "Repeated local workload measurement",
+            artifact: `../measurements/${id}.json`,
+            digest: measurementDigest,
+          },
+        ],
+      };
+      await recordInvestigationSnapshot(context.artifacts, nextBundle);
       const human =
         measurement.schemaVersion === "footgun.scaling.v1"
           ? `Scaling measurement ${id}\nParameter: ${measurement.parameter}\nPoints: ${measurement.points.length}\nSelected model: ${measurement.selectedModel ?? "inconclusive"}\nArtifact: ${path}`
