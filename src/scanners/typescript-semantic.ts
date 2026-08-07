@@ -21,6 +21,7 @@ export function scanTypeScript(
   const indexResult = buildTypeScriptIndex(root, files, signal);
   const sourcePaths = files.filter((path) => isTypeScriptPath(path)).map((path) => resolve(path));
   if (sourcePaths.length === 0 || indexResult.state === "unavailable") return {...indexResult, findings: []};
+  const selectedPaths = new Set(sourcePaths);
   const findings: FindingV1[] = [];
   try {
     const program = ts.createProgram(sourcePaths, {
@@ -36,7 +37,9 @@ export function scanTypeScript(
     const absoluteRoot = resolve(root);
     for (const sourceFile of program.getSourceFiles()) {
       signal?.throwIfAborted();
-      if (sourceFile.isDeclarationFile || !isWithinRoot(absoluteRoot, resolve(sourceFile.fileName))) continue;
+      const sourcePath = resolve(sourceFile.fileName);
+      if (sourceFile.isDeclarationFile || !isWithinRoot(absoluteRoot, sourcePath) || !selectedPaths.has(sourcePath))
+        continue;
       const relativePath = portablePath(relative(absoluteRoot, sourceFile.fileName));
       const visit = (node: ts.Node, loopDepth: number): void => {
         signal?.throwIfAborted();
