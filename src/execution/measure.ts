@@ -51,11 +51,15 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       "This runner does not silently collapse an input-size series into one measurement.",
       "Measure one declared input point at a time or use a scaling-capable runner.",
     );
-  if (workload.resourceLimits?.cpuMs !== undefined)
+  if (
+    workload.resourceLimits?.cpuMs !== undefined ||
+    workload.resourceLimits?.memoryBytes !== undefined ||
+    workload.resourceLimits?.maxProcesses !== undefined
+  )
     return problem(
       "resource-limit-unavailable",
-      "The available runners cannot enforce a per-workload CPU millisecond budget.",
-      "Use a runner with CPU quota support and remove cpuMs only when that control is acceptable.",
+      "The available runners cannot enforce every requested CPU, memory, or process limit.",
+      "Use a runner with resource-limit support and remove an unsupported limit only when that control is acceptable.",
     );
   const cwd = resolve(options.root, workload.cwd);
   const root = resolve(options.root);

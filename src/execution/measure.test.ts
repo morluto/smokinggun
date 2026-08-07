@@ -85,6 +85,27 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
   expect("code" in readOnly && readOnly.code).toBe("execution-profile-unavailable");
 });
 
+it("refuses unsupported host memory and process limits before execution", async () => {
+  const result = await measureWorkload(
+    {
+      schemaVersion: "footgun.workload.v1",
+      command: [process.execPath, "-e", "process.exit(0)"],
+      cwd: ".",
+      environment: {},
+      inheritEnvironment: false,
+      warmups: 0,
+      repetitions: 1,
+      timeoutMs: 100,
+      requestedProfile: "local-exec",
+      expectedArtifacts: [],
+      behaviorChecks: [],
+      resourceLimits: {memoryBytes: 1_000_000, maxProcesses: 1},
+    },
+    {root: process.cwd()},
+  );
+  expect("code" in result && result.code).toBe("resource-limit-unavailable");
+});
+
 it("records a redacted reproduction contract and rejects artifact escapes", async () => {
   const result = await measureWorkload(
     {
