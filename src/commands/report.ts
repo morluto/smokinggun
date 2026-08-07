@@ -40,6 +40,25 @@ export default class Report extends BaseCommand {
     const parsed = await this.parse(Report);
     const context = await this.context(parsed.flags as ParsedGlobalFlags);
     try {
+      if (parsed.flags.investigation !== undefined) {
+        try {
+          const investigation = await loadLatestInvestigation(context.artifacts, parsed.flags.investigation);
+          if (investigation === undefined)
+            throw new Error(`Investigation ${parsed.flags.investigation} does not exist.`);
+        } catch (cause: unknown) {
+          this.emitProblem(
+            {
+              schemaVersion: "footgun.problem.v1",
+              code: "investigation-unavailable",
+              message: "The requested investigation is invalid or does not exist.",
+              ...(cause instanceof Error ? {detail: cause.message} : {}),
+              recovery: "Create or select an existing investigation before attaching this report.",
+            },
+            2,
+            context,
+          );
+        }
+      }
       if (parsed.flags.benchmark !== undefined && parsed.flags.profile !== undefined)
         this.emitProblem(
           {
