@@ -66,7 +66,7 @@ export default class Report extends BaseCommand {
             {
               schemaVersion: "footgun.problem.v1",
               code: "invalid-benchmark-tool",
-              message: "The benchmark tool is not supported by this Footgun build.",
+              message: "The benchmark tool is not supported by this SmokingGun build.",
               recovery: "Choose hyperfine, pyperf, google-benchmark, criterion, or jmh.",
             },
             2,

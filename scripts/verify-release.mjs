@@ -8,9 +8,9 @@ const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const grammarLock = JSON.parse(await readFile("grammar.lock.json", "utf8"));
 const failures = [];
 
-if (packageJson.name !== "footgun") failures.push("package name is not footgun");
-if (Object.keys(packageJson.bin ?? {}).join(",") !== "footgun")
-  failures.push("package exposes more than the footgun executable");
+if (packageJson.name !== "smokinggun") failures.push("package name is not smokinggun");
+if (Object.keys(packageJson.bin ?? {}).join(",") !== "smokinggun")
+  failures.push("package exposes more than the smokinggun executable");
 for (const grammar of grammarLock.grammars ?? []) {
   const bytes = await readFile(grammar.file).catch(() => undefined);
   if (bytes === undefined) {
@@ -42,7 +42,7 @@ if (pack !== undefined) {
   for (const required of [
     "dist/bin/footgun.js",
     "grammar.lock.json",
-    "skills/footgun/SKILL.md",
+    "skills/smokinggun/SKILL.md",
     ...schemaFiles.map((file) => `schemas/${file}`),
   ]) {
     if (!paths.includes(required)) failures.push(`missing packed path ${required}`);

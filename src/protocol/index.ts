@@ -647,8 +647,8 @@ export function parseScanReport(input: unknown): ScanReportV1 | ProtocolProblemV
     _tag: "ProtocolProblem",
     schemaVersion: "footgun.problem.v1",
     code: "invalid-scan-report",
-    message: "The input is not a valid Footgun ScanReportV1.",
+    message: "The input is not a valid SmokingGun ScanReportV1.",
     detail: result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
-    recovery: "Regenerate the artifact with `footgun scan <path> --format json`.",
+    recovery: "Regenerate the artifact with `smokinggun scan <path> --format json`.",
   };
 }

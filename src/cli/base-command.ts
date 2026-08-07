@@ -67,7 +67,7 @@ export abstract class BaseCommand extends Command {
         {
           schemaVersion: "footgun.problem.v1",
           code: "runtime-context-failed",
-          message: "Footgun could not initialize its local runtime context.",
+          message: "SmokingGun could not initialize its local runtime context.",
           ...(normalizedFlags.debug && cause instanceof Error ? {detail: redactSensitive(cause.message)} : {}),
           recovery: "Check the working directory, configuration, and local data directory.",
         },

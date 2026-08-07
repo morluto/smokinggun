@@ -1,4 +1,4 @@
-name: Footgun CI
+name: SmokingGun CI
 
 on:
   push:

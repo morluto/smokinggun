@@ -135,7 +135,7 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
       "The Perfetto query is empty or exceeds the bounded query length.",
       "Provide a bounded SQL query of at most 10,000 characters.",
     );
-  const executable = options.executable ?? process.env.FOOTGUN_TRACE_PROCESSOR ?? "trace_processor";
+  const executable = options.executable ?? process.env.SMOKINGGUN_TRACE_PROCESSOR ?? "trace_processor";
   try {
     const result = await execa(
       executable,
@@ -200,7 +200,7 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
       "The requested Perfetto trace processor could not be started.",
       cause instanceof Error
         ? cause.message
-        : "Install trace_processor and set FOOTGUN_TRACE_PROCESSOR if it is not on PATH.",
+        : "Install trace_processor and set SMOKINGGUN_TRACE_PROCESSOR if it is not on PATH.",
     );
   }
 }

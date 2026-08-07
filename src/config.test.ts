@@ -6,16 +6,16 @@ import {isConfigFailure, loadConfig} from "./config.js";
 
 describe("configuration", () => {
   it("rejects unknown JSON configuration keys", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "footgun-config-"));
-    const config = join(directory, "footgun.config.json");
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const config = join(directory, "smokinggun.config.json");
     await writeFile(config, JSON.stringify({wat: true}), "utf8");
     const result = await loadConfig({config, cwd: directory});
     expect(isConfigFailure(result)).toBe(true);
   });
 
   it("normalizes a valid explicit configuration and computes a digest", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "footgun-config-"));
-    const config = join(directory, "footgun.config.json");
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const config = join(directory, "smokinggun.config.json");
     await writeFile(config, JSON.stringify({format: "json", maxFindings: 12}), "utf8");
     const result = await loadConfig({config, cwd: directory});
     expect(isConfigFailure(result)).toBe(false);
@@ -28,15 +28,15 @@ describe("configuration", () => {
   });
 
   it("accepts the fail-on policy from the environment", async () => {
-    const result = await loadConfig({cwd: process.cwd()}, {FOOTGUN_FAIL_ON: "high"});
+    const result = await loadConfig({cwd: process.cwd()}, {SMOKINGGUN_FAIL_ON: "high"});
     expect(isConfigFailure(result)).toBe(false);
     if (!isConfigFailure(result)) expect(result.failOn).toBe("high");
   });
 
   it("resolves file paths relative to the defining config file", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "footgun-config-"));
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
     const nested = join(directory, "nested");
-    const config = join(nested, "footgun.config.json");
+    const config = join(nested, "smokinggun.config.json");
     await mkdir(nested);
     await writeFile(config, JSON.stringify({output: "artifacts/report.json"}), "utf8");
     const result = await loadConfig({config, cwd: directory});

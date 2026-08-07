@@ -57,7 +57,7 @@ export function importSarif(
       _tag: "ProtocolProblem",
       code: "invalid-sarif",
       message: "The artifact is not SARIF 2.1.0.",
-      recovery: "Pass a SARIF 2.1.0 document or generate one with `footgun scan --format sarif`.",
+      recovery: "Pass a SARIF 2.1.0 document or generate one with `smokinggun scan --format sarif`.",
     };
   const findings: FindingV1[] = [];
   const diagnostics: ScanReportV1["diagnostics"] = [];
@@ -128,7 +128,7 @@ export function importSarif(
           endLine: Math.max(line, region?.endLine ?? line),
           endColumn: Math.max(0, (region?.endColumn ?? region?.startColumn ?? 1) - 1),
         },
-        assumptions: ["SARIF was imported as third-party evidence; Footgun did not independently verify the rule."],
+        assumptions: ["SARIF was imported as third-party evidence; SmokingGun did not independently verify the rule."],
         evidence: [
           result.fingerprints === undefined
             ? `sarif:${runIndex}:${resultIndex}`
@@ -165,7 +165,7 @@ export function importSarif(
     ],
     diagnostics,
     timings: {startedAt: new Date().toISOString(), durationMs: 0},
-    assumptions: ["Imported third-party SARIF results are evidence references, not independent Footgun findings."],
+    assumptions: ["Imported third-party SARIF results are evidence references, not independent SmokingGun findings."],
     filesModified: [],
     rawArtifacts: rawArtifact === undefined ? [] : [rawArtifact],
   };

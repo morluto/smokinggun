@@ -8,7 +8,7 @@ import {probeTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {probeIsolation} from "../execution/capabilities.js";
 
 export default class Doctor extends BaseCommand {
-  static override description = "Report local Footgun capabilities and configuration health.";
+  static override description = "Report local SmokingGun capabilities and configuration health.";
   static override flags = {
     ...globalFlags,
     "check-updates": Flags.boolean({description: "Perform an explicit bounded npm registry check.", default: false}),
@@ -58,7 +58,7 @@ export default class Doctor extends BaseCommand {
         : isolation.map((entry) => `${entry.backend}: ${entry.available ? "available" : entry.reason}`).join(", ");
     const scannerSummary = scanners.map((scanner) => `${scanner.id}: ${scanner.availability}`).join(", ");
     const human = [
-      `Footgun 1.0.0`,
+      `SmokingGun 1.0.0`,
       `Node ${result.node} on ${result.platform}`,
       `Configuration: ${result.configSource}`,
       `Network checks: ${registry.state}`,
@@ -80,7 +80,7 @@ async function checkRegistry(
   signal: AbortSignal,
 ): Promise<{readonly state: "available" | "unavailable"; readonly version?: string; readonly integrity?: string}> {
   try {
-    const result = await execa("npm", ["view", "footgun", "version", "dist.integrity", "--json"], {
+    const result = await execa("npm", ["view", "smokinggun", "version", "dist.integrity", "--json"], {
       cwd,
       reject: false,
       stdin: "ignore",

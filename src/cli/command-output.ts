@@ -11,7 +11,7 @@ export async function printResult(value: unknown, human: string, context: Runtim
 /** Render a command result through the common stream contract. */
 export function renderCommandResult(value: unknown, human: string, format: OutputFormat): string {
   if (format === "json") return `${JSON.stringify(value, null, 2)}\n`;
-  if (format === "markdown") return `# Footgun\n\n${human}\n`;
+  if (format === "markdown") return `# SmokingGun\n\n${human}\n`;
   if (format === "sarif") return `${JSON.stringify(toGenericSarif(value, human), null, 2)}\n`;
   return `${human}\n`;
 }

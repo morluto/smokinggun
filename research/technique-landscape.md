@@ -1,4 +1,4 @@
-# Footgun technique and resource landscape
+# SmokingGun technique and resource landscape
 
 This note records the redesign space for the scanner. It is research output,
 not an implementation proposal that has already been applied. The central

@@ -1,4 +1,4 @@
-name: Footgun release
+name: SmokingGun release
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
           version: 11.20.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           registry-url: https://registry.npmjs.org
           cache: pnpm
       - run: pnpm install --frozen-lockfile
@@ -37,8 +37,6 @@ jobs:
         uses: changesets/action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         with:
           version: pnpm version:packages
           publish: pnpm publish:packages

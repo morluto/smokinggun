@@ -91,7 +91,7 @@ it("records a redacted reproduction contract and rejects artifact escapes", asyn
       schemaVersion: "footgun.workload.v1",
       command: [process.execPath, "-e", "process.stdout.write('ok')", "--", "--token", "secret-value"],
       cwd: ".",
-      environment: {FOOTGUN_TEST_TOKEN: "not-recorded"},
+      environment: {SMOKINGGUN_TEST_TOKEN: "not-recorded"},
       inheritEnvironment: false,
       warmups: 0,
       repetitions: 1,
@@ -107,7 +107,7 @@ it("records a redacted reproduction contract and rejects artifact escapes", asyn
   expect(result.reproduction.command).toContain("--token");
   expect(result.reproduction.command).toContain("[REDACTED]");
   expect(result.reproduction.command).not.toContain("secret-value");
-  expect(result.reproduction.environmentKeys).toContain("FOOTGUN_TEST_TOKEN");
+  expect(result.reproduction.environmentKeys).toContain("SMOKINGGUN_TEST_TOKEN");
   expect(result.reproduction.environmentKeys).not.toContain("CAAS_ARTIFACTORY_READER_PASSWORD");
 
   const escaped = await measureWorkload(

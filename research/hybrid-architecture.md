@@ -1,4 +1,4 @@
-# Footgun evidence architecture
+# SmokingGun evidence architecture
 
 This document describes the implementation boundary, not a historical
 prototype.

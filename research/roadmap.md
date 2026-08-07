@@ -5,7 +5,7 @@ release state. It keeps each contribution focused on one outcome.
 
 ## Completed foundation
 
-The release foundation is implemented: `footgun@1.0.0` has a pinned lockfile,
+The release foundation is implemented: `smokinggun@1.0.0` has a pinned lockfile,
 grammar digest verification, package allowlist checks, an explicit skill
 installer, CLI smoke coverage, Vite+ and Vitest gates, and a hosted Node 22/24
 Linux/macOS/Windows CI matrix.

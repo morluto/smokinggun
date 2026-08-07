@@ -1,6 +1,6 @@
-# Footgun
+# SmokingGun
 
-Footgun is a local CLI for software-engineering agents: it finds code-complexity hotspots and helps test optimization ideas with evidence. It scans source and repository context, imports external findings, and can compare explicitly authorized baseline/candidate measurements. It reports coverage, assumptions, and unknowns; it does not rewrite source.
+SmokingGun is a local CLI for software-engineering agents: it finds code-complexity hotspots and helps test optimization ideas with evidence. It scans source and repository context, imports external findings, and can compare explicitly authorized baseline/candidate measurements. It reports coverage, assumptions, and unknowns; it does not rewrite source.
 
 ## Rules for agents
 

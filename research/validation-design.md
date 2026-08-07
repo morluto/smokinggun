@@ -13,14 +13,14 @@ Run these checks against the packed tarball, not only the checkout:
 | --- | --- |
 | Contents | `npm pack --dry-run --json`; assert the allowlisted files, modes, digests, and no accidental credentials/caches |
 | Version | The manifest version equals the release tag; after publish, `npm view` returns that version and the recorded integrity digest |
-| Fresh install | Empty temporary project; the shared Skills CLI discovers `skills/footgun/SKILL.md`, and npm installation exposes the `footgun` scanner |
+| Fresh install | Empty temporary project; the shared Skills CLI discovers `skills/smokinggun/SKILL.md`, and npm installation exposes the `smokinggun` scanner |
 | Repeat install | Installing twice is deterministic and leaves the same file hashes |
 | Custom files | A pre-existing marker and user-added file are tested explicitly; the chosen overwrite/backup contract is asserted |
 | Failure | Missing bundled `SKILL.md` or an unavailable CLI produces a visible recovery path without silently claiming success |
 | Permissions | The installed scanner and installer retain executable behavior where required; read-only or permission-denied destinations are covered |
 
 The shared Skills CLI owns skill placement, conflict handling, and updates.
-Footgun only ships the self-contained skill document; npm installation does not
+SmokingGun only ships the self-contained skill document; npm installation does not
 write agent directories or install anything implicitly.
 
 ## 2. Scanner precision and recall

@@ -34,8 +34,8 @@ export default class Investigate extends BaseCommand {
           {
             schemaVersion: "footgun.problem.v1",
             code: "invalid-finding-id",
-            message: "The investigation finding ID is not a stable Footgun finding ID.",
-            recovery: "Pass an ID returned by `footgun scan <path> --format json`.",
+            message: "The investigation finding ID is not a stable SmokingGun finding ID.",
+            recovery: "Pass an ID returned by `smokinggun scan <path> --format json`.",
           },
           2,
           context,

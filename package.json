@@ -1,22 +1,22 @@
 {
-  "name": "footgun",
+  "name": "smokinggun",
   "version": "2.0.0",
   "description": "Evidence-bearing local complexity scanner and investigation tool for software-engineering agents.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/morluto/footgun.git"
+    "url": "git+https://github.com/morluto/smokinggun.git"
   },
   "bugs": {
-    "url": "https://github.com/morluto/footgun/issues"
+    "url": "https://github.com/morluto/smokinggun/issues"
   },
-  "homepage": "https://github.com/morluto/footgun#readme",
+  "homepage": "https://github.com/morluto/smokinggun#readme",
   "publishConfig": {
     "access": "public"
   },
   "bin": {
-    "footgun": "dist/bin/footgun.js"
+    "smokinggun": "dist/bin/footgun.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,7 +28,7 @@
   "files": [
     "dist",
     "grammars",
-    "skills/footgun",
+    "skills/smokinggun",
     "schemas",
     "grammar.lock.json",
     "README.md",
@@ -46,8 +46,8 @@
   },
   "packageManager": "pnpm@11.20.0",
   "oclif": {
-    "bin": "footgun",
-    "dirname": "footgun",
+    "bin": "smokinggun",
+    "dirname": "smokinggun",
     "topicSeparator": " ",
     "commands": {
       "strategy": "pattern",

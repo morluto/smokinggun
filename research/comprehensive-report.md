@@ -1,8 +1,8 @@
-# Footgun implementation report
+# SmokingGun implementation report
 
 Research status: 2026-08-05.
 
-Footgun is a local, offline-by-default evidence broker for complexity
+SmokingGun is a local, offline-by-default evidence broker for complexity
 investigations. The package separates syntax-aware candidate generation,
 repository context, controlled execution, behavior checks, measurement, and
 reporting. A finding is never treated as proof of an asymptotic bound or a
@@ -12,7 +12,7 @@ speedup by itself.
 
 The shipped package provides:
 
-- an ESM 'footgun' executable on Node 22.18 or newer;
+- an ESM 'smokinggun' executable on Node 22.18 or newer;
 - oclif commands for scanning, investigation, measurement, comparison,
   reporting, capability checks, explanations, SCIP context import, scanner
   discovery, and an optional shared Skills CLI skill;
@@ -43,7 +43,7 @@ implicitly. Workload execution requires an explicit descriptor and --execute.
 
 The committed corpus contains labeled positive and negative cases across all 14
 shipped grammar languages. Its precision/recall gate is run by the TypeScript
-test suite and `footgun evaluate:corpus`, which reports a content digest plus
+test suite and `smokinggun evaluate:corpus`, which reports a content digest plus
 per-language and per-rule metrics; it is still a regression gate, not a claim
 of language-wide accuracy. Parse coverage is reported separately from semantic
 coverage, and unavailable or partial adapters remain visible in results.

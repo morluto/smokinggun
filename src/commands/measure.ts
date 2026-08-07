@@ -33,7 +33,7 @@ export default class Measure extends BaseCommand {
           reason: "measurement-authorization-required",
           explanation:
             "Measurement requires a workload descriptor and explicit --execute authorization. --yes alone never authorizes workload execution.",
-          recoveryCommands: [`footgun measure ${parsed.args.investigation} --workload workload.json --execute`],
+          recoveryCommands: [`smokinggun measure ${parsed.args.investigation} --workload workload.json --execute`],
         },
         context,
       );

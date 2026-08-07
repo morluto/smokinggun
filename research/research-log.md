@@ -1,4 +1,4 @@
-# Footgun implementation log
+# SmokingGun implementation log
 
 This log records current implementation decisions and reproducible local
 evidence and current operating instructions.
@@ -6,7 +6,7 @@ evidence and current operating instructions.
 ## Package foundation
 
 The root package is TypeScript ESM, targets Node 22.18 or newer, uses pnpm
-11.20.0, and exposes only the footgun executable. oclif owns command parsing
+11.20.0, and exposes only the smokinggun executable. oclif owns command parsing
 and help; domain modules remain independent of command handlers. Configuration
 is strict JSON with CLI, environment, explicit-file, nearest-file, user-file,
 and built-in precedence.

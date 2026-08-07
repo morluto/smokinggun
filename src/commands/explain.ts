@@ -54,7 +54,7 @@ export default class Explain extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "invalid-finding-id",
           message: "Finding IDs must use fg_ followed by 16 lowercase hexadecimal characters, or be a known rule ID.",
-          recovery: "Copy the ID from `footgun scan --format json`.",
+          recovery: "Copy the ID from `smokinggun scan --format json`.",
         },
         2,
         context,

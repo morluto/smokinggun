@@ -74,7 +74,7 @@ export async function loadExternalAdapters(
       continue;
     }
     if (parsed.data.sideEffects.includes("network")) {
-      const reason = "Network-capable adapters are blocked by Footgun's offline static policy.";
+      const reason = "Network-capable adapters are blocked by SmokingGun's offline static policy.";
       diagnostics.push(
         problem("adapter-network-blocked", `Adapter ${parsed.data.id} was not probed or executed.`, reason, inputPath),
       );

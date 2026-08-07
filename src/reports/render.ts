@@ -18,7 +18,7 @@ export function renderScanReport(report: ScanReportV1, format: OutputFormat): st
   }
 }
 
-/** Convert a scan report to SARIF while retaining Footgun evidence in properties. */
+/** Convert a scan report to SARIF while retaining SmokingGun evidence in properties. */
 export function toSarif(report: ScanReportV1): Record<string, unknown> {
   return {
     version: "2.1.0",
@@ -29,7 +29,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
           driver: {
             name: "footgun",
             version: report.tool.version,
-            informationUri: "https://github.com/morluto/footgun",
+            informationUri: "https://github.com/morluto/smokinggun",
           },
         },
         results: report.findings.map((finding) => ({
@@ -90,7 +90,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
 
 function renderMarkdown(report: ScanReportV1): string {
   const lines = [
-    "# Footgun scan",
+    "# SmokingGun scan",
     "",
     `Root: \`${report.repository.root}\``,
     `Revision: ${report.repository.revision ?? "unknown"}`,
@@ -156,7 +156,7 @@ function renderMarkdown(report: ScanReportV1): string {
 
 function renderHuman(report: ScanReportV1): string {
   const lines = [
-    `Footgun scan: ${report.repository.root}`,
+    `SmokingGun scan: ${report.repository.root}`,
     `${report.findings.length} candidate${report.findings.length === 1 ? "" : "s"}; coverage ${report.coverage.map((entry) => entry.parseStatus).join(", ")}`,
     `Assumptions: ${report.assumptions.join("; ")}`,
   ];

@@ -1,12 +1,12 @@
-# Footgun research
+# SmokingGun research
 
 This directory records the release audit, literature review, scanner evaluation,
 hybrid architecture, roadmap, and validation design for the
-`$footgun` skill and the `footgun` CLI.
+`$smokinggun` skill and the `smokinggun` CLI.
 
 The conclusion is intentionally conservative: static analysis generates
 candidates, but it is not evidence that a change improves a real workload.
-Footgun therefore keeps scanning, context, measurement, behavior validation,
+SmokingGun therefore keeps scanning, context, measurement, behavior validation,
 and reporting as separate evidence stages.
 
 ## Reproduction
@@ -22,7 +22,7 @@ the output exposes both supported-pattern performance and known gaps. The
 repository-wide first pass is:
 
 ```bash
-footgun scan . --format json
+smokinggun scan . --format json
 ```
 
 The release check used for this audit is:
@@ -34,7 +34,7 @@ npm pack --dry-run --json
 See the individual reports for the evidence and decisions:
 
 - [Comprehensive research report](comprehensive-report.md)
-- [Footgun long-term specification](long-term-spec.md)
+- [SmokingGun long-term specification](long-term-spec.md)
 - [Research log](research-log.md)
 - [Release and package integrity](release-integrity.md)
 - [Literature matrix](literature-matrix.md)

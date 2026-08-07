@@ -80,9 +80,9 @@ export async function loadConfig(
   overrides: CliOverrides,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<RuntimeConfig | ConfigFailure> {
-  const cwdInput = overrides.cwd ?? environment.FOOTGUN_CWD ?? process.cwd();
+  const cwdInput = overrides.cwd ?? environment.SMOKINGGUN_CWD ?? process.cwd();
   const initialCwd = resolve(cwdInput);
-  const explicitPath = overrides.config ?? environment.FOOTGUN_CONFIG;
+  const explicitPath = overrides.config ?? environment.SMOKINGGUN_CONFIG;
   let configPath: string | undefined;
   try {
     configPath =
@@ -109,7 +109,7 @@ export async function loadConfig(
     fileValues.cwd === undefined
       ? initialCwd
       : resolve(configPath === undefined ? initialCwd : dirname(configPath), fileValues.cwd);
-  const selectedCwd = overrides.cwd === undefined && environment.FOOTGUN_CWD === undefined ? fileCwd : initialCwd;
+  const selectedCwd = overrides.cwd === undefined && environment.SMOKINGGUN_CWD === undefined ? fileCwd : initialCwd;
   const merged: FileConfig = {
     ...defaults,
     ...fileValues,
@@ -119,7 +119,7 @@ export async function loadConfig(
   };
   const cwd = resolve(merged.cwd ?? initialCwd);
   const outputBase =
-    overrides.output !== undefined || environment.FOOTGUN_OUTPUT !== undefined
+    overrides.output !== undefined || environment.SMOKINGGUN_OUTPUT !== undefined
       ? initialCwd
       : configPath === undefined
         ? initialCwd
@@ -183,7 +183,7 @@ async function readJsonConfig(
 async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv): Promise<string | undefined> {
   let current = start;
   while (true) {
-    const candidate = join(current, "footgun.config.json");
+    const candidate = join(current, "smokinggun.config.json");
     try {
       await readFile(candidate, "utf8");
       return candidate;
@@ -194,7 +194,7 @@ async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv):
       current = parent;
     }
   }
-  const userConfig = join(environment.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "footgun", "config.json");
+  const userConfig = join(environment.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "smokinggun", "config.json");
   try {
     await readFile(userConfig, "utf8");
     return userConfig;
@@ -206,23 +206,23 @@ async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv):
 
 function parseEnvironment(environment: NodeJS.ProcessEnv): FileConfig | ConfigFailure {
   const values: FileConfig = {};
-  if (environment.FOOTGUN_FORMAT !== undefined) {
-    if (!isOutputFormat(environment.FOOTGUN_FORMAT))
+  if (environment.SMOKINGGUN_FORMAT !== undefined) {
+    if (!isOutputFormat(environment.SMOKINGGUN_FORMAT))
       return configFailure(
         "invalid-environment",
-        "FOOTGUN_FORMAT is invalid.",
+        "SMOKINGGUN_FORMAT is invalid.",
         "Expected one of " + outputFormats.join(", ") + ".",
       );
-    values.format = environment.FOOTGUN_FORMAT;
+    values.format = environment.SMOKINGGUN_FORMAT;
   }
-  if (environment.FOOTGUN_OUTPUT !== undefined) values.output = environment.FOOTGUN_OUTPUT;
-  if (environment.FOOTGUN_FAIL_ON !== undefined) values.failOn = environment.FOOTGUN_FAIL_ON;
+  if (environment.SMOKINGGUN_OUTPUT !== undefined) values.output = environment.SMOKINGGUN_OUTPUT;
+  if (environment.SMOKINGGUN_FAIL_ON !== undefined) values.failOn = environment.SMOKINGGUN_FAIL_ON;
   for (const [name, key] of [
-    ["FOOTGUN_NO_COLOR", "noColor"],
-    ["FOOTGUN_QUIET", "quiet"],
-    ["FOOTGUN_DEBUG", "debug"],
-    ["FOOTGUN_NON_INTERACTIVE", "nonInteractive"],
-    ["FOOTGUN_STRICT", "strict"],
+    ["SMOKINGGUN_NO_COLOR", "noColor"],
+    ["SMOKINGGUN_QUIET", "quiet"],
+    ["SMOKINGGUN_DEBUG", "debug"],
+    ["SMOKINGGUN_NON_INTERACTIVE", "nonInteractive"],
+    ["SMOKINGGUN_STRICT", "strict"],
   ] as const) {
     const value = environment[name];
     if (value !== undefined) {
@@ -231,16 +231,16 @@ function parseEnvironment(environment: NodeJS.ProcessEnv): FileConfig | ConfigFa
       values[key] = value === "true";
     }
   }
-  if (environment.FOOTGUN_MAX_FINDINGS !== undefined) {
-    const value = Number(environment.FOOTGUN_MAX_FINDINGS);
+  if (environment.SMOKINGGUN_MAX_FINDINGS !== undefined) {
+    const value = Number(environment.SMOKINGGUN_MAX_FINDINGS);
     if (!Number.isInteger(value) || value <= 0)
-      return configFailure("invalid-environment", "FOOTGUN_MAX_FINDINGS is invalid.", "Use a positive integer.");
+      return configFailure("invalid-environment", "SMOKINGGUN_MAX_FINDINGS is invalid.", "Use a positive integer.");
     values.maxFindings = value;
   }
-  if (environment.FOOTGUN_EXCLUDE !== undefined)
-    values.exclude = environment.FOOTGUN_EXCLUDE.split(",").filter((value) => value.length > 0);
-  if (environment.FOOTGUN_ADAPTERS !== undefined)
-    values.adapters = environment.FOOTGUN_ADAPTERS.split(",").filter((value) => value.length > 0);
+  if (environment.SMOKINGGUN_EXCLUDE !== undefined)
+    values.exclude = environment.SMOKINGGUN_EXCLUDE.split(",").filter((value) => value.length > 0);
+  if (environment.SMOKINGGUN_ADAPTERS !== undefined)
+    values.adapters = environment.SMOKINGGUN_ADAPTERS.split(",").filter((value) => value.length > 0);
   return values;
 }
 
@@ -290,7 +290,8 @@ export function isConfigFailure(value: RuntimeConfig | ConfigFailure): value is 
 
 export function userDataDirectory(environment: NodeJS.ProcessEnv = process.env): string {
   return (
-    environment.FOOTGUN_DATA_DIR ?? resolve(environment.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "footgun")
+    environment.SMOKINGGUN_DATA_DIR ??
+    resolve(environment.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "smokinggun")
   );
 }
 

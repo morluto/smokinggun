@@ -76,7 +76,7 @@ try {
       throw new Error(`package install wrote agent directory ${agentDirectory}`);
   }
 
-  const executable = join(consumer, "node_modules", ".bin", "footgun");
+  const executable = join(consumer, "node_modules", ".bin", "smokinggun");
   const doctor = await run(executable, ["doctor", "--format", "json", "--non-interactive"], {
     cwd: sandbox,
     env: consumerEnv,
@@ -87,15 +87,24 @@ try {
     throw new Error("packed consumer doctor returned an unexpected document");
 
   const skillText = await readFile(
-    join(consumer, "node_modules", packageJson.name, "skills", "footgun", "SKILL.md"),
+    join(consumer, "node_modules", packageJson.name, "skills", "smokinggun", "SKILL.md"),
     "utf8",
   );
-  if (!skillText.includes("footgun scan ."))
+  if (!skillText.includes("smokinggun scan ."))
     throw new Error("packed consumer contains an incomplete or host-specific skill");
 
   const npxScan = await run(
     "npx",
-    ["--yes", `--package=${packageJson.name}@${packageJson.version}`, "--", "footgun", "scan", ".", "--format", "json"],
+    [
+      "--yes",
+      `--package=${packageJson.name}@${packageJson.version}`,
+      "--",
+      "smokinggun",
+      "scan",
+      ".",
+      "--format",
+      "json",
+    ],
     {cwd: target, env: {...consumerEnv, npm_config_registry: registry}, maxBuffer: 1_000_000},
   );
   const scan = JSON.parse(npxScan.stdout);
@@ -108,7 +117,7 @@ try {
       "--yes",
       `--package=${packageJson.name}@${packageJson.version}`,
       "--",
-      "footgun",
+      "smokinggun",
       "scanners",
       "list",
       "--format",
@@ -133,7 +142,7 @@ try {
     ],
     {cwd: sandbox, env: consumerEnv, maxBuffer: 1_000_000},
   );
-  const globalScanners = await run(join(globalPrefix, "bin", "footgun"), ["scanners", "list", "--format", "json"], {
+  const globalScanners = await run(join(globalPrefix, "bin", "smokinggun"), ["scanners", "list", "--format", "json"], {
     cwd: sandbox,
     env: consumerEnv,
     maxBuffer: 1_000_000,
@@ -148,7 +157,7 @@ try {
       scannerCount: scannerValue.scanners.length,
       npxScan: true,
       global: true,
-      skill: "skills/footgun/SKILL.md",
+      skill: "skills/smokinggun/SKILL.md",
       agentDirectoriesCreated: false,
     }),
   );

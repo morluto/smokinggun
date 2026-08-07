@@ -15,7 +15,7 @@ try {
     report.schemaVersion !== "footgun.scan-report.v1" ||
     scan.stderr.length !== 0 ||
     scan.stdout.includes("\u001b") ||
-    scan.stdout.includes("Footgun scan:")
+    scan.stdout.includes("SmokingGun scan:")
   )
     throw new Error("JSON scan stream contract failed");
 
@@ -73,7 +73,7 @@ try {
   const renderedMarkdown = await run([entry, "report", scanArtifact, "--format", "markdown"]);
   if (
     renderedMarkdown.code !== 0 ||
-    !renderedMarkdown.stdout.startsWith("# Footgun scan") ||
+    !renderedMarkdown.stdout.startsWith("# SmokingGun scan") ||
     renderedMarkdown.stderr.length !== 0
   )
     throw new Error("report Markdown contract failed");
@@ -151,7 +151,7 @@ try {
       await writeFile(processor, "#!/usr/bin/env node\nprocess.stdout.write('name,dur\\nmain,12.5\\n');\n", "utf8");
       await chmod(processor, 0o755);
       const traceResult = await run([entry, "report", trace, "--profile", "perfetto", "--format", "json"], {
-        FOOTGUN_TRACE_PROCESSOR: processor,
+        SMOKINGGUN_TRACE_PROCESSOR: processor,
       });
       const traceValue = JSON.parse(traceResult.stdout);
       if (
@@ -209,7 +209,7 @@ function run(args, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: root,
-      env: {...process.env, ...extraEnv, FOOTGUN_DATA_DIR: `${root}/.cli-smoke-data`},
+      env: {...process.env, ...extraEnv, SMOKINGGUN_DATA_DIR: `${root}/.cli-smoke-data`},
       shell: false,
     });
     let stdout = "";

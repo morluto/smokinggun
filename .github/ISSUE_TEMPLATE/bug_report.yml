@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a bug in Footgun
+description: Report a bug in SmokingGun
 labels: [bug]
 body:
   - type: textarea
@@ -12,8 +12,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Footgun version
-      description: The version from `footgun --version` (or the package version)
+      label: SmokingGun version
+      description: The version from `smokinggun --version` (or the package version)
     validations:
       required: true
   - type: textarea

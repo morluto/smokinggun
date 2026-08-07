@@ -1,4 +1,4 @@
-# Footgun long-term specification
+# SmokingGun long-term specification
 
 Status: design target; no implementation is implied by this document.
 
@@ -6,17 +6,17 @@ This project has two deliberately separate names and responsibilities:
 
 | Surface | Name | Responsibility |
 | --- | --- | --- |
-| npm package | `footgun` | Distribute the CLI, scanner backends, adapters, and agent skill |
-| CLI command | `footgun` | Run scans, combine scanner results, and produce reports |
-| Agent skill | `$footgun` | Teach compatible agent hosts when and how to use `footgun` |
-| repository/product | Footgun | Own the complete project and its research corpus |
+| npm package | `smokinggun` | Distribute the CLI, scanner backends, adapters, and agent skill |
+| CLI command | `smokinggun` | Run scans, combine scanner results, and produce reports |
+| Agent skill | `$smokinggun` | Teach compatible agent hosts when and how to use `smokinggun` |
+| repository/product | SmokingGun | Own the complete project and its research corpus |
 
 The scanner is the primary product. The skill is a thin distribution and
 orchestration layer around it. The project does not require an MCP server.
 
 ## Product boundary
 
-Footgun is a local, evidence-oriented code-complexity scanner that combines
+SmokingGun is a local, evidence-oriented code-complexity scanner that combines
 multiple static-analysis and, later, runtime-analysis backends. It generates
 optimization candidates and explains the evidence behind them. It does not
 claim to prove arbitrary program complexity or guarantee a universal speedup.
@@ -24,18 +24,18 @@ claim to prove arbitrary program complexity or guarantee a universal speedup.
 The core product must remain useful without an agent host:
 
 ```bash
-npx footgun scan .
-npx footgun scan . --scanner auto
-npx footgun scanners list
+npx smokinggun scan .
+npx smokinggun scan . --scanner auto
+npx smokinggun scanners list
 ```
 
-The installed executable is named `footgun`:
+The installed executable is named `smokinggun`:
 
 ```bash
-footgun scan .
-footgun scan . --scanner auto
-footgun scanners list
-footgun report
+smokinggun scan .
+smokinggun scan . --scanner auto
+smokinggun scanners list
+smokinggun report
 ```
 
 The skill adds agent guidance, not a second implementation. An agent session
@@ -58,7 +58,7 @@ prompt instructions.
 
 ## CLI responsibilities
 
-The `footgun` CLI owns the operational workflow:
+The `smokinggun` CLI owns the operational workflow:
 
 - scanner discovery and selection;
 - language and repository detection;
@@ -75,14 +75,14 @@ The `footgun` CLI owns the operational workflow:
 The initial command groups are:
 
 ```text
-footgun scan <path>       Static candidate discovery
-footgun scanners list     Installed and available scanner backends
-footgun explain <id>      Source context, assumptions, and related findings
-footgun investigate       Build an evidence plan for selected candidates
-footgun measure           Run an explicitly supplied workload or benchmark
-footgun compare           Compare baseline and candidate evidence
-footgun report            Render a saved investigation or scan report
-footgun doctor            Check runtime, parser, and optional-tool availability
+smokinggun scan <path>       Static candidate discovery
+smokinggun scanners list     Installed and available scanner backends
+smokinggun explain <id>      Source context, assumptions, and related findings
+smokinggun investigate       Build an evidence plan for selected candidates
+smokinggun measure           Run an explicitly supplied workload or benchmark
+smokinggun compare           Compare baseline and candidate evidence
+smokinggun report            Render a saved investigation or scan report
+smokinggun doctor            Check runtime, parser, and optional-tool availability
 ```
 
 `scan` is the first-class path. `investigate`, `measure`, and `compare` extend
@@ -92,11 +92,11 @@ the agent skill.
 Illustrative options:
 
 ```bash
-footgun scan . --scanner auto --format json
-footgun scan . --scanner python-semantic --max-findings 80
-footgun scan . --only language:typescript --exclude test,dist
-footgun investigate . --finding F-014 --plan-only
-footgun measure . --workload ./benchmarks/import-users.json --execute
+smokinggun scan . --scanner auto --format json
+smokinggun scan . --scanner python-semantic --max-findings 80
+smokinggun scan . --only language:typescript --exclude test,dist
+smokinggun investigate . --finding F-014 --plan-only
+smokinggun measure . --workload ./benchmarks/import-users.json --execute
 ```
 
 The exact flag names may change. The stable contract is that commands are
@@ -117,9 +117,9 @@ Supported backend categories include:
 - framework and database scanners for queries, rendering, I/O, and cache behavior.
 
 External static-scanner results should use SARIF as the preferred interchange
-format when available. Footgun should preserve SARIF tool identity, rule IDs,
+format when available. SmokingGun should preserve SARIF tool identity, rule IDs,
 locations, related locations, invocations, fingerprints, and fixes, then add
-Footgun-owned complexity claims and measurement evidence in the normalized
+SmokingGun-owned complexity claims and measurement evidence in the normalized
 finding or investigation sidecar.
 
 Users may request one backend, several backends, or `auto`. In `auto` mode the
@@ -145,7 +145,7 @@ distinguish `complete`, `partial`, `unavailable`, `blocked`, `failed`, and
 digests, raw artifact references, and reproduction metadata. A missing or
 failed optional adapter is unknown coverage, not an empty result. External
 static analyzers should cross the boundary through SARIF where possible;
-Footgun-specific complexity and measurement fields remain in an extension or
+SmokingGun-specific complexity and measurement fields remain in an extension or
 investigation sidecar.
 
 The registry must support built-in backends and externally installed adapters
@@ -221,7 +221,7 @@ estimate and a measured 2x speedup answer different questions.
 ## Language-support architecture
 
 “All languages” is an extensibility goal, not a claim that every language has
-equal analysis quality. Footgun uses capability tiers so unsupported or weakly
+equal analysis quality. SmokingGun uses capability tiers so unsupported or weakly
 supported languages remain honest and useful.
 
 ### Tier 0: repository inventory
@@ -416,8 +416,8 @@ The npm package should distribute the CLI and the skill together without
 duplicating the scanner implementation:
 
 ```text
-footgun/
-  bin/footgun
+smokinggun/
+  bin/smokinggun
   src/
     core/
     cli/
@@ -425,15 +425,15 @@ footgun/
     adapters/
     reports/
   skills/
-    footgun/
+    smokinggun/
       SKILL.md
   package.json
 ```
 
-The package’s public binary is `footgun`. Skill distribution is explicit:
+The package’s public binary is `smokinggun`. Skill distribution is explicit:
 
 ```bash
-npx skills add https://github.com/morluto/footgun --skill footgun
+npx skills add https://github.com/morluto/smokinggun --skill smokinggun
 ```
 
 The package must not modify an agent directory during ordinary npm
@@ -442,10 +442,10 @@ updates.
 
 ## Agent skill contract
 
-`$footgun` should remain concise and procedural. It should tell an agent:
+`$smokinggun` should remain concise and procedural. It should tell an agent:
 
 1. establish repository scope and available tools;
-2. run `footgun scan` for a first pass;
+2. run `smokinggun scan` for a first pass;
 3. inspect the source and repository context around selected findings;
 4. choose additional scanner backends when they add distinct evidence;
 5. keep static candidates separate from measured observations;
@@ -531,8 +531,8 @@ behavior and measurement gates pass or the report explicitly states the gap.
 
 ### Foundation
 
-- Establish `footgun` package and `$footgun` skill names.
-- Expose the `footgun` binary.
+- Establish `smokinggun` package and `$smokinggun` skill names.
+- Expose the `smokinggun` binary.
 - Define the normalized finding schema and coverage states.
 - Remove destructive or implicit package installation behavior.
 - Add packed-artifact and isolated Skills CLI discovery tests.
@@ -569,7 +569,7 @@ behavior and measurement gates pass or the report explicitly states the gap.
 
 ## Explicit non-goals
 
-Footgun will not:
+SmokingGun will not:
 
 - claim universal Big-O proofs for arbitrary programs;
 - treat a regex warning as a verified optimization;

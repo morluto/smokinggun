@@ -13,11 +13,11 @@ scanner, literature, and benchmark survey:
 5. how benchmark and profiler evidence can be compared without flattening
    different kinds of measurements into one score.
 
-The recommendation is deliberately layered. `footgun` should have a small,
+The recommendation is deliberately layered. `smokinggun` should have a small,
 versioned host-owned adapter contract, import established interchange formats
 where they already exist, use local indexing as a universal fallback, and
 preserve raw evidence alongside normalized summaries. The
-`$footgun` skill should interpret those artifacts; it should not
+`$smokinggun` skill should interpret those artifacts; it should not
 become a second plugin runtime or evidence format.
 
 ## 1. Scanner and adapter plugin contract
@@ -90,7 +90,7 @@ scan. One failed adapter should not erase findings produced by other adapters.
 SARIF is the preferred import boundary for external static analyzers. Its tool
 identity, rule IDs, source locations, related locations, invocation status,
 fingerprints, and optional fixes already cover much of the interchange
-problem. Footgun-specific fields should be kept in an extension or linked
+problem. SmokingGun-specific fields should be kept in an extension or linked
 investigation sidecar:
 
 - estimated complexity claim and claim class;
@@ -103,7 +103,7 @@ investigation sidecar:
 The import path should be:
 
 ```text
-external analyzer -> SARIF importer -> Footgun finding
+external analyzer -> SARIF importer -> SmokingGun finding
 ```
 
 Native adapters remain appropriate for tools with no SARIF output and for
@@ -163,7 +163,7 @@ detail.
 
 ### Comparison
 
-| Source | Strongest contribution | Cost or limitation | Footgun position |
+| Source | Strongest contribution | Cost or limitation | SmokingGun position |
 | --- | --- | --- | --- |
 | Local syntax index | Always available file, symbol, loop, call-site, and import hints | Weak alias/type resolution; dynamic dispatch remains unknown | Required fallback for every language with a parser |
 | SCIP | Batch symbols, occurrences, definitions, references, implementations, enclosing symbols, and external symbols in a compact protobuf index | Requires a language-specific indexer and build/configuration context; does not encode complexity, runtime, or performance | First optional semantic-context importer |
@@ -181,7 +181,7 @@ for navigation. These are useful context sources, but neither is a substitute
 for a complexity or benchmark evidence model.
 
 SCIP should be the first batch import because its document/occurrence model is
-close to the caller and enclosing-symbol queries Footgun needs without making
+close to the caller and enclosing-symbol queries SmokingGun needs without making
 the core understand every compiler database. Kythe should remain a future
 high-value adapter where its graph already exists. LSIF should be a compatible
 input, not a required build step. A live LSP request is a useful last-mile
@@ -341,7 +341,7 @@ CodeQL's [custom query testing workflow](https://docs.github.com/en/code-securit
 is a useful model: query tests keep example code separate from the query,
 store expected results, compare actual and expected output, and fail on an
 unexpected change. CodeQL also separates query tests from library tests and
-uses pinned pack dependencies. Footgun should adopt the same separation for
+uses pinned pack dependencies. SmokingGun should adopt the same separation for
 scanner rules, context adapters, and workload oracles.
 
 The corpus evaluator should report precision, recall, F1, location accuracy,
@@ -385,7 +385,7 @@ without the raw distribution is not sufficient for a performance claim.
 The common benchmark record should contain:
 
 ```text
-schema_version: footgun.evidence/v1
+schema_version: smokinggun.evidence/v1
 kind: benchmark-observation
 run_id
 subject: baseline | candidate, revision/artifact identity and digest
@@ -446,7 +446,7 @@ source mapping confidence and unresolved frames
 sampled call stacks and symbolization information and supports aggregation and
 comparison. [Perfetto](https://perfetto.dev/docs/) models timestamped slices,
 counters, scheduling/process events, and SQL-queryable trace data. These are
-different native models; Footgun should normalize their metadata and selected
+different native models; SmokingGun should normalize their metadata and selected
 hotspot summaries while preserving the original artifacts.
 
 The report must state whether a profile is sampled or exact, what overhead it

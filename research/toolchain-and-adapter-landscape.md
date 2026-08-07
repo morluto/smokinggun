@@ -2,14 +2,14 @@
 
 Research pass: 2026-08-05.
 
-This pass focused on the pieces that determine whether Footgun can support
-many languages through one `footgun` CLI while keeping `$footgun`
+This pass focused on the pieces that determine whether SmokingGun can support
+many languages through one `smokinggun` CLI while keeping `$smokinggun`
 as a thin, host-neutral agent skill. It used current Context7 documentation, DeepWiki
 repository views, and the available GitContribute corpus.
 
 ## Findings at a glance
 
-| Resource | What it contributes | What Footgun should take | Boundary to preserve |
+| Resource | What it contributes | What SmokingGun should take | Boundary to preserve |
 | --- | --- | --- | --- |
 | Tree-sitter | Incremental, error-tolerant syntax trees, queries, positions, language loading | Parser and query substrate; source spans; partial-parse diagnostics | Grammar and query definitions stay outside the core ranking/report policy |
 | Semgrep | Staged rule/config resolution, target handling, parallel scan execution, structured errors and output | Explicit scan pipeline, per-target failure records, bounded parallelism, machine-readable output | Its rule engine is not a drop-in complexity proof or a plugin protocol |
@@ -27,7 +27,7 @@ DeepWiki exposes the project as separate components for the parser engine,
 tree/node management, incremental parsing, query system, language bindings,
 grammar generation, CLI testing, dynamic loading, and distribution.
 
-### Implications for Footgun
+### Implications for SmokingGun
 
 Tree-sitter should be a parser substrate, not the whole analyzer. The first
 useful abstraction is:
@@ -77,9 +77,9 @@ It also describes per-target error conversion, parallel target execution,
 intermediate types between stages, and a Python CLI wrapper over a separate
 core engine.
 
-### Implications for Footgun
+### Implications for SmokingGun
 
-Footgun should copy the separation of concerns, not Semgrep's implementation:
+SmokingGun should copy the separation of concerns, not Semgrep's implementation:
 
 - parse CLI/configuration input into a scan configuration object;
 - resolve scanner backends and rule sources before scanning;
@@ -90,15 +90,15 @@ Footgun should copy the separation of concerns, not Semgrep's implementation:
 - use bounded parallelism only after measuring memory and parser contention;
 - keep formatting out of scanning and normalization.
 
-Semgrep also exposes a warning for Footgun: an extensive configuration object
-can make a CLI difficult to discover. Footgun should group options by concern
+Semgrep also exposes a warning for SmokingGun: an extensive configuration object
+can make a CLI difficult to discover. SmokingGun should group options by concern
 and provide simple defaults, with advanced scanner-specific configuration in
 separate files rather than an unbounded flag bag.
 
 Semgrep's architecture is not evidence that every external scanner should be
 run as a backend. Its engine modes are internally coordinated, and the
 DeepWiki analysis explicitly notes that they are not equivalent to independent
-plugin backends. Footgun needs a small adapter contract around external tools,
+plugin backends. SmokingGun needs a small adapter contract around external tools,
 not a claim that all tools are interchangeable.
 
 ## ast-grep
@@ -118,22 +118,22 @@ DeepWiki describes several especially relevant capabilities:
 - rule test directories and snapshots;
 - precompiled native binaries distributed through npm and Python packages.
 
-### Implications for Footgun
+### Implications for SmokingGun
 
-Footgun should separate ad-hoc structural queries from routine scans:
+SmokingGun should separate ad-hoc structural queries from routine scans:
 
 ```text
-footgun query       Explore a structural pattern
-footgun scan        Run configured complexity rules
-footgun rule test   Validate a rule against fixtures
-footgun scanners    Inspect backend capabilities and availability
+smokinggun query       Explore a structural pattern
+smokinggun scan        Run configured complexity rules
+smokinggun rule test   Validate a rule against fixtures
+smokinggun scanners    Inspect backend capabilities and availability
 ```
 
 The names are illustrative, but the separation is important. A one-off query,
 a maintained complexity rule, and an external profiler have different result
 contracts and validation requirements.
 
-Ast-grep's rule configuration suggests a useful future shape for Footgun rules:
+Ast-grep's rule configuration suggests a useful future shape for SmokingGun rules:
 
 ```text
 rule id
@@ -151,7 +151,7 @@ candidate transformation that requires behavior and performance validation.
 
 Ast-grep's npm packaging is also a useful warning. Cross-platform precompiled
 binaries can make a CLI feel dependency-free, but they add platform matrices,
-release artifacts, and native-binary verification. Footgun should decide
+release artifacts, and native-binary verification. SmokingGun should decide
 whether to ship a pure Node runtime, optional native parser packages, or a
 platform package strategy only after measuring distribution and startup needs.
 
@@ -161,7 +161,7 @@ DeepWiki describes SCIP as a language-neutral transmission format for code
 intelligence. It represents documents, symbols, occurrences, source ranges,
 definitions, references, implementations, and external symbols.
 
-SCIP is a promising optional context layer for Footgun:
+SCIP is a promising optional context layer for SmokingGun:
 
 ```text
 finding location
@@ -211,16 +211,16 @@ interchange boundary for external static analyzers:
 - `fingerprints` and `partialFingerprints` support stable result identity and
   deduplication across runs;
 - `invocations` preserve execution status and tool notifications;
-- `fixes` can carry proposed edits without requiring Footgun to apply them.
+- `fixes` can carry proposed edits without requiring SmokingGun to apply them.
 
-Footgun should provide a SARIF importer before inventing one bespoke adapter
+SmokingGun should provide a SARIF importer before inventing one bespoke adapter
 for every static analyzer. The importer should retain the original SARIF run
-and map its results into Footgun findings with `scanner`, `rule`, `location`,
+and map its results into SmokingGun findings with `scanner`, `rule`, `location`,
 `related_evidence`, `status`, and provenance fields.
 
-SARIF does not express Footgun's central claims by itself. Complexity estimates,
+SARIF does not express SmokingGun's central claims by itself. Complexity estimates,
 assumptions, empirical scaling, benchmark distributions, and semantic risks
-need Footgun-owned extension properties or a sidecar investigation record.
+need SmokingGun-owned extension properties or a sidecar investigation record.
 The sidecar should reference the SARIF result by run, rule ID, and fingerprint
 instead of replacing the standard data.
 
@@ -230,7 +230,7 @@ This gives the adapter strategy a clear order:
 external scanner
   -> SARIF (preferred)
   -> native adapter for non-SARIF output
-  -> normalized Footgun finding
+  -> normalized SmokingGun finding
 ```
 
 External outputs that are not SARIF remain supported, but each native adapter
@@ -252,7 +252,7 @@ user namespaces, `PR_SET_NO_NEW_PRIVS`, and optional seccomp filters. DeepWiki
 also highlights that its safety depends on the caller constructing a correct
 policy; it is not a complete sandbox by itself.
 
-### Implications for Footgun
+### Implications for SmokingGun
 
 Execution isolation should be an adapter capability, not an assumption of the
 benchmark engine:
@@ -273,7 +273,7 @@ require explicit user consent; it should not silently downgrade a high-risk
 execution request.
 
 The first safe default can remain static-only. When execution is introduced,
-Footgun should prefer a declared local workload, bounded process lifetime,
+SmokingGun should prefer a declared local workload, bounded process lifetime,
 controlled filesystem exposure, explicit network policy, output limits, and
 process-tree cleanup. Cross-platform support will likely require different
 adapters rather than pretending Linux namespace controls exist everywhere.
@@ -300,5 +300,5 @@ validation of concrete decisions:
    preserve raw profiler/benchmark artifacts alongside normalized evidence.
 
 There is no current need to research MCP architecture further. The target is a
-`footgun` CLI distributed in the `footgun` npm package, with
-`$footgun` teaching compatible agent hosts how to invoke and interpret it.
+`smokinggun` CLI distributed in the `smokinggun` npm package, with
+`$smokinggun` teaching compatible agent hosts how to invoke and interpret it.

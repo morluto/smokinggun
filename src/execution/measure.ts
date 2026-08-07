@@ -76,7 +76,7 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       return problem(
         "candidate-workspace-unavailable",
         "candidate-write requires an injected artifact workspace root.",
-        "Run candidate measurements through the Footgun CLI or provide workspaceRoot to the library API.",
+        "Run candidate measurements through the SmokingGun CLI or provide workspaceRoot to the library API.",
       );
     candidateWorkspace = await createCandidateWorkspace(root, workload, options.workspaceRoot, workloadDigest);
     executionRoot = candidateWorkspace;
@@ -312,8 +312,8 @@ export function parseMeasurement(input: unknown): MeasurementV1 | ProblemV1 {
     ? result.data
     : problem(
         "invalid-measurement",
-        "The artifact is not a valid Footgun MeasurementV1.",
-        "Regenerate it with `footgun measure`.",
+        "The artifact is not a valid SmokingGun MeasurementV1.",
+        "Regenerate it with `smokinggun measure`.",
       );
 }
 
@@ -326,7 +326,7 @@ export function parseMeasurementArtifact(input: unknown): MeasurementV1 | Scalin
     : problem(
         "invalid-measurement-artifact",
         "The artifact is not a valid MeasurementV1 or ScalingAnalysisV1.",
-        "Regenerate it with `footgun measure`.",
+        "Regenerate it with `smokinggun measure`.",
       );
 }
 

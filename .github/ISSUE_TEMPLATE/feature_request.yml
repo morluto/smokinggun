@@ -1,19 +1,19 @@
 name: Feature request
-description: Suggest a new capability for Footgun
+description: Suggest a new capability for SmokingGun
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: What can you not do today with Footgun?
+      description: What can you not do today with SmokingGun?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
       label: Proposed solution
-      description: How should Footgun behave, and which commands or output would be affected?
+      description: How should SmokingGun behave, and which commands or output would be affected?
     validations:
       required: true
   - type: textarea
