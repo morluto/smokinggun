@@ -78,7 +78,9 @@ export function buildScalingComparison(
       candidate.points.every((point) => point.behaviorValidated),
     improvement,
     comparable: environmentsMatch(baseline.environment, candidate.environment),
-    downgradeReasons: [],
+    downgradeReasons: [...baseline.points, ...candidate.points].flatMap(
+      (point) => point.isolation?.downgradeReasons ?? [],
+    ),
     digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
   });
   return {

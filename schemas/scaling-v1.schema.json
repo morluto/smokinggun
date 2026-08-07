@@ -99,6 +99,71 @@
           "behaviorValidated": {
             "type": "boolean"
           },
+          "isolation": {
+            "type": "object",
+            "properties": {
+              "backend": {
+                "type": "string",
+                "enum": [
+                  "host-process",
+                  "docker",
+                  "podman",
+                  "bwrap",
+                  "nsjail"
+                ]
+              },
+              "controlsRequested": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "controlsApplied": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "downgradeReasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "candidateWorkspace": {
+                "type": "string"
+              },
+              "runner": {
+                "type": "object",
+                "properties": {
+                  "runtime": {
+                    "type": "string",
+                    "enum": [
+                      "docker",
+                      "podman",
+                      "bwrap",
+                      "nsjail"
+                    ]
+                  },
+                  "image": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "runtime"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "backend",
+              "controlsRequested",
+              "controlsApplied",
+              "downgradeReasons"
+            ],
+            "additionalProperties": false
+          },
           "diagnostic": {
             "type": "string"
           }

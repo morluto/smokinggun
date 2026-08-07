@@ -5,7 +5,14 @@ import type {ScalingAnalysisV1} from "../protocol/index.js";
 it("compares scaling points deterministically", () => {
   const base = scaling("base", [10, 20]);
   const candidate = scaling("candidate", [8, 21]);
-  const result = buildScalingComparison(base, candidate, "baseline.json", "candidate.json");
+  const result = buildScalingComparison(
+    base,
+    candidate,
+    "baseline.json",
+    "candidate.json",
+    "a".repeat(64),
+    "b".repeat(64),
+  );
   expect(result.mode).toBe("scaling");
   expect(result.points?.map((point) => point.improvement)).toEqual([true, false]);
   expect(result.improvement).toBe(false);
@@ -33,6 +40,32 @@ it("uses immutable artifact digests in comparison identity", () => {
     "d".repeat(64),
   );
   expect(first.id).not.toBe(replacedCandidate.id);
+});
+
+it("blocks scaling promotion when a point has an isolation downgrade", () => {
+  const base = scaling("base", [10, 20]);
+  const candidate = scaling("candidate", [5, 10]);
+  base.points[0] = {
+    ...base.points[0],
+    isolation: {
+      backend: "host-process",
+      controlsRequested: ["network-denied"],
+      controlsApplied: ["network-unrestricted"],
+      downgradeReasons: ["host-process execution cannot enforce network denial"],
+    },
+  };
+  const result = buildScalingComparison(
+    base,
+    candidate,
+    "baseline.json",
+    "candidate.json",
+    "a".repeat(64),
+    "b".repeat(64),
+  );
+  expect(result.promotion).toBe("blocked");
+  expect(result.promotionReasons).toContain(
+    "execution-control-downgrade:host-process execution cannot enforce network denial",
+  );
 });
 
 function scaling(id: string, medians: ReadonlyArray<number>): ScalingAnalysisV1 {
