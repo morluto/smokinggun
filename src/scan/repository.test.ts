@@ -1,4 +1,5 @@
 import {mkdtemp, rm, writeFile} from "node:fs/promises";
+import {execFileSync} from "node:child_process";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -57,6 +58,26 @@ describe("repository scan seam", () => {
           (record) => record.scanner === "footgun.adapter:fixture-adapter" && record.parseStatus === "complete",
         ),
       ).toBe(true);
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("marks provenance dirty when analyzed source includes untracked files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-provenance-"));
+    try {
+      execFileSync("git", ["init"], {cwd: root});
+      await writeFile(join(root, "tracked.ts"), "export const tracked = 1;\n", "utf8");
+      execFileSync("git", ["add", "tracked.ts"], {cwd: root});
+      execFileSync(
+        "git",
+        ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"],
+        {cwd: root},
+      );
+      await writeFile(join(root, "untracked.ts"), "export const untracked = 2;\n", "utf8");
+      const report = await scanRepository(root, {configDigest: "d".repeat(64)});
+      expect(report.repository.dirty).toBe(true);
+      expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 2, extensions: [".ts"]});
     } finally {
       await rm(root, {recursive: true, force: true});
     }
