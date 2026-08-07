@@ -97,6 +97,25 @@ try {
   )
     throw new Error("plan-only investigations must be repeatable");
 
+  const missingFinding = await run([
+    entry,
+    "investigate",
+    "fixtures/corpus/typescript",
+    "--finding",
+    "fg_0000000000000000",
+    "--format",
+    "json",
+    "--non-interactive",
+  ]);
+  const missingFindingValue = JSON.parse(missingFinding.stdout);
+  if (
+    missingFinding.code !== 2 ||
+    missingFindingValue.schemaVersion !== "footgun.problem.v1" ||
+    missingFindingValue.code !== "finding-not-found" ||
+    missingFinding.stderr.length !== 0
+  )
+    throw new Error("investigate must reject finding IDs absent from its scan report");
+
   const scanArtifact = join(sandbox, "scan-report.json");
   await writeFile(scanArtifact, scan.stdout, "utf8");
   const renderedReport = await run([entry, "report", scanArtifact, "--format", "json"]);
