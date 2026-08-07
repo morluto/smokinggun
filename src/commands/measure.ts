@@ -76,6 +76,7 @@ export default class Measure extends BaseCommand {
       await writeFile(path, `${JSON.stringify(storedMeasurement, null, 2)}\n`, "utf8");
       const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const measurementDigest = createHash("sha256").update(stableJson(storedMeasurement)).digest("hex");
+      const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const nextBundle = {
         ...investigation.bundle,
         state: "baseline-measured" as const,
