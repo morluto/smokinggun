@@ -28,7 +28,7 @@ export function buildMeasurementComparison(
   });
   return {
     schemaVersion: "footgun.comparison.v1",
-    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest),
+    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
     mode: "measurement",
     baseline: baselinePath,
     candidate: candidatePath,
@@ -83,7 +83,7 @@ export function buildScalingComparison(
   });
   return {
     schemaVersion: "footgun.comparison.v1",
-    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest),
+    id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
     mode: "scaling",
     baseline: baselinePath,
     candidate: candidatePath,
@@ -164,9 +164,15 @@ function isImprovement(
   return candidateMedian < threshold;
 }
 
-function comparisonIdFor(baseline: string, candidate: string, workloadDigest: string): `cmp_${string}` {
+function comparisonIdFor(
+  baseline: string,
+  candidate: string,
+  workloadDigest: string,
+  baselineDigest: string | undefined,
+  candidateDigest: string | undefined,
+): `cmp_${string}` {
   return `cmp_${createHash("sha256")
-    .update(stableJson({baseline, candidate, workload: workloadDigest}))
+    .update(stableJson({baseline, candidate, workload: workloadDigest, baselineDigest, candidateDigest}))
     .digest("hex")
     .slice(0, 16)}`;
 }
