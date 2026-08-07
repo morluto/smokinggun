@@ -8,7 +8,7 @@ import {printResult} from "../cli/command-output.js";
 import {scanRepository} from "../scan/repository.js";
 import {Protocol, type InvestigationBundleV1} from "../protocol/index.js";
 import {resolveConfiguredPath} from "../config.js";
-import {recordInvestigationSnapshot} from "../investigations/store.js";
+import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
 import {stableJson} from "../serialization.js";
 
 export default class Investigate extends BaseCommand {
@@ -51,6 +51,17 @@ export default class Investigate extends BaseCommand {
       const digest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
       const id = `inv_${digest.slice(0, 16)}`;
       const directory = join(context.artifacts, "investigations", id);
+      if (parsed.flags["plan-only"]) {
+        const existing = await loadLatestInvestigation(context.artifacts, id);
+        if (existing !== undefined) {
+          await printResult(
+            existing.bundle,
+            `Investigation ${id}\nState: ${existing.bundle.state}\nBundle: ${join(directory, "bundle.json")}`,
+            context,
+          );
+          return;
+        }
+      }
       await mkdir(directory, {recursive: true});
       const reportPath = join(directory, "scan-report.json");
       if (report !== undefined) await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
