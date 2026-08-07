@@ -13,6 +13,28 @@ it("compares scaling points deterministically", () => {
   expect(result.promotionReasons).toContain("configured-statistical-policy-not-met");
 });
 
+it("uses immutable artifact digests in comparison identity", () => {
+  const baseline = scaling("base", [10, 20]);
+  const candidate = scaling("candidate", [8, 16]);
+  const first = buildScalingComparison(
+    baseline,
+    candidate,
+    "baseline.json",
+    "candidate.json",
+    "b".repeat(64),
+    "c".repeat(64),
+  );
+  const replacedCandidate = buildScalingComparison(
+    baseline,
+    candidate,
+    "baseline.json",
+    "candidate.json",
+    "b".repeat(64),
+    "d".repeat(64),
+  );
+  expect(first.id).not.toBe(replacedCandidate.id);
+});
+
 function scaling(id: string, medians: ReadonlyArray<number>): ScalingAnalysisV1 {
   return {
     schemaVersion: "footgun.scaling.v1",
