@@ -106,10 +106,10 @@ export function scanSource(
           path,
           index + 1,
           "nested-or-callback-loop",
-          "high",
+          "medium",
           "Loop or array iteration appears inside another iterative region.",
           "Check whether indexing, grouping, batching, or a single-pass algorithm can remove repeated scans.",
-          ["the inner iteration count depends on an outer iteration"],
+          ["input bounds, runtime frequency, and dependency between the iterations are unknown"],
         ),
       );
     }
