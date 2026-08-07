@@ -57,7 +57,8 @@ export default class Scan extends BaseCommand {
         this.exit(3);
       }
       const failOn = context.config.failOn;
-      if (failOn !== undefined && report.findings.some((finding) => matchesFailPolicy(finding, failOn))) this.exit(4);
+      if (failOn !== undefined && report.policyFindings.some((finding) => matchesFailPolicy(finding, failOn)))
+        this.exit(4);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)

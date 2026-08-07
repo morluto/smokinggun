@@ -389,6 +389,30 @@
         "additionalProperties": false
       }
     },
+    "findingSummary": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "emitted": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "total",
+        "emitted",
+        "truncated"
+      ],
+      "additionalProperties": false
+    },
     "coverage": {
       "type": "array",
       "items": {

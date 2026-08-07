@@ -45,8 +45,10 @@ export type ScanOptions = {
   readonly adapterManifests?: ReadonlyArray<string>;
 };
 
+export type ScanRepositoryResult = ScanReportV1 & {readonly policyFindings: ReadonlyArray<FindingV1>};
+
 /** Scan one local repository without executing source code or contacting the network. */
-export async function scanRepository(inputRoot: string, options: ScanOptions): Promise<ScanReportV1> {
+export async function scanRepository(inputRoot: string, options: ScanOptions): Promise<ScanRepositoryResult> {
   const started = performance.now();
   const startedAt = new Date().toISOString();
   const root = resolve(inputRoot);
@@ -206,9 +208,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   findings.push(...adapterRun.findings);
   parseDiagnostics.push(...adapterRun.diagnostics);
   parseDiagnostics.push(...scannerDisagreements(findings));
-  const allFindings = relateFindings(findings)
-    .sort(compareFindings)
-    .slice(0, options.maxFindings ?? 80);
+  const policyFindings = relateFindings(findings).sort(compareFindings);
+  const allFindings = policyFindings.slice(0, options.maxFindings ?? 80);
   const coverage: CoverageRecordV1 = {
     scanner: scannerId,
     version: scannerVersion,
@@ -281,7 +282,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             pythonSemanticUnavailable > 0 ? "unavailable" : pythonSemanticPartial > 0 ? "partial" : "complete",
           skippedFiles: pythonSemanticSkipped.sort(comparePortable),
         };
-  return {
+  const report: ScanReportV1 = {
     schemaVersion: "footgun.scan-report.v1",
     tool: {name: "footgun", version: "1.0.0"},
     repository,
@@ -289,6 +290,11 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     sourceDigest,
     configDigest: options.configDigest,
     findings: allFindings,
+    findingSummary: {
+      total: policyFindings.length,
+      emitted: allFindings.length,
+      truncated: allFindings.length < policyFindings.length,
+    },
     coverage: [
       coverage,
       ...parserRecords,
@@ -309,6 +315,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     filesModified: [],
     rawArtifacts: [...adapterRun.rawArtifacts],
   };
+  return Object.defineProperty(report, "policyFindings", {value: policyFindings}) as ScanRepositoryResult;
 }
 
 async function runConfiguredAdapters(
