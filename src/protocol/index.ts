@@ -175,7 +175,7 @@ const contextIndexSchema = z.strictObject({
 
 const scanReportSchema = z.strictObject({
   schemaVersion: version("footgun.scan-report.v1"),
-  tool: z.strictObject({name: z.literal("footgun"), version: z.string().min(1)}),
+  tool: z.strictObject({name: z.literal("smokinggun"), version: z.string().min(1)}),
   repository: repositorySchema,
   inventory: inventorySchema.optional(),
   sourceDigest: z

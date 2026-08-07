@@ -16,6 +16,7 @@ import {buildRepositoryInventory} from "./inventory.js";
 import {loadExternalAdapters} from "../scanners/external.js";
 import {runSubprocessAdapter} from "../adapters/subprocess.js";
 import {createHash} from "node:crypto";
+import {toolIdentity} from "../tool-identity.js";
 
 const defaultExcludes = new Set([
   ".git",
@@ -283,7 +284,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         };
   return {
     schemaVersion: "footgun.scan-report.v1",
-    tool: {name: "footgun", version: "1.0.0"},
+    tool: toolIdentity,
     repository,
     inventory,
     sourceDigest,

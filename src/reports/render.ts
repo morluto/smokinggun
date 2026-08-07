@@ -1,6 +1,7 @@
 import type {ScanReportV1} from "../protocol/index.js";
 import {parseScanReport} from "../protocol/index.js";
 import type {OutputFormat} from "../config.js";
+import {toolIdentity} from "../tool-identity.js";
 
 /** Render the normalized scan model without adding diagnostics to machine output. */
 export function renderScanReport(report: ScanReportV1, format: OutputFormat): string {
@@ -27,7 +28,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
       {
         tool: {
           driver: {
-            name: "footgun",
+            name: toolIdentity.name,
             version: report.tool.version,
             informationUri: "https://github.com/morluto/smokinggun",
           },

@@ -3,6 +3,7 @@ import {createRuntimeContext, isContextFailure, type GlobalFlags, type RuntimeCo
 import type {OutputFormat} from "../config.js";
 import type {ActionRequiredV1, ProblemV1} from "../protocol/index.js";
 import {redactSensitive} from "../execution/environment.js";
+import {toolIdentity} from "../tool-identity.js";
 
 export const globalFlags = {
   cwd: Flags.string({description: "Repository working directory."}),
@@ -110,7 +111,7 @@ export abstract class BaseCommand extends Command {
         $schema: "https://json.schemastore.org/sarif-2.1.0.json",
         runs: [
           {
-            tool: {driver: {name: "footgun", version: "1.0.0"}},
+            tool: {driver: toolIdentity},
             results: [],
             invocations: [
               {
@@ -138,7 +139,7 @@ export abstract class BaseCommand extends Command {
     if (context.config.format === "json") context.stdout.write(`${JSON.stringify(action)}\n`);
     else if (context.config.format === "sarif")
       context.stdout.write(
-        `${JSON.stringify({version: "2.1.0", $schema: "https://json.schemastore.org/sarif-2.1.0.json", runs: [{tool: {driver: {name: "footgun", version: "1.0.0"}}, results: [], invocations: [{executionSuccessful: false, toolExecutionNotifications: [{level: "warning", message: {text: action.explanation}, properties: action}]}], properties: {schemaVersion: action.schemaVersion, actionRequired: action}}]})}\n`,
+        `${JSON.stringify({version: "2.1.0", $schema: "https://json.schemastore.org/sarif-2.1.0.json", runs: [{tool: {driver: toolIdentity}, results: [], invocations: [{executionSuccessful: false, toolExecutionNotifications: [{level: "warning", message: {text: action.explanation}, properties: action}]}], properties: {schemaVersion: action.schemaVersion, actionRequired: action}}]})}\n`,
       );
     else context.stderr.write(`${action.explanation}\nRecovery: ${action.recoveryCommands.join("; ")}\n`);
     this.exit(2);

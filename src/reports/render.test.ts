@@ -4,7 +4,7 @@ import {parseReportArtifact, renderScanReport, toSarif} from "./render.js";
 
 const report: ScanReportV1 = {
   schemaVersion: "footgun.scan-report.v1",
-  tool: {name: "footgun", version: "1.0.0"},
+  tool: {name: "smokinggun", version: "2.0.0"},
   repository: {root: ".", revision: null, dirty: false},
   configDigest: "a".repeat(64),
   findings: [],
@@ -29,7 +29,10 @@ describe("report renderers", () => {
   it("round-trips JSON and emits valid SARIF", () => {
     const parsed = parseReportArtifact(JSON.parse(renderScanReport(report, "json")) as unknown);
     expect("_tag" in parsed).toBe(false);
-    expect(toSarif(report)).toMatchObject({version: "2.1.0", runs: [{tool: {driver: {name: "footgun"}}, results: []}]});
+    expect(toSarif(report)).toMatchObject({
+      version: "2.1.0",
+      runs: [{tool: {driver: {name: "smokinggun", version: "2.0.0"}}, results: []}],
+    });
   });
 
   it("keeps assumptions visible in human output", () => {
