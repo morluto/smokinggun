@@ -64,7 +64,8 @@ try {
     join(root, ".cli-smoke-data", "investigations", investigationValue.id, "scan-report.json"),
   );
   const storedScanDigest = createHash("sha256").update(storedScan).digest("hex");
-  if (investigationValue.evidence[0]?.digest !== storedScanDigest)
+  const scanEvidence = investigationValue.evidence.find((evidence) => evidence.artifact === "scan-report.json");
+  if (scanEvidence?.digest !== storedScanDigest)
     throw new Error("investigation scan evidence digest must match its stored artifact");
 
   const firstPlan = await run([
