@@ -5,7 +5,7 @@ import {runSubprocessAdapter} from "./subprocess.js";
 describe("subprocess adapter seam", () => {
   it("round-trips one bounded versioned JSON request through a real process", async () => {
     const script =
-      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stderr.write('adapter diagnostic token=secret-value');process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v1',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
+      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stderr.write('adapter diagnostic token=secret-value');process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v2',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
     const result = await runSubprocessAdapter(
       {
         schemaVersion: "footgun.adapter-manifest.v1",
@@ -28,7 +28,7 @@ describe("subprocess adapter seam", () => {
 
   it("accepts every declared adapter result state and preserves the state", async () => {
     for (const state of ["complete", "partial", "unavailable", "blocked", "failed", "cancelled"] as const) {
-      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v1',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]})));`;
+      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v2',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]})));`;
       const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {root: process.cwd()});
       expect("_tag" in result).toBe(false);
       if (!("_tag" in result)) expect(result.state).toBe(state);

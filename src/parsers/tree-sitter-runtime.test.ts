@@ -18,6 +18,7 @@ describe("pinned Tree-sitter runtime", () => {
     const invalid = await parseWithTreeSitter("invalid.py", "def broken(:\n  return 1\n");
     expect(valid.status).toBe("complete");
     expect(invalid.status).toBe("partial");
+    if (invalid.status !== "complete") expect(invalid.error).toContain("syntax errors");
   });
 
   it("parses Rust raw identifiers used as bindings and references", async () => {

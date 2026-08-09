@@ -1,18 +1,17 @@
 import {createHash} from "node:crypto";
 import {z} from "zod";
-import {Protocol, type BenchmarkImportV1, type BenchmarkRecordV1, type ProblemV1} from "../protocol/index.js";
+import {Protocol, type BenchmarkImportV2, type BenchmarkRecordV2, type ProblemV1} from "../protocol/index.js";
 import {stableJson} from "../serialization.js";
 
-export type BenchmarkTool = BenchmarkRecordV1["tool"];
+export type BenchmarkTool = BenchmarkRecordV2["tool"];
 
-export type BenchmarkImportOptions = {
-  readonly tool: BenchmarkTool;
-  readonly rawArtifact?: string;
-  readonly rawArtifactDigest?: string;
-};
+type WithoutRawArtifact = {readonly rawArtifact?: never; readonly rawArtifactDigest?: never};
+type WithRawArtifact = {readonly rawArtifact: string; readonly rawArtifactDigest?: string};
+
+export type BenchmarkImportOptions = {readonly tool: BenchmarkTool} & (WithoutRawArtifact | WithRawArtifact);
 
 /** Import one standard benchmark JSON document while preserving whether values are raw observations or summaries. */
-export function importBenchmark(input: unknown, options: BenchmarkImportOptions): BenchmarkImportV1 | ProblemV1 {
+export function importBenchmark(input: unknown, options: BenchmarkImportOptions): BenchmarkImportV2 | ProblemV1 {
   const records =
     options.tool === "hyperfine"
       ? importHyperfine(input, options)
@@ -25,7 +24,7 @@ export function importBenchmark(input: unknown, options: BenchmarkImportOptions)
             : importJmh(input, options);
   if ("code" in records) return records;
   const result = {
-    schemaVersion: "footgun.benchmark-import.v1" as const,
+    schemaVersion: "footgun.benchmark-import.v2" as const,
     tool: options.tool,
     records,
     ...(options.rawArtifact === undefined ? {} : {rawArtifact: options.rawArtifact}),
@@ -41,7 +40,7 @@ export function importBenchmark(input: unknown, options: BenchmarkImportOptions)
       );
 }
 
-function importHyperfine(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV1[] | ProblemV1 {
+function importHyperfine(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
   const object = objectValue(input);
   const results = arrayValue(object?.results);
   if (results === undefined || results.length === 0)
@@ -50,7 +49,7 @@ function importHyperfine(input: unknown, options: BenchmarkImportOptions): Bench
       "The input is not a Hyperfine JSON result with a non-empty results array.",
       "Export Hyperfine with --export-json and pass that JSON artifact.",
     );
-  const records: BenchmarkRecordV1[] = [];
+  const records: BenchmarkRecordV2[] = [];
   for (const [index, value] of results.entries()) {
     const entry = objectValue(value);
     const samples = finiteArray(entry?.times);
@@ -75,7 +74,7 @@ function importHyperfine(input: unknown, options: BenchmarkImportOptions): Bench
     : records;
 }
 
-function importPyperf(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV1[] | ProblemV1 {
+function importPyperf(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
   const object = objectValue(input);
   const benchmarks = arrayValue(object?.benchmarks);
   if (benchmarks === undefined || benchmarks.length === 0)
@@ -84,7 +83,7 @@ function importPyperf(input: unknown, options: BenchmarkImportOptions): Benchmar
       "The input is not a pyperf JSON result with a non-empty benchmarks array.",
       "Export the benchmark with pyperf JSON output and pass that artifact.",
     );
-  const records: BenchmarkRecordV1[] = [];
+  const records: BenchmarkRecordV2[] = [];
   for (const [index, value] of benchmarks.entries()) {
     const entry = objectValue(value);
     if (entry === undefined || typeof entry.name !== "string") continue;
@@ -106,7 +105,7 @@ function importPyperf(input: unknown, options: BenchmarkImportOptions): Benchmar
     : records;
 }
 
-function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV1[] | ProblemV1 {
+function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
   const object = objectValue(input);
   const benchmarks = arrayValue(object?.benchmarks);
   if (benchmarks === undefined || benchmarks.length === 0)
@@ -115,7 +114,7 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
       "The input is not Google Benchmark JSON with a non-empty benchmarks array.",
       "Export Google Benchmark with --benchmark_format=json.",
     );
-  const records: BenchmarkRecordV1[] = [];
+  const records: BenchmarkRecordV2[] = [];
   for (const [index, value] of benchmarks.entries()) {
     const entry = objectValue(value);
     const realTime = finiteNumber(entry?.real_time);
@@ -146,7 +145,7 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
     : records;
 }
 
-function importCriterion(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV1[] | ProblemV1 {
+function importCriterion(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
   const object = objectValue(input);
   const mean = finiteNumber(objectValue(object?.mean)?.point_estimate);
   const median = finiteNumber(objectValue(object?.median)?.point_estimate);
@@ -167,7 +166,7 @@ function importCriterion(input: unknown, options: BenchmarkImportOptions): Bench
   ];
 }
 
-function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV1[] | ProblemV1 {
+function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
   const entries = arrayValue(input);
   if (entries === undefined || entries.length === 0)
     return problem(
@@ -175,7 +174,7 @@ function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRe
       "The input is not a JMH JSON array with benchmark records.",
       "Export JMH using its JSON result format.",
     );
-  const records: BenchmarkRecordV1[] = [];
+  const records: BenchmarkRecordV2[] = [];
   for (const [index, value] of entries.entries()) {
     const entry = objectValue(value);
     const metric = objectValue(entry?.primaryMetric);
@@ -228,7 +227,7 @@ function makeRecord(
   samplesMs: number[],
   sourceUnit: string,
   metadata: Record<string, string | number | boolean>,
-): BenchmarkRecordV1 {
+): BenchmarkRecordV2 {
   const sorted = [...samplesMs].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   const medianMs =
@@ -248,7 +247,7 @@ function makeRecord(
     )
     .digest("hex");
   return {
-    schemaVersion: "footgun.benchmark-record.v1",
+    schemaVersion: "footgun.benchmark-record.v2",
     id: `bench_${digest.slice(0, 16)}`,
     tool: options.tool,
     name,

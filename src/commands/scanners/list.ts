@@ -28,7 +28,7 @@ export default class ScannersList extends BaseCommand {
       "Scanner capabilities",
       ...scanners.map(
         (scanner) =>
-          `- ${scanner.id} ${scanner.version}: ${scanner.availability}${scanner.reason === undefined ? "" : ` (${scanner.reason})`}`,
+          `- ${scanner.id} ${scanner.version}: ${scanner.availability}${scanner.availability === "available" ? "" : ` (${scanner.reason})`}`,
       ),
     ].join("\n");
     await printResult(

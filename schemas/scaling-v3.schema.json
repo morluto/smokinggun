@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.scaling.v2"
+      "const": "footgun.scaling.v3"
     },
     "id": {
       "type": "string",
@@ -17,9 +17,18 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
-    "parameter": {
+    "parameters": {
+      "minItems": 2,
+      "maxItems": 2,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "coordinatesDigest": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^[a-f0-9]{64}$"
     },
     "points": {
       "minItems": 1,
@@ -166,6 +175,15 @@
               "timedOut": {
                 "type": "boolean",
                 "const": false
+              },
+              "coordinates": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
               }
             },
             "required": [
@@ -177,7 +195,8 @@
               "medianMs",
               "meanMs",
               "quartiles",
-              "timedOut"
+              "timedOut",
+              "coordinates"
             ],
             "additionalProperties": false
           },
@@ -322,6 +341,15 @@
               "timedOut": {
                 "type": "boolean",
                 "const": true
+              },
+              "coordinates": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
               }
             },
             "required": [
@@ -333,7 +361,8 @@
               "meanMs",
               "quartiles",
               "status",
-              "timedOut"
+              "timedOut",
+              "coordinates"
             ],
             "additionalProperties": false
           },
@@ -478,6 +507,15 @@
               "timedOut": {
                 "type": "boolean",
                 "const": false
+              },
+              "coordinates": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
               }
             },
             "required": [
@@ -489,60 +527,179 @@
               "meanMs",
               "quartiles",
               "status",
-              "timedOut"
+              "timedOut",
+              "coordinates"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "statisticalPolicy": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "median-improvement",
+                      "non-overlapping-iqr"
+                    ]
+                  },
+                  "minimumRelativeImprovement": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "minimumRelativeImprovement"
+                ],
+                "additionalProperties": false
+              },
+              "behaviorValidated": {
+                "type": "boolean"
+              },
+              "isolation": {
+                "type": "object",
+                "properties": {
+                  "backend": {
+                    "type": "string",
+                    "enum": [
+                      "host-process",
+                      "docker",
+                      "podman",
+                      "bwrap",
+                      "nsjail"
+                    ]
+                  },
+                  "controlsRequested": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "controlsApplied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "downgradeReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "candidateWorkspace": {
+                    "type": "string"
+                  },
+                  "runner": {
+                    "type": "object",
+                    "properties": {
+                      "runtime": {
+                        "type": "string",
+                        "enum": [
+                          "docker",
+                          "podman",
+                          "bwrap",
+                          "nsjail"
+                        ]
+                      },
+                      "image": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "runtime"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "backend",
+                  "controlsRequested",
+                  "controlsApplied",
+                  "downgradeReasons"
+                ],
+                "additionalProperties": false
+              },
+              "diagnostic": {
+                "type": "string"
+              },
+              "samplesMs": {
+                "minItems": 0,
+                "maxItems": 0,
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "medianMs": {
+                "type": "number",
+                "const": 0
+              },
+              "meanMs": {
+                "type": "number",
+                "const": 0
+              },
+              "quartiles": {
+                "type": "object",
+                "properties": {
+                  "q1Ms": {
+                    "type": "number",
+                    "const": 0
+                  },
+                  "q3Ms": {
+                    "type": "number",
+                    "const": 0
+                  }
+                },
+                "required": [
+                  "q1Ms",
+                  "q3Ms"
+                ],
+                "additionalProperties": false
+              },
+              "status": {
+                "type": "string",
+                "const": "cancelled"
+              },
+              "timedOut": {
+                "type": "boolean",
+                "const": false
+              },
+              "coordinates": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "statisticalPolicy",
+              "behaviorValidated",
+              "samplesMs",
+              "medianMs",
+              "meanMs",
+              "quartiles",
+              "status",
+              "timedOut",
+              "coordinates"
             ],
             "additionalProperties": false
           }
         ]
       }
-    },
-    "models": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": [
-              "constant",
-              "logarithmic",
-              "linear",
-              "linearithmic",
-              "quadratic"
-            ]
-          },
-          "coefficients": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "residual": {
-            "type": "number",
-            "minimum": 0
-          },
-          "rSquared": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "name",
-          "coefficients",
-          "residual",
-          "rSquared"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "selectedModel": {
-      "type": "string",
-      "enum": [
-        "constant",
-        "logarithmic",
-        "linear",
-        "linearithmic",
-        "quadratic"
-      ]
     },
     "reproduction": {
       "type": "object",
@@ -645,9 +802,9 @@
     "schemaVersion",
     "id",
     "workloadDigest",
-    "parameter",
+    "parameters",
+    "coordinatesDigest",
     "points",
-    "models",
     "reproduction",
     "environment",
     "limitations"

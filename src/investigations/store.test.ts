@@ -8,7 +8,7 @@ describe("investigation snapshots", () => {
   it("advances through content-addressed snapshots", async () => {
     const root = await mkdtemp(join(tmpdir(), "footgun-investigation-"));
     const initial = {
-      schemaVersion: "footgun.investigation-bundle.v1" as const,
+      schemaVersion: "footgun.investigation-bundle.v2" as const,
       id: "inv_0123456789abcdef",
       state: "scanned" as const,
       root: ".",
@@ -32,7 +32,7 @@ describe("investigation snapshots", () => {
   it("rejects state regressions and skipped validation stages", async () => {
     const root = await mkdtemp(join(tmpdir(), "footgun-investigation-"));
     const initial = {
-      schemaVersion: "footgun.investigation-bundle.v1" as const,
+      schemaVersion: "footgun.investigation-bundle.v2" as const,
       id: "inv_fedcba9876543210",
       state: "created" as const,
       root: ".",

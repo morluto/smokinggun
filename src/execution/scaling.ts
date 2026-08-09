@@ -2,14 +2,18 @@ import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import {
   Protocol,
+  isMultiScalingWorkload,
+  isSingleScalingWorkload,
+  type MultiScalingWorkloadV2,
   type ProblemV1,
-  type ScalingAnalysisV1,
+  type SingleScalingWorkloadV2,
   type ScalingAnalysisV2,
+  type ScalingAnalysisV3,
   type ScalingModelV1,
-  type ScalingPointV1,
+  type ScalingPointV2,
 } from "../protocol/index.js";
 import {stableJson} from "../serialization.js";
-import {measureWorkload, type MeasurementOptions} from "./measure.js";
+import {measureParsedWorkload, type MeasurementOptions} from "./measure.js";
 import {executionEnvironment, redactCommand} from "./environment.js";
 import {portablePath} from "../paths.js";
 
@@ -17,55 +21,45 @@ import {portablePath} from "../paths.js";
 export async function measureScaling(
   input: unknown,
   options: MeasurementOptions,
-): Promise<ScalingAnalysisV1 | ProblemV1> {
+): Promise<ScalingAnalysisV2 | ProblemV1> {
   const parsed = Protocol.workload.safeParse(input);
   if (!parsed.success)
     return problem(
       "invalid-workload",
-      "The workload is not a valid WorkloadV1 descriptor.",
+      "The workload is not a valid WorkloadV2 descriptor.",
       "Provide a strict workload with an input-size parameterization.",
     );
   const workload = parsed.data;
-  if (workload.multiParameterization !== undefined)
+  if (isMultiScalingWorkload(workload))
     return problem(
       "scaling-profile-unavailable",
       "A multi-parameter workload must use the multi-scaling runner.",
       "Call measureMultiScaling for a multiParameterization descriptor.",
     );
-  const parameter = workload.inputSizeParameterization;
-  if (parameter === undefined)
+  if (!isSingleScalingWorkload(workload))
     return problem(
       "scaling-parameter-missing",
       "The workload does not declare an input-size parameterization.",
-      "Add name, values, and an explicit commandIndex to WorkloadV1.",
+      "Add name, values, and an explicit commandIndex to WorkloadV2.",
     );
-  if (parameter.commandIndex >= workload.command.length)
-    return problem(
-      "scaling-command-index-invalid",
-      "The input-size command index is outside the declared command.",
-      "Point commandIndex at an existing argument; command substitution never uses a shell.",
-    );
-  const points: ScalingPointV1[] = [];
+  return measureParsedScaling(workload, options);
+}
+
+/** Measure a single-parameter workload already parsed at the caller's boundary. */
+export async function measureParsedScaling(
+  workload: SingleScalingWorkloadV2,
+  options: MeasurementOptions,
+): Promise<ScalingAnalysisV2 | ProblemV1> {
+  const parameter = workload.inputSizeParameterization;
+  const points: ScalingPointV2[] = [];
   const {inputSizeParameterization: _parameter, ...baseWorkload} = workload;
   for (const value of parameter.values) {
     options.signal?.throwIfAborted();
     const command = [...workload.command];
     command[parameter.commandIndex] = String(value);
-    const pointWorkload: unknown = {...baseWorkload, command};
-    const measurement = await measureWorkload(pointWorkload, options);
+    const measurement = await measureParsedWorkload({...baseWorkload, command}, options);
     if ("code" in measurement) {
-      points.push({
-        value,
-        status: measurement.code === "measurement-timeout" ? "timed-out" : "failed",
-        samplesMs: [],
-        medianMs: 0,
-        meanMs: 0,
-        quartiles: {q1Ms: 0, q3Ms: 0},
-        statisticalPolicy: workload.statisticalPolicy,
-        timedOut: measurement.code === "measurement-timeout",
-        behaviorValidated: false,
-        diagnostic: measurement.code,
-      });
+      points.push(makeFailedPoint(value, workload.statisticalPolicy, measurement.code));
       if (measurement.code === "measurement-cancelled") return measurement;
       continue;
     }
@@ -99,7 +93,7 @@ export async function measureScaling(
       : []),
   ];
   return {
-    schemaVersion: "footgun.scaling.v1",
+    schemaVersion: "footgun.scaling.v2",
     id,
     workloadDigest,
     parameter: parameter.name,
@@ -125,66 +119,34 @@ export async function measureScaling(
 export async function measureMultiScaling(
   input: unknown,
   options: MeasurementOptions,
-): Promise<ScalingAnalysisV2 | ProblemV1> {
+): Promise<ScalingAnalysisV3 | ProblemV1> {
   const parsed = Protocol.workload.safeParse(input);
   if (!parsed.success)
     return problem(
       "invalid-workload",
-      "The workload is not a valid WorkloadV1 descriptor.",
+      "The workload is not a valid WorkloadV2 descriptor.",
       "Provide a strict workload.",
     );
   const workload = parsed.data;
-  const design = workload.multiParameterization;
-  if (design === undefined)
+  if (!isMultiScalingWorkload(workload))
     return problem(
       "scaling-parameters-missing",
       "The workload does not declare a multi-parameter scaling plan.",
       "Add multiParameterization.",
     );
+  return measureParsedMultiScaling(workload, options);
+}
+
+/** Measure a multi-parameter workload already parsed at the caller's boundary. */
+export async function measureParsedMultiScaling(
+  workload: MultiScalingWorkloadV2,
+  options: MeasurementOptions,
+): Promise<ScalingAnalysisV3 | ProblemV1> {
+  const design = workload.multiParameterization;
   const names = design.parameters.map((parameter) => parameter.name);
-  if (
-    new Set(names).size !== names.length ||
-    new Set(design.parameters.map((parameter) => parameter.commandIndex)).size !== names.length
-  )
-    return problem(
-      "scaling-parameters-invalid",
-      "Scaling parameter names and command indexes must be distinct.",
-      "Declare distinct names and commandIndex values.",
-    );
-  if (design.parameters.some((parameter) => parameter.commandIndex >= workload.command.length))
-    return problem(
-      "scaling-command-index-invalid",
-      "A scaling command index is outside the declared command.",
-      "Point every commandIndex at an existing argument.",
-    );
-  const coordinateCount = design.coordinates === undefined ? cartesianCoordinateCount(design.parameters) : undefined;
-  if (coordinateCount !== undefined && coordinateCount > design.maxPoints)
-    return problem(
-      "scaling-points-limit-exceeded",
-      "The scaling coordinate plan exceeds maxPoints.",
-      "Reduce parameter values, provide explicit coordinates, or raise maxPoints up to 64.",
-    );
   const coordinates = design.coordinates ?? cartesianCoordinates(design.parameters);
-  if (coordinates.length > design.maxPoints)
-    return problem(
-      "scaling-points-limit-exceeded",
-      "The scaling coordinate plan exceeds maxPoints.",
-      "Reduce parameter values, provide explicit coordinates, or raise maxPoints up to 64.",
-    );
-  if (
-    coordinates.some(
-      (coordinate) =>
-        !names.every((name) => Number.isFinite(coordinate[name])) ||
-        Object.keys(coordinate).some((name) => !names.includes(name)),
-    )
-  )
-    return problem(
-      "scaling-coordinates-invalid",
-      "Every coordinate must contain exactly the declared numeric parameter names.",
-      "Provide complete named coordinates.",
-    );
-  const {inputSizeParameterization: _single, multiParameterization: _multi, ...baseWorkload} = workload;
-  const points: ScalingAnalysisV2["points"] = [];
+  const {multiParameterization: _multi, ...baseWorkload} = workload;
+  const points: ScalingAnalysisV3["points"] = [];
   for (const [index, coordinate] of coordinates.entries()) {
     if (options.signal?.aborted) {
       appendCancelledPoints(points, coordinates.slice(index), workload.statisticalPolicy);
@@ -192,23 +154,16 @@ export async function measureMultiScaling(
     }
     const command = [...workload.command];
     for (const parameter of design.parameters) command[parameter.commandIndex] = String(coordinate[parameter.name]);
-    const measurement = await measureWorkload({...baseWorkload, command}, options);
+    const measurement = await measureParsedWorkload({...baseWorkload, command}, options);
     if ("code" in measurement) {
-      points.push({
-        value: points.length,
-        coordinates: coordinate,
-        status: measurement.code === "measurement-timeout" ? "timed-out" : "failed",
-        samplesMs: [],
-        medianMs: 0,
-        meanMs: 0,
-        quartiles: {q1Ms: 0, q3Ms: 0},
-        statisticalPolicy: workload.statisticalPolicy,
-        timedOut: measurement.code === "measurement-timeout",
-        behaviorValidated: false,
-        diagnostic: measurement.code,
-      });
+      points.push(makeFailedMultiPoint(points.length, coordinate, workload.statisticalPolicy, measurement.code));
       if (measurement.code === "measurement-cancelled") {
-        points[points.length - 1] = {...points[points.length - 1]!, status: "cancelled", diagnostic: measurement.code};
+        points[points.length - 1] = makeCancelledMultiPoint(
+          points.length - 1,
+          coordinate,
+          workload.statisticalPolicy,
+          measurement.code,
+        );
         appendCancelledPoints(points, coordinates.slice(index + 1), workload.statisticalPolicy);
         break;
       }
@@ -235,7 +190,7 @@ export async function measureMultiScaling(
   const root = resolve(options.root);
   const cwd = resolve(root, workload.cwd);
   return {
-    schemaVersion: "footgun.scaling.v2",
+    schemaVersion: "footgun.scaling.v3",
     id,
     workloadDigest,
     parameters: names,
@@ -269,32 +224,79 @@ function cartesianCoordinates(
   );
 }
 
-function cartesianCoordinateCount(parameters: ReadonlyArray<{readonly values: ReadonlyArray<number>}>): number {
-  return parameters.reduce((count, parameter) => count * parameter.values.length, 1);
-}
-
 function appendCancelledPoints(
-  points: ScalingAnalysisV2["points"],
+  points: ScalingAnalysisV3["points"],
   coordinates: ReadonlyArray<Record<string, number>>,
-  statisticalPolicy: ScalingAnalysisV2["points"][number]["statisticalPolicy"],
+  statisticalPolicy: ScalingAnalysisV3["points"][number]["statisticalPolicy"],
 ): void {
   for (const coordinate of coordinates)
-    points.push({
-      value: points.length,
-      coordinates: coordinate,
-      status: "cancelled",
+    points.push(makeCancelledMultiPoint(points.length, coordinate, statisticalPolicy, "measurement-cancelled"));
+}
+
+function makeFailedPoint(
+  value: number,
+  statisticalPolicy: ScalingPointV2["statisticalPolicy"],
+  diagnostic: string,
+): ScalingPointV2 {
+  if (diagnostic === "measurement-timeout")
+    return {
+      value,
+      status: "timed-out",
       samplesMs: [],
       medianMs: 0,
       meanMs: 0,
       quartiles: {q1Ms: 0, q3Ms: 0},
       statisticalPolicy,
-      timedOut: false,
+      timedOut: true,
       behaviorValidated: false,
-      diagnostic: "measurement-cancelled",
-    });
+      diagnostic,
+    };
+  return {
+    value,
+    status: "failed",
+    samplesMs: [],
+    medianMs: 0,
+    meanMs: 0,
+    quartiles: {q1Ms: 0, q3Ms: 0},
+    statisticalPolicy,
+    timedOut: false,
+    behaviorValidated: false,
+    diagnostic,
+  };
 }
 
-function fitModels(points: ReadonlyArray<ScalingPointV1>): ScalingModelV1[] {
+function makeFailedMultiPoint(
+  value: number,
+  coordinates: Record<string, number>,
+  statisticalPolicy: ScalingAnalysisV3["points"][number]["statisticalPolicy"],
+  diagnostic: string,
+): ScalingAnalysisV3["points"][number] {
+  const point = makeFailedPoint(value, statisticalPolicy, diagnostic);
+  return {...point, coordinates};
+}
+
+function makeCancelledMultiPoint(
+  value: number,
+  coordinates: Record<string, number>,
+  statisticalPolicy: ScalingAnalysisV3["points"][number]["statisticalPolicy"],
+  diagnostic: string,
+): ScalingAnalysisV3["points"][number] {
+  return {
+    value,
+    coordinates,
+    status: "cancelled",
+    samplesMs: [],
+    medianMs: 0,
+    meanMs: 0,
+    quartiles: {q1Ms: 0, q3Ms: 0},
+    statisticalPolicy,
+    timedOut: false,
+    behaviorValidated: false,
+    diagnostic,
+  };
+}
+
+function fitModels(points: ReadonlyArray<ScalingPointV2>): ScalingModelV1[] {
   const complete = points.filter((point) => point.status === "complete");
   const definitions: ReadonlyArray<{
     readonly name: ScalingModelV1["name"];

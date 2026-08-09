@@ -11,11 +11,13 @@ import type {
 import {comparePortable, isWithinRoot, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
 
-export type TypeScriptIndexResult = {
-  readonly state: "complete" | "partial" | "unavailable";
-  readonly index?: ContextIndexV1;
-  readonly diagnostics: ReadonlyArray<ProblemV1>;
-};
+export type TypeScriptIndexResult =
+  | {
+      readonly state: "complete" | "partial";
+      readonly index: ContextIndexV1;
+      readonly diagnostics: ReadonlyArray<ProblemV1>;
+    }
+  | {readonly state: "unavailable"; readonly diagnostics: ReadonlyArray<ProblemV1>};
 
 const supportedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 

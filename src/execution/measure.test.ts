@@ -10,7 +10,7 @@ it("records repeated timing and validates explicit behavior checks", async () =>
   const stdoutDigest = createHash("sha256").update("ok").digest("hex");
   const result = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.stdout.write('ok')"],
       cwd: ".",
       environment: {},
@@ -34,7 +34,7 @@ it("records repeated timing and validates explicit behavior checks", async () =>
 it("refuses workload cwd escape and unsupported isolation without downgrade", async () => {
   const escaped = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath],
       cwd: "..",
       environment: {},
@@ -50,7 +50,7 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
   );
   const isolated = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath],
       cwd: ".",
       environment: {},
@@ -68,7 +68,7 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
   expect("code" in isolated && isolated.code).toBe("container-runner-missing");
   const readOnly = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath],
       cwd: ".",
       environment: {},
@@ -88,7 +88,7 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
 it("refuses unsupported host memory and process limits before execution", async () => {
   const result = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.exit(0)"],
       cwd: ".",
       environment: {},
@@ -109,7 +109,7 @@ it("refuses unsupported host memory and process limits before execution", async 
 it("records a redacted reproduction contract and rejects artifact escapes", async () => {
   const result = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.stdout.write('ok')", "--", "--token", "secret-value"],
       cwd: ".",
       environment: {SMOKINGGUN_TEST_TOKEN: "not-recorded"},
@@ -133,7 +133,7 @@ it("records a redacted reproduction contract and rejects artifact escapes", asyn
 
   const escaped = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath],
       cwd: ".",
       environment: {},
@@ -153,7 +153,7 @@ it("records a redacted reproduction contract and rejects artifact escapes", asyn
 it.skipIf(!existsSync("/usr/bin/bwrap"))("runs an explicitly selected workload through bubblewrap", async () => {
   const result = await measureWorkload(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.stdout.write('sandboxed')"],
       cwd: ".",
       environment: {},
@@ -181,7 +181,7 @@ it("runs candidate-write in a copied workspace and leaves the source tree untouc
     await writeFile(join(source, "input.txt"), "source", "utf8");
     const result = await measureWorkload(
       {
-        schemaVersion: "footgun.workload.v1",
+        schemaVersion: "footgun.workload.v2",
         command: [process.execPath, "-e", "require('node:fs').writeFileSync('output.txt','candidate')"],
         cwd: ".",
         environment: {},

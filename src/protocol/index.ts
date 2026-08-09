@@ -37,8 +37,51 @@ const coverageSchema = z.strictObject({
   reason: z.string().optional(),
 });
 
+const evidenceSchema = z
+  .strictObject({
+    schemaVersion: version("footgun.evidence.v2"),
+    id: z.string().min(1),
+    kind: z.enum([
+      "static",
+      "estimate",
+      "measurement",
+      "benchmark",
+      "profile",
+      "trace",
+      "behavior",
+      "context",
+      "unknown",
+    ]),
+    claimClass: z
+      .enum([
+        "static-fact",
+        "theoretical-estimate",
+        "empirical-scaling",
+        "constant-factor",
+        "system-bottleneck",
+        "behavioral",
+        "unknown",
+      ])
+      .optional(),
+    summary: z.string().min(1),
+    artifact: z.string().optional(),
+    digest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    provenance: z.record(z.string(), z.string()).optional(),
+  })
+  .superRefine((evidence, context) => {
+    if (evidence.digest !== undefined && evidence.artifact === undefined)
+      context.addIssue({
+        code: "custom",
+        message: "An evidence digest requires an artifact reference.",
+        path: ["digest"],
+      });
+  });
+
 const findingSchema = z.strictObject({
-  schemaVersion: version("footgun.finding.v1"),
+  schemaVersion: version("footgun.finding.v2"),
   id: z.string().regex(/^fg_[a-f0-9]{16}$/),
   scanner: z.string().min(1),
   scannerVersion: z.string().min(1),
@@ -68,31 +111,7 @@ const findingSchema = z.strictObject({
   location: locationSchema,
   assumptions: z.array(z.string()),
   evidence: z.array(z.string()),
-  evidenceRecords: z
-    .array(
-      z.strictObject({
-        schemaVersion: version("footgun.evidence.v1"),
-        id: z.string().min(1),
-        kind: z.enum([
-          "static",
-          "estimate",
-          "measurement",
-          "benchmark",
-          "profile",
-          "trace",
-          "behavior",
-          "context",
-          "unknown",
-        ]),
-        summary: z.string().min(1),
-        artifact: z.string().optional(),
-        digest: z
-          .string()
-          .regex(/^[a-f0-9]{64}$/)
-          .optional(),
-      }),
-    )
-    .optional(),
+  evidenceRecords: z.array(evidenceSchema).optional(),
   thirdParty: z.record(z.string(), z.unknown()).optional(),
   complexity: z.strictObject({
     current: z.string().optional(),
@@ -173,27 +192,37 @@ const contextIndexSchema = z.strictObject({
   digest: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
-const scanReportSchema = z.strictObject({
-  schemaVersion: version("footgun.scan-report.v1"),
-  tool: z.strictObject({name: z.enum(["footgun", "smokinggun"]), version: z.string().min(1)}),
-  repository: repositorySchema,
-  inventory: inventorySchema.optional(),
-  sourceDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  configDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  findings: z.array(findingSchema),
-  coverage: z.array(coverageSchema),
-  context: contextIndexSchema.optional(),
-  diagnostics: z.array(problemSchema),
-  timings: timingsSchema,
-  assumptions: z.array(z.string()),
-  nextAction: z.string().optional(),
-  filesModified: z.array(z.string()).default([]),
-  rawArtifacts: z.array(z.string()),
-  rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
-});
+const scanReportSchema = z
+  .strictObject({
+    schemaVersion: version("footgun.scan-report.v2"),
+    tool: z.strictObject({name: z.enum(["footgun", "smokinggun"]), version: z.string().min(1)}),
+    repository: repositorySchema,
+    inventory: inventorySchema.optional(),
+    sourceDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    configDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    findings: z.array(findingSchema),
+    coverage: z.array(coverageSchema),
+    context: contextIndexSchema.optional(),
+    diagnostics: z.array(problemSchema),
+    timings: timingsSchema,
+    assumptions: z.array(z.string()),
+    nextAction: z.string().optional(),
+    filesModified: z.array(z.string()).default([]),
+    rawArtifacts: z.array(z.string()),
+    rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).optional(),
+  })
+  .superRefine((report, context) => {
+    for (const artifact of Object.keys(report.rawArtifactDigests ?? {}))
+      if (!report.rawArtifacts.includes(artifact))
+        context.addIssue({
+          code: "custom",
+          message: "An artifact digest requires a matching rawArtifacts entry.",
+          path: ["rawArtifactDigests", artifact],
+        });
+  });
 
 const adapterManifestSchema = z.strictObject({
   schemaVersion: version("footgun.adapter-manifest.v1"),
@@ -246,40 +275,50 @@ const adapterRequestSchema = z.strictObject({
     .default({network: "disabled", shell: false, maxOutputBytes: 1_000_000}),
 });
 
-const adapterResultSchema = z.strictObject({
-  schemaVersion: version("footgun.adapter-result.v1"),
-  requestId: z.string().min(1),
-  state: z.enum(["complete", "partial", "unavailable", "blocked", "failed", "cancelled"]),
-  findings: z.array(findingSchema),
-  coverage: z.array(coverageSchema),
-  diagnostics: z.array(problemSchema),
-  rawArtifacts: z.array(z.string()),
-  rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
-  adapter: z
-    .strictObject({
-      id: z.string().min(1),
-      version: z.string().min(1),
-      command: z.array(z.string().min(1)),
-      tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional(),
-    })
-    .optional(),
-  requestDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  configDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  sourceDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  reproduction: z.record(z.string(), z.unknown()).optional(),
-});
+const adapterResultSchema = z
+  .strictObject({
+    schemaVersion: version("footgun.adapter-result.v2"),
+    requestId: z.string().min(1),
+    state: z.enum(["complete", "partial", "unavailable", "blocked", "failed", "cancelled"]),
+    findings: z.array(findingSchema),
+    coverage: z.array(coverageSchema),
+    diagnostics: z.array(problemSchema),
+    rawArtifacts: z.array(z.string()),
+    rawArtifactDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
+    adapter: z
+      .strictObject({
+        id: z.string().min(1),
+        version: z.string().min(1),
+        command: z.array(z.string().min(1)),
+        tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional(),
+      })
+      .optional(),
+    requestDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    configDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    sourceDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    reproduction: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((result, context) => {
+    for (const artifact of Object.keys(result.rawArtifactDigests))
+      if (!result.rawArtifacts.includes(artifact))
+        context.addIssue({
+          code: "custom",
+          message: "An artifact digest requires a matching rawArtifacts entry.",
+          path: ["rawArtifactDigests", artifact],
+        });
+  });
 
-const workloadSchema = z.strictObject({
-  schemaVersion: version("footgun.workload.v1"),
+const workloadFields = {
+  schemaVersion: version("footgun.workload.v2"),
   command: z.array(z.string()).min(1),
   cwd: z.string().min(1),
   environment: z.record(z.string(), z.string()),
@@ -287,29 +326,6 @@ const workloadSchema = z.strictObject({
   warmups: z.number().int().nonnegative(),
   repetitions: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
-  inputSizeParameterization: z
-    .strictObject({
-      name: z.string().min(1),
-      values: z.array(z.number().finite()).min(1),
-      commandIndex: z.number().int().nonnegative(),
-    })
-    .optional(),
-  multiParameterization: z
-    .strictObject({
-      parameters: z
-        .array(
-          z.strictObject({
-            name: z.string().min(1),
-            values: z.array(z.number().finite()).min(1),
-            commandIndex: z.number().int().nonnegative(),
-          }),
-        )
-        .min(2)
-        .max(2),
-      coordinates: z.array(z.record(z.string(), z.number().finite())).min(1).optional(),
-      maxPoints: z.number().int().positive().max(64),
-    })
-    .optional(),
   datasetDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
   resourceLimits: z
     .strictObject({
@@ -332,7 +348,81 @@ const workloadSchema = z.strictObject({
   behaviorChecks: z.array(z.string()),
   networkPolicy: z.enum(["disabled", "explicit"]).default("disabled"),
   candidateRoot: z.string().optional(),
+};
+
+const parameterSchema = z.strictObject({
+  name: z.string().min(1),
+  values: z.array(z.number().finite()).min(1),
+  commandIndex: z.number().int().nonnegative(),
 });
+
+const singleParameterizationSchema = parameterSchema;
+
+const multiParameterizationSchema = z
+  .strictObject({
+    parameters: z.array(parameterSchema).length(2),
+    coordinates: z.array(z.record(z.string(), z.number().finite())).min(1).optional(),
+    maxPoints: z.number().int().positive().max(64),
+  })
+  .superRefine((design, context) => {
+    const names = design.parameters.map((parameter) => parameter.name);
+    const commandIndexes = design.parameters.map((parameter) => parameter.commandIndex);
+    if (new Set(names).size !== names.length)
+      context.addIssue({code: "custom", message: "Scaling parameter names must be distinct.", path: ["parameters"]});
+    if (new Set(commandIndexes).size !== commandIndexes.length)
+      context.addIssue({
+        code: "custom",
+        message: "Scaling parameter command indexes must be distinct.",
+        path: ["parameters"],
+      });
+    if (design.coordinates !== undefined)
+      for (const [index, coordinate] of design.coordinates.entries()) {
+        const coordinateNames = Object.keys(coordinate);
+        if (coordinateNames.length !== names.length || !names.every((name) => Number.isFinite(coordinate[name])))
+          context.addIssue({
+            code: "custom",
+            message: "Every coordinate must contain exactly the declared numeric parameter names.",
+            path: ["coordinates", index],
+          });
+      }
+  });
+
+const unparameterizedWorkloadSchema = z.strictObject(workloadFields);
+const singleScalingWorkloadSchema = z
+  .strictObject({...workloadFields, inputSizeParameterization: singleParameterizationSchema})
+  .superRefine((workload, context) => {
+    if (workload.inputSizeParameterization.commandIndex >= workload.command.length)
+      context.addIssue({
+        code: "custom",
+        message: "The input-size command index must reference a declared command argument.",
+        path: ["inputSizeParameterization", "commandIndex"],
+      });
+  });
+const multiScalingWorkloadSchema = z
+  .strictObject({...workloadFields, multiParameterization: multiParameterizationSchema})
+  .superRefine((workload, context) => {
+    const {parameters, coordinates, maxPoints} = workload.multiParameterization;
+    if (parameters.some((parameter) => parameter.commandIndex >= workload.command.length))
+      context.addIssue({
+        code: "custom",
+        message: "Every scaling command index must reference a declared command argument.",
+        path: ["multiParameterization", "parameters"],
+      });
+    const coordinateCount =
+      coordinates?.length ?? parameters.reduce((count, parameter) => count * parameter.values.length, 1);
+    if (coordinateCount > maxPoints)
+      context.addIssue({
+        code: "custom",
+        message: "The scaling coordinate plan exceeds maxPoints.",
+        path: ["multiParameterization", "maxPoints"],
+      });
+  });
+
+const workloadSchema = z.union([
+  unparameterizedWorkloadSchema,
+  singleScalingWorkloadSchema,
+  multiScalingWorkloadSchema,
+]);
 
 const reproductionSchema = z.strictObject({
   command: z.array(z.string().min(1)),
@@ -343,40 +433,6 @@ const reproductionSchema = z.strictObject({
   repetitions: z.number().int().positive(),
   expectedArtifacts: z.array(z.string().min(1)),
   datasetDigests: z.record(z.string(), z.string().regex(/^[a-f0-9]{64}$/)).default({}),
-});
-
-const evidenceSchema = z.strictObject({
-  schemaVersion: version("footgun.evidence.v1"),
-  id: z.string().min(1),
-  kind: z.enum([
-    "static",
-    "estimate",
-    "measurement",
-    "benchmark",
-    "profile",
-    "trace",
-    "behavior",
-    "context",
-    "unknown",
-  ]),
-  claimClass: z
-    .enum([
-      "static-fact",
-      "theoretical-estimate",
-      "empirical-scaling",
-      "constant-factor",
-      "system-bottleneck",
-      "behavioral",
-      "unknown",
-    ])
-    .optional(),
-  summary: z.string().min(1),
-  artifact: z.string().optional(),
-  digest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  provenance: z.record(z.string(), z.string()).optional(),
 });
 
 const measurementSchema = z.strictObject({
@@ -414,33 +470,51 @@ const measurementSchema = z.strictObject({
   artifact: z.string().optional(),
 });
 
-const benchmarkRecordSchema = z.strictObject({
-  schemaVersion: version("footgun.benchmark-record.v1"),
-  id: z.string().regex(/^bench_[a-f0-9]{16}$/),
-  tool: z.enum(["hyperfine", "pyperf", "google-benchmark", "criterion", "jmh"]),
-  name: z.string().min(1),
-  samplesMs: z.array(z.number().nonnegative()).min(1),
-  medianMs: z.number().nonnegative(),
-  meanMs: z.number().nonnegative(),
-  sourceUnit: z.string().min(1),
-  rawArtifact: z.string().optional(),
-  rawArtifactDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  metadata: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).default({}),
-});
+const benchmarkRecordSchema = z
+  .strictObject({
+    schemaVersion: version("footgun.benchmark-record.v2"),
+    id: z.string().regex(/^bench_[a-f0-9]{16}$/),
+    tool: z.enum(["hyperfine", "pyperf", "google-benchmark", "criterion", "jmh"]),
+    name: z.string().min(1),
+    samplesMs: z.array(z.number().nonnegative()).min(1),
+    medianMs: z.number().nonnegative(),
+    meanMs: z.number().nonnegative(),
+    sourceUnit: z.string().min(1),
+    rawArtifact: z.string().optional(),
+    rawArtifactDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    metadata: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).default({}),
+  })
+  .superRefine((record, context) => {
+    if (record.rawArtifactDigest !== undefined && record.rawArtifact === undefined)
+      context.addIssue({
+        code: "custom",
+        message: "A raw artifact digest requires a rawArtifact reference.",
+        path: ["rawArtifactDigest"],
+      });
+  });
 
-const benchmarkImportSchema = z.strictObject({
-  schemaVersion: version("footgun.benchmark-import.v1"),
-  tool: benchmarkRecordSchema.shape.tool,
-  records: z.array(benchmarkRecordSchema).min(1),
-  rawArtifact: z.string().optional(),
-  rawArtifactDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-});
+const benchmarkImportSchema = z
+  .strictObject({
+    schemaVersion: version("footgun.benchmark-import.v2"),
+    tool: benchmarkRecordSchema.shape.tool,
+    records: z.array(benchmarkRecordSchema).min(1),
+    rawArtifact: z.string().optional(),
+    rawArtifactDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+  })
+  .superRefine((benchmark, context) => {
+    if (benchmark.rawArtifactDigest !== undefined && benchmark.rawArtifact === undefined)
+      context.addIssue({
+        code: "custom",
+        message: "A raw artifact digest requires a rawArtifact reference.",
+        path: ["rawArtifactDigest"],
+      });
+  });
 
 const profileSummarySchema = z.strictObject({
   schemaVersion: version("footgun.profile-summary.v1"),
@@ -469,22 +543,58 @@ const traceSummarySchema = z.strictObject({
   limitations: z.array(z.string()),
 });
 
-const scalingPointSchema = z.strictObject({
+const scalingPointFields = {
   value: z.number().finite(),
-  status: z.enum(["complete", "timed-out", "failed"]),
-  samplesMs: z.array(z.number().nonnegative()),
-  medianMs: z.number().nonnegative(),
-  meanMs: z.number().nonnegative(),
-  quartiles: z.strictObject({q1Ms: z.number().nonnegative(), q3Ms: z.number().nonnegative()}),
   statisticalPolicy: z.strictObject({
     kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
     minimumRelativeImprovement: z.number().nonnegative().max(1),
   }),
-  timedOut: z.boolean(),
   behaviorValidated: z.boolean(),
   isolation: measurementSchema.shape.isolation.optional(),
   diagnostic: z.string().optional(),
+};
+
+const completedScalingPointSchema = z.strictObject({
+  ...scalingPointFields,
+  status: z.literal("complete"),
+  samplesMs: z.array(z.number().nonnegative()).min(1),
+  medianMs: z.number().nonnegative(),
+  meanMs: z.number().nonnegative(),
+  quartiles: z.strictObject({q1Ms: z.number().nonnegative(), q3Ms: z.number().nonnegative()}),
+  timedOut: z.literal(false),
 });
+
+const failedScalingPointFields = {
+  ...scalingPointFields,
+  samplesMs: z.array(z.number().nonnegative()).length(0),
+  medianMs: z.literal(0),
+  meanMs: z.literal(0),
+  quartiles: z.strictObject({q1Ms: z.literal(0), q3Ms: z.literal(0)}),
+};
+
+const timedOutScalingPointSchema = z.strictObject({
+  ...failedScalingPointFields,
+  status: z.literal("timed-out"),
+  timedOut: z.literal(true),
+});
+
+const failedScalingPointSchema = z.strictObject({
+  ...failedScalingPointFields,
+  status: z.literal("failed"),
+  timedOut: z.literal(false),
+});
+
+const cancelledScalingPointSchema = z.strictObject({
+  ...failedScalingPointFields,
+  status: z.literal("cancelled"),
+  timedOut: z.literal(false),
+});
+
+const scalingPointSchema = z.discriminatedUnion("status", [
+  completedScalingPointSchema,
+  timedOutScalingPointSchema,
+  failedScalingPointSchema,
+]);
 
 const scalingModelSchema = z.strictObject({
   name: z.enum(["constant", "logarithmic", "linear", "linearithmic", "quadratic"]),
@@ -494,7 +604,7 @@ const scalingModelSchema = z.strictObject({
 });
 
 const scalingSchema = z.strictObject({
-  schemaVersion: version("footgun.scaling.v1"),
+  schemaVersion: version("footgun.scaling.v2"),
   id: z.string().regex(/^scale_[a-f0-9]{16}$/),
   investigation: z.string().optional(),
   workloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -508,13 +618,15 @@ const scalingSchema = z.strictObject({
   artifact: z.string().optional(),
 });
 
-const multiScalingPointSchema = scalingPointSchema.omit({status: true}).extend({
-  status: z.enum(["complete", "timed-out", "failed", "cancelled"]),
-  coordinates: z.record(z.string(), z.number().finite()),
-});
+const multiScalingPointSchema = z.discriminatedUnion("status", [
+  completedScalingPointSchema.extend({coordinates: z.record(z.string(), z.number().finite())}),
+  timedOutScalingPointSchema.extend({coordinates: z.record(z.string(), z.number().finite())}),
+  failedScalingPointSchema.extend({coordinates: z.record(z.string(), z.number().finite())}),
+  cancelledScalingPointSchema.extend({coordinates: z.record(z.string(), z.number().finite())}),
+]);
 
 const multiScalingSchema = z.strictObject({
-  schemaVersion: version("footgun.scaling.v2"),
+  schemaVersion: version("footgun.scaling.v3"),
   id: z.string().regex(/^scale_[a-f0-9]{16}$/),
   investigation: z.string().optional(),
   workloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -527,59 +639,84 @@ const multiScalingSchema = z.strictObject({
   artifact: z.string().optional(),
 });
 
-const comparisonSchema = z.strictObject({
-  schemaVersion: version("footgun.comparison.v1"),
+const comparisonPointSchema = z.strictObject({
+  value: z.number().finite(),
+  coordinates: z.record(z.string(), z.number().finite()).optional(),
+  baselineMedianMs: z.number().nonnegative(),
+  candidateMedianMs: z.number().nonnegative(),
+  deltaPercent: z.number().finite(),
+  improvement: z.boolean(),
+  statisticalPolicy: z.strictObject({
+    kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+    minimumRelativeImprovement: z.number().nonnegative().max(1),
+  }),
+});
+
+const comparisonFields = {
+  schemaVersion: version("footgun.comparison.v2"),
   id: z.string().regex(/^cmp_[a-f0-9]{16}$/),
-  mode: z.enum(["measurement", "scaling"]),
   baseline: z.string().min(1),
   candidate: z.string().min(1),
   workloadDigest: z.string().regex(/^[a-f0-9]{64}$/),
   behaviorValidated: z.boolean(),
   improvement: z.boolean(),
-  baselineMedianMs: z.number().nonnegative().optional(),
-  candidateMedianMs: z.number().nonnegative().optional(),
-  deltaPercent: z.number().finite().optional(),
-  statisticalPolicy: z
-    .strictObject({
-      kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
-      minimumRelativeImprovement: z.number().nonnegative().max(1),
-    })
-    .optional(),
-  points: z
-    .array(
-      z.strictObject({
-        value: z.number().finite(),
-        coordinates: z.record(z.string(), z.number().finite()).optional(),
-        baselineMedianMs: z.number().nonnegative(),
-        candidateMedianMs: z.number().nonnegative(),
-        deltaPercent: z.number().finite(),
-        improvement: z.boolean(),
-        statisticalPolicy: z.strictObject({
-          kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
-          minimumRelativeImprovement: z.number().nonnegative().max(1),
-        }),
-      }),
-    )
-    .optional(),
-  baselineModel: scalingModelSchema.shape.name.optional(),
-  candidateModel: scalingModelSchema.shape.name.optional(),
-  baselineDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  candidateDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
+  statisticalPolicy: z.strictObject({
+    kind: z.enum(["median-improvement", "non-overlapping-iqr"]),
+    minimumRelativeImprovement: z.number().nonnegative().max(1),
+  }),
   comparability: z
     .strictObject({status: z.enum(["comparable", "cross-machine", "inconclusive"]), reasons: z.array(z.string())})
     .optional(),
   promotion: z.enum(["eligible", "blocked", "inconclusive"]).optional(),
   promotionReasons: z.array(z.string()).optional(),
+};
+
+const comparisonDigestFields = {
+  baselineDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  candidateDigest: z.string().regex(/^[a-f0-9]{64}$/),
+};
+
+const measurementComparisonSchema = z.strictObject({
+  ...comparisonFields,
+  mode: z.literal("measurement"),
+  baselineMedianMs: z.number().nonnegative(),
+  candidateMedianMs: z.number().nonnegative(),
+  deltaPercent: z.number().finite(),
 });
 
+const scalingComparisonSchema = z.strictObject({
+  ...comparisonFields,
+  mode: z.literal("scaling"),
+  points: z.array(comparisonPointSchema).min(1),
+  baselineModel: scalingModelSchema.shape.name.optional(),
+  candidateModel: scalingModelSchema.shape.name.optional(),
+});
+
+const measurementComparisonWithDigestsSchema = z.strictObject({
+  ...comparisonFields,
+  ...comparisonDigestFields,
+  mode: z.literal("measurement"),
+  baselineMedianMs: z.number().nonnegative(),
+  candidateMedianMs: z.number().nonnegative(),
+  deltaPercent: z.number().finite(),
+});
+
+const scalingComparisonWithDigestsSchema = z.strictObject({
+  ...comparisonFields,
+  ...comparisonDigestFields,
+  mode: z.literal("scaling"),
+  points: z.array(comparisonPointSchema).min(1),
+  baselineModel: scalingModelSchema.shape.name.optional(),
+  candidateModel: scalingModelSchema.shape.name.optional(),
+});
+
+const comparisonSchema = z.union([
+  z.discriminatedUnion("mode", [measurementComparisonSchema, scalingComparisonSchema]),
+  z.discriminatedUnion("mode", [measurementComparisonWithDigestsSchema, scalingComparisonWithDigestsSchema]),
+]);
+
 const investigationSchema = z.strictObject({
-  schemaVersion: version("footgun.investigation-bundle.v1"),
+  schemaVersion: version("footgun.investigation-bundle.v2"),
   id: z.string().regex(/^inv_[a-f0-9]{16}$/),
   state: z.enum([
     "created",
@@ -626,30 +763,53 @@ export type LocationV1 = z.infer<typeof locationSchema>;
 export type ProblemV1 = z.infer<typeof problemSchema>;
 export type ActionRequiredV1 = z.infer<typeof actionRequiredSchema>;
 export type CoverageRecordV1 = z.infer<typeof coverageSchema>;
-export type FindingV1 = z.infer<typeof findingSchema>;
+export type FindingV2 = z.infer<typeof findingSchema>;
 export type RepositoryInventoryV1 = z.infer<typeof inventorySchema>;
 export type ContextDefinitionV1 = z.infer<typeof contextDefinitionSchema>;
 export type ContextReferenceV1 = z.infer<typeof contextReferenceSchema>;
 export type ContextCallV1 = z.infer<typeof contextCallSchema>;
 export type ContextIndexV1 = z.infer<typeof contextIndexSchema>;
-export type ScanReportV1 = z.infer<typeof scanReportSchema>;
+export type ScanReportV2 = z.infer<typeof scanReportSchema>;
 export type AdapterManifestV1 = z.infer<typeof adapterManifestSchema>;
 export type AdapterRequestV1 = z.infer<typeof adapterRequestSchema>;
-export type AdapterResultV1 = z.infer<typeof adapterResultSchema>;
-export type WorkloadV1 = z.infer<typeof workloadSchema>;
-export type EvidenceRecordV1 = z.infer<typeof evidenceSchema>;
+export type AdapterResultV2 = z.infer<typeof adapterResultSchema>;
+export type WorkloadV2 = z.infer<typeof workloadSchema>;
+export type SingleScalingWorkloadV2 = z.infer<typeof singleScalingWorkloadSchema>;
+export type MultiScalingWorkloadV2 = z.infer<typeof multiScalingWorkloadSchema>;
+export type EvidenceRecordV2 = z.infer<typeof evidenceSchema>;
 export type MeasurementV1 = z.infer<typeof measurementSchema>;
-export type BenchmarkRecordV1 = z.infer<typeof benchmarkRecordSchema>;
-export type BenchmarkImportV1 = z.infer<typeof benchmarkImportSchema>;
+export type BenchmarkRecordV2 = z.infer<typeof benchmarkRecordSchema>;
+export type BenchmarkImportV2 = z.infer<typeof benchmarkImportSchema>;
 export type ProfileSummaryV1 = z.infer<typeof profileSummarySchema>;
 export type TraceSummaryV1 = z.infer<typeof traceSummarySchema>;
-export type ScalingPointV1 = z.infer<typeof scalingPointSchema>;
+export type ScalingPointV2 = z.infer<typeof scalingPointSchema>;
 export type ScalingModelV1 = z.infer<typeof scalingModelSchema>;
-export type ScalingAnalysisV1 = z.infer<typeof scalingSchema>;
-export type ScalingAnalysisV2 = z.infer<typeof multiScalingSchema>;
-export type ComparisonV1 = z.infer<typeof comparisonSchema>;
-export type InvestigationBundleV1 = z.infer<typeof investigationSchema>;
+export type ScalingAnalysisV2 = z.infer<typeof scalingSchema>;
+export type ScalingAnalysisV3 = z.infer<typeof multiScalingSchema>;
+export type ComparisonV2 = z.infer<typeof comparisonSchema>;
+export type MeasurementComparisonV2 =
+  | z.infer<typeof measurementComparisonSchema>
+  | z.infer<typeof measurementComparisonWithDigestsSchema>;
+export type ScalingComparisonV2 =
+  | z.infer<typeof scalingComparisonSchema>
+  | z.infer<typeof scalingComparisonWithDigestsSchema>;
+export type InvestigationBundleV2 = z.infer<typeof investigationSchema>;
 export type InvestigationPointerV1 = z.infer<typeof investigationPointerSchema>;
+
+/** Narrow a parsed workload to its single-parameter scaling form. */
+export function isSingleScalingWorkload(workload: WorkloadV2): workload is SingleScalingWorkloadV2 {
+  return "inputSizeParameterization" in workload;
+}
+
+/** Narrow a parsed workload to its two-parameter scaling form. */
+export function isMultiScalingWorkload(workload: WorkloadV2): workload is MultiScalingWorkloadV2 {
+  return "multiParameterization" in workload;
+}
+
+/** Return whether a parsed workload belongs to either scaling runner. */
+export function isScalingWorkload(workload: WorkloadV2): boolean {
+  return isSingleScalingWorkload(workload) || isMultiScalingWorkload(workload);
+}
 
 export const Protocol = {
   location: locationSchema,
@@ -670,6 +830,7 @@ export const Protocol = {
   benchmarkImport: benchmarkImportSchema,
   profileSummary: profileSummarySchema,
   traceSummary: traceSummarySchema,
+  scalingPoint: scalingPointSchema,
   scaling: scalingSchema,
   multiScaling: multiScalingSchema,
   comparison: comparisonSchema,
@@ -680,14 +841,14 @@ export const Protocol = {
 /** Parse an untrusted JSON value as a versioned scan report. */
 export type ProtocolProblemV1 = ProblemV1 & {_tag: "ProtocolProblem"};
 
-export function parseScanReport(input: unknown): ScanReportV1 | ProtocolProblemV1 {
+export function parseScanReport(input: unknown): ScanReportV2 | ProtocolProblemV1 {
   const result = scanReportSchema.safeParse(input);
   if (result.success) return result.data;
   return {
     _tag: "ProtocolProblem",
     schemaVersion: "footgun.problem.v1",
     code: "invalid-scan-report",
-    message: "The input is not a valid SmokingGun ScanReportV1.",
+    message: "The input is not a valid SmokingGun ScanReportV2.",
     detail: result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
     recovery: "Regenerate the artifact with `smokinggun scan <path> --format json`.",
   };

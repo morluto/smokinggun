@@ -171,7 +171,7 @@ export default class Report extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "artifact-read-failed",
           message,
-          recovery: "Pass a JSON ScanReportV1 artifact path.",
+          recovery: "Pass a JSON ScanReportV2 artifact path.",
         },
         2,
         context,
@@ -224,7 +224,7 @@ async function recordReportedArtifact(
     evidence: [
       ...stored.bundle.evidence,
       {
-        schemaVersion: "footgun.evidence.v1" as const,
+        schemaVersion: "footgun.evidence.v2" as const,
         id: `${investigationId}:report:${artifact}`,
         kind,
         claimClass,

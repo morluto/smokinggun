@@ -1,10 +1,10 @@
-import type {ScanReportV1} from "../protocol/index.js";
+import type {ScanReportV2} from "../protocol/index.js";
 import {parseScanReport} from "../protocol/index.js";
 import type {OutputFormat} from "../config.js";
 import {toolIdentity} from "../tool-identity.js";
 
 /** Render the normalized scan model without adding diagnostics to machine output. */
-export function renderScanReport(report: ScanReportV1, format: OutputFormat): string {
+export function renderScanReport(report: ScanReportV2, format: OutputFormat): string {
   switch (format) {
     case "json":
       return `${JSON.stringify(report, null, 2)}\n`;
@@ -20,7 +20,7 @@ export function renderScanReport(report: ScanReportV1, format: OutputFormat): st
 }
 
 /** Convert a scan report to SARIF while retaining SmokingGun evidence in properties. */
-export function toSarif(report: ScanReportV1): Record<string, unknown> {
+export function toSarif(report: ScanReportV2): Record<string, unknown> {
   const truncation = findingTruncation(report);
   return {
     version: "2.1.0",
@@ -91,7 +91,7 @@ export function toSarif(report: ScanReportV1): Record<string, unknown> {
   };
 }
 
-function renderMarkdown(report: ScanReportV1): string {
+function renderMarkdown(report: ScanReportV2): string {
   const truncation = findingTruncation(report);
   const lines = [
     "# SmokingGun scan",
@@ -159,7 +159,7 @@ function renderMarkdown(report: ScanReportV1): string {
   return `${lines.join("\n")}\n`;
 }
 
-function renderHuman(report: ScanReportV1): string {
+function renderHuman(report: ScanReportV2): string {
   const truncation = findingTruncation(report);
   const lines = [
     `SmokingGun scan: ${report.repository.root}`,
@@ -176,14 +176,14 @@ function renderHuman(report: ScanReportV1): string {
   return `${lines.join("\n")}\n`;
 }
 
-function findingTruncation(report: ScanReportV1): {readonly message: string} | undefined {
+function findingTruncation(report: ScanReportV2): {readonly message: string} | undefined {
   const diagnostic = report.diagnostics.find((entry) => entry.code === "findings-truncated");
   return diagnostic === undefined ? undefined : {message: diagnostic.message};
 }
 
 export function parseReportArtifact(
   input: unknown,
-): ScanReportV1 | {readonly _tag: "InvalidReport"; readonly message: string} {
+): ScanReportV2 | {readonly _tag: "InvalidReport"; readonly message: string} {
   const result = parseScanReport(input);
   return "_tag" in result ? {_tag: "InvalidReport", message: result.detail ?? result.message} : result;
 }

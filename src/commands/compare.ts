@@ -14,12 +14,17 @@ import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investiga
 import {comparePortable} from "../paths.js";
 import {
   Protocol,
-  type ComparisonV1,
+  type ComparisonV2,
   type MeasurementV1,
-  type ScalingAnalysisV1,
   type ScalingAnalysisV2,
+  type ScalingAnalysisV3,
 } from "../protocol/index.js";
-import {buildMeasurementComparison, buildMultiScalingComparison, buildScalingComparison} from "../execution/compare.js";
+import {
+  buildMeasurementComparison,
+  buildMultiScalingComparison,
+  buildScalingComparison,
+  type ComparisonArtifactDigests,
+} from "../execution/compare.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -43,7 +48,7 @@ export default class Compare extends BaseCommand {
             schemaVersion: "footgun.problem.v1",
             code: "measurement-kind-mismatch",
             message: "Baseline and candidate artifacts use different measurement kinds.",
-            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV1 artifacts.",
+            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV2 artifacts.",
           },
           2,
           context,
@@ -54,7 +59,7 @@ export default class Compare extends BaseCommand {
             schemaVersion: "footgun.problem.v1",
             code: "workload-mismatch",
             message: "Baseline and candidate measurements use different workload digests.",
-            recovery: "Measure both artifacts from the same immutable WorkloadV1 descriptor.",
+            recovery: "Measure both artifacts from the same immutable WorkloadV2 descriptor.",
           },
           2,
           context,
@@ -71,31 +76,29 @@ export default class Compare extends BaseCommand {
             schemaVersion: "footgun.problem.v1",
             code: "statistical-policy-mismatch",
             message: "Baseline and candidate measurements use different statistical policies.",
-            recovery: "Measure both artifacts from the same WorkloadV1 descriptor and policy.",
+            recovery: "Measure both artifacts from the same WorkloadV2 descriptor and policy.",
           },
           2,
           context,
         );
-      if (baseline.schemaVersion === "footgun.scaling.v1" && candidate.schemaVersion === "footgun.scaling.v1") {
+      if (baseline.schemaVersion === "footgun.scaling.v2" && candidate.schemaVersion === "footgun.scaling.v2") {
         await this.compareScaling(
           baseline,
           candidate,
           parsed.args.baseline,
           parsed.args.candidate,
-          digest(baselineBytes),
-          digest(candidateBytes),
+          [digest(baselineBytes), digest(candidateBytes)],
           context,
         );
         return;
       }
-      if (baseline.schemaVersion === "footgun.scaling.v2" && candidate.schemaVersion === "footgun.scaling.v2") {
+      if (baseline.schemaVersion === "footgun.scaling.v3" && candidate.schemaVersion === "footgun.scaling.v3") {
         await this.compareMultiScaling(
           baseline,
           candidate,
           parsed.args.baseline,
           parsed.args.candidate,
-          digest(baselineBytes),
-          digest(candidateBytes),
+          [digest(baselineBytes), digest(candidateBytes)],
           context,
         );
         return;
@@ -106,7 +109,7 @@ export default class Compare extends BaseCommand {
             schemaVersion: "footgun.problem.v1",
             code: "measurement-kind-mismatch",
             message: "Baseline and candidate artifacts use different measurement kinds.",
-            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV1 artifacts.",
+            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV2 artifacts.",
           },
           2,
           context,
@@ -119,20 +122,16 @@ export default class Compare extends BaseCommand {
             explanation:
               "The measurement artifacts do not establish behavioral equivalence, so the comparison cannot be promoted.",
             recoveryCommands: [
-              "Add explicit behavior checks to WorkloadV1, validate them, then rerun measure and compare.",
+              "Add explicit behavior checks to WorkloadV2, validate them, then rerun measure and compare.",
             ],
           },
           context,
         );
       }
-      const result = buildMeasurementComparison(
-        baseline,
-        candidate,
-        parsed.args.baseline,
-        parsed.args.candidate,
+      const result = buildMeasurementComparison(baseline, candidate, parsed.args.baseline, parsed.args.candidate, [
         digest(baselineBytes),
         digest(candidateBytes),
-      );
+      ]);
       await this.storeComparison(result, context, baseline, candidate);
       await this.writeComparison(
         result,
@@ -158,7 +157,7 @@ export default class Compare extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "comparison-failed",
           message,
-          recovery: "Pass two valid MeasurementV1 or ScalingAnalysisV1 JSON artifacts.",
+          recovery: "Pass two valid MeasurementV1 or ScalingAnalysisV2 JSON artifacts.",
         },
         2,
         context,
@@ -167,14 +166,14 @@ export default class Compare extends BaseCommand {
   }
 
   private async compareScaling(
-    baseline: ScalingAnalysisV1,
-    candidate: ScalingAnalysisV1,
+    baseline: ScalingAnalysisV2,
+    candidate: ScalingAnalysisV2,
     baselinePath: string,
     candidatePath: string,
-    baselineDigest: string,
-    candidateDigest: string,
+    digests: ComparisonArtifactDigests,
     context: RuntimeContext,
   ): Promise<void> {
+    const [baselineDigest, candidateDigest] = digests;
     if (
       baseline.parameter !== candidate.parameter ||
       baseline.points.length !== candidate.points.length ||
@@ -185,7 +184,7 @@ export default class Compare extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "scaling-points-mismatch",
           message: "Baseline and candidate scaling artifacts do not use the same parameter points.",
-          recovery: "Measure both artifacts from the same immutable parameterized WorkloadV1 descriptor.",
+          recovery: "Measure both artifacts from the same immutable parameterized WorkloadV2 descriptor.",
         },
         2,
         context,
@@ -204,7 +203,7 @@ export default class Compare extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "statistical-policy-mismatch",
           message: "Baseline and candidate scaling points use different statistical policies.",
-          recovery: "Measure both artifacts from the same parameterized WorkloadV1 descriptor and policy.",
+          recovery: "Measure both artifacts from the same parameterized WorkloadV2 descriptor and policy.",
         },
         2,
         context,
@@ -219,20 +218,16 @@ export default class Compare extends BaseCommand {
           reason: "behavior-validation-required",
           explanation: "The scaling artifacts do not establish behavioral equivalence at every input point.",
           recoveryCommands: [
-            "Add explicit behavior checks to WorkloadV1, validate every point, then rerun measure and compare.",
+            "Add explicit behavior checks to WorkloadV2, validate every point, then rerun measure and compare.",
           ],
         },
         context,
       );
     }
-    const result = buildScalingComparison(
-      baseline,
-      candidate,
-      baselinePath,
-      candidatePath,
+    const result = buildScalingComparison(baseline, candidate, baselinePath, candidatePath, [
       baselineDigest,
       candidateDigest,
-    );
+    ]);
     await this.storeComparison(result, context, baseline, candidate);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
@@ -243,14 +238,14 @@ export default class Compare extends BaseCommand {
   }
 
   private async compareMultiScaling(
-    baseline: ScalingAnalysisV2,
-    candidate: ScalingAnalysisV2,
+    baseline: ScalingAnalysisV3,
+    candidate: ScalingAnalysisV3,
     baselinePath: string,
     candidatePath: string,
-    baselineDigest: string,
-    candidateDigest: string,
+    digests: ComparisonArtifactDigests,
     context: RuntimeContext,
   ): Promise<void> {
+    const [baselineDigest, candidateDigest] = digests;
     const baselineCoordinates = baseline.points.map((point) => point.coordinates);
     const candidateCoordinates = candidate.points.map((point) => point.coordinates);
     const computedBaselineCoordinatesDigest = createHash("sha256")
@@ -304,19 +299,15 @@ export default class Compare extends BaseCommand {
           reason: "behavior-validation-required",
           explanation: "The scaling artifacts do not establish behavioral equivalence at every coordinate.",
           recoveryCommands: [
-            "Add explicit behavior checks to WorkloadV1, validate every coordinate, then rerun measure and compare.",
+            "Add explicit behavior checks to WorkloadV2, validate every coordinate, then rerun measure and compare.",
           ],
         },
         context,
       );
-    const result = buildMultiScalingComparison(
-      baseline,
-      candidate,
-      baselinePath,
-      candidatePath,
+    const result = buildMultiScalingComparison(baseline, candidate, baselinePath, candidatePath, [
       baselineDigest,
       candidateDigest,
-    );
+    ]);
     await this.storeComparison(result, context, baseline, candidate);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
@@ -327,10 +318,10 @@ export default class Compare extends BaseCommand {
   }
 
   private async storeComparison(
-    result: ComparisonV1,
+    result: ComparisonV2,
     context: RuntimeContext,
-    baseline: MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2,
-    candidate: MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2,
+    baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
   ): Promise<void> {
     const validated = Protocol.comparison.parse(result);
     const directory = join(context.artifacts, "comparisons");
@@ -352,7 +343,7 @@ export default class Compare extends BaseCommand {
         evidence: [
           ...investigation.bundle.evidence,
           {
-            schemaVersion: "footgun.evidence.v1" as const,
+            schemaVersion: "footgun.evidence.v2" as const,
             id: `${investigationId}:comparison:${result.id}`,
             kind: "behavior" as const,
             claimClass: "behavioral" as const,
@@ -368,7 +359,7 @@ export default class Compare extends BaseCommand {
         evidence: [
           ...candidateCompared.evidence,
           {
-            schemaVersion: "footgun.evidence.v1" as const,
+            schemaVersion: "footgun.evidence.v2" as const,
             id: `${investigationId}:comparison:${result.id}:validated`,
             kind: "behavior" as const,
             claimClass: "behavioral" as const,
@@ -380,7 +371,7 @@ export default class Compare extends BaseCommand {
     }
   }
 
-  private async writeComparison(result: ComparisonV1, human: string, context: RuntimeContext): Promise<void> {
+  private async writeComparison(result: ComparisonV2, human: string, context: RuntimeContext): Promise<void> {
     const rendered = renderCommandResult(result, human, context.config.format);
     await writeResult(rendered, context);
     if (!context.config.quiet || context.config.format !== "human") context.stdout.write(rendered);

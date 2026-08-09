@@ -6,7 +6,7 @@ import {ExitError} from "@oclif/core/errors";
 import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {scanRepository} from "../scan/repository.js";
-import {Protocol, type InvestigationBundleV1} from "../protocol/index.js";
+import {Protocol, type InvestigationBundleV2} from "../protocol/index.js";
 import {resolveConfiguredPath} from "../config.js";
 import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
 import {stableJson} from "../serialization.js";
@@ -94,8 +94,8 @@ export default class Investigate extends BaseCommand {
       const reportDigest =
         reportBytes === undefined ? undefined : createHash("sha256").update(reportBytes).digest("hex");
       if (reportBytes !== undefined) await writeFile(reportPath, reportBytes);
-      const createdBundle: InvestigationBundleV1 = {
-        schemaVersion: "footgun.investigation-bundle.v1",
+      const createdBundle: InvestigationBundleV2 = {
+        schemaVersion: "footgun.investigation-bundle.v2",
         id,
         state: "created",
         root: report?.repository.root ?? ".",
@@ -121,9 +121,9 @@ export default class Investigate extends BaseCommand {
         ...(finding === undefined ? {} : {findingIds: [finding]}),
       };
       await recordInvestigationSnapshot(context.artifacts, createdBundle);
-      const inventoriedBundle: InvestigationBundleV1 = {...createdBundle, state: "inventoried"};
+      const inventoriedBundle: InvestigationBundleV2 = {...createdBundle, state: "inventoried"};
       await recordInvestigationSnapshot(context.artifacts, inventoriedBundle);
-      const scannedBundle: InvestigationBundleV1 =
+      const scannedBundle: InvestigationBundleV2 =
         report === undefined
           ? {...inventoriedBundle, state: "measurement-planned"}
           : {
@@ -132,7 +132,7 @@ export default class Investigate extends BaseCommand {
               reports: ["scan-report.json"],
               evidence: [
                 {
-                  schemaVersion: "footgun.evidence.v1",
+                  schemaVersion: "footgun.evidence.v2",
                   id: `${id}:scan`,
                   kind: "static",
                   claimClass: "static-fact",
@@ -143,17 +143,22 @@ export default class Investigate extends BaseCommand {
               ],
               diagnostics: report.diagnostics,
             };
-      const bundle: InvestigationBundleV1 =
+      const bundle: InvestigationBundleV2 =
         report?.context === undefined || scannedBundle.state !== "scanned"
           ? scannedBundle
           : {...scannedBundle, state: "context-resolved"};
       const parsedBundle = Protocol.investigation.safeParse(bundle);
       if (!parsedBundle.success) throw new Error("Internal investigation bundle validation failed.");
+      const finalBundle = parsedBundle.data;
       const bundlePath = join(directory, "bundle.json");
-      await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`, "utf8");
+      await writeFile(bundlePath, `${JSON.stringify(finalBundle, null, 2)}\n`, "utf8");
       await recordInvestigationSnapshot(context.artifacts, scannedBundle);
-      if (bundle.state !== scannedBundle.state) await recordInvestigationSnapshot(context.artifacts, bundle);
-      await printResult(bundle, `Investigation ${id}\nState: ${bundle.state}\nBundle: ${bundlePath}`, context);
+      if (finalBundle.state !== scannedBundle.state) await recordInvestigationSnapshot(context.artifacts, finalBundle);
+      await printResult(
+        finalBundle,
+        `Investigation ${id}\nState: ${finalBundle.state}\nBundle: ${bundlePath}`,
+        context,
+      );
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)

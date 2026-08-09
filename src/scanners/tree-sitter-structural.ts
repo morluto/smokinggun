@@ -1,7 +1,7 @@
 import type {Node} from "web-tree-sitter";
 import {inspectWithTreeSitter, type ParseCoverage} from "../parsers/tree-sitter-runtime.js";
 import {makeFinding} from "./structural.js";
-import type {FindingV1} from "../protocol/index.js";
+import type {FindingV2} from "../protocol/index.js";
 
 const loopTypes = new Set([
   "for_statement",
@@ -30,7 +30,7 @@ const sortPattern = /(?:\.sort\s*\(|\bsorted\s*\(|\bsort\s*\()/i;
 const transformPattern = /\.(?:filter|map|reduce|some|every)\s*\(/i;
 
 export type TreeStructuralResult = {
-  readonly findings: ReadonlyArray<FindingV1>;
+  readonly findings: ReadonlyArray<FindingV2>;
   readonly coverage: ParseCoverage;
 };
 
@@ -41,11 +41,11 @@ export async function scanWithTreeSitter(
   signal?: AbortSignal,
 ): Promise<TreeStructuralResult> {
   const result = await inspectWithTreeSitter(path, source, (root) => collectFindings(root, path), signal);
-  return {findings: result.value ?? [], coverage: result.coverage};
+  return {findings: result._tag === "inspected" ? result.value : [], coverage: result.coverage};
 }
 
-function collectFindings(root: Node, path: string): ReadonlyArray<FindingV1> {
-  const findings: FindingV1[] = [];
+function collectFindings(root: Node, path: string): ReadonlyArray<FindingV2> {
+  const findings: FindingV2[] = [];
   const seen = new Set<string>();
   const visit = (node: Node, loopDepth: number): void => {
     const nested = loopDepth > 0 && loopTypes.has(node.type);
@@ -109,7 +109,7 @@ function collectFindings(root: Node, path: string): ReadonlyArray<FindingV1> {
   visit(root, 0);
   return findings;
 
-  function add(finding: FindingV1): void {
+  function add(finding: FindingV2): void {
     const key = `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`;
     if (seen.has(key)) return;
     seen.add(key);

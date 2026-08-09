@@ -1,9 +1,9 @@
 import {describe, expect, it} from "vitest";
-import type {ScanReportV1} from "../protocol/index.js";
+import type {ScanReportV2} from "../protocol/index.js";
 import {parseReportArtifact, renderScanReport, toSarif} from "./render.js";
 
-const report: ScanReportV1 = {
-  schemaVersion: "footgun.scan-report.v1",
+const report: ScanReportV2 = {
+  schemaVersion: "footgun.scan-report.v2",
   tool: {name: "smokinggun", version: "2.0.0"},
   repository: {root: ".", revision: null, dirty: false},
   configDigest: "a".repeat(64),

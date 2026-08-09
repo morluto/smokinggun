@@ -23,7 +23,9 @@ it("blocks network-capable adapters before capability probing", async () => {
       "utf8",
     );
     const result = await loadExternalAdapters([manifest], root, undefined, true);
-    expect(result.descriptors[0]?.availability).toBe("unavailable");
+    const descriptor = result.descriptors[0];
+    expect(descriptor?.availability).toBe("unavailable");
+    if (descriptor?.availability === "unavailable") expect(descriptor.reason).toContain("Network-capable");
     expect(result.diagnostics[0]?.code).toBe("adapter-network-blocked");
   } finally {
     await rm(root, {recursive: true, force: true});
@@ -48,7 +50,9 @@ it("does not execute adapter probes without explicit authorization", async () =>
       "utf8",
     );
     const result = await loadExternalAdapters([manifest], root);
-    expect(result.descriptors[0]?.availability).toBe("unavailable");
+    const descriptor = result.descriptors[0];
+    expect(descriptor?.availability).toBe("unavailable");
+    if (descriptor?.availability === "unavailable") expect(descriptor.reason).toContain("explicit authorization");
     expect(result.diagnostics[0]?.code).toBe("adapter-execution-required");
     await expect(access(marker)).rejects.toMatchObject({code: "ENOENT"});
   } finally {

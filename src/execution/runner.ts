@@ -1,6 +1,6 @@
 import {execa} from "execa";
 import {relative, resolve} from "node:path";
-import {type ProblemV1, type WorkloadV1} from "../protocol/index.js";
+import {type ProblemV1, type WorkloadV2} from "../protocol/index.js";
 import {executionEnvironment, redactSensitive} from "./environment.js";
 
 export type RunnerOptions = {
@@ -9,20 +9,30 @@ export type RunnerOptions = {
   readonly signal?: AbortSignal;
 };
 
-export type WorkloadExecution = {
+type WorkloadExecutionBase = {
   readonly backend: "host-process" | "docker" | "podman" | "bwrap" | "nsjail";
   readonly controlsApplied: ReadonlyArray<string>;
   readonly downgradeReasons: ReadonlyArray<string>;
   readonly stdout: string;
   readonly stderr: string;
-  readonly exitCode: number | undefined;
+};
+
+export type WorkloadExecution =
+  | (WorkloadExecutionBase & {readonly outcome: "completed"; readonly exitCode: number})
+  | (WorkloadExecutionBase & {readonly outcome: "timed-out"})
+  | (WorkloadExecutionBase & {readonly outcome: "cancelled"});
+
+type ProcessResult = {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode?: number;
   readonly timedOut: boolean;
   readonly isCanceled: boolean;
 };
 
 /** Run a validated workload through the requested process boundary without a shell. */
 export async function executeWorkload(
-  workload: WorkloadV1,
+  workload: WorkloadV2,
   options: RunnerOptions,
 ): Promise<WorkloadExecution | ProblemV1> {
   if (workload.requestedProfile === "container-exec") return executeContainer(workload, options);
@@ -53,23 +63,24 @@ export async function executeWorkload(
       shell: false,
       ...(options.signal === undefined ? {} : {cancelSignal: options.signal}),
     });
-    return {
-      backend: "host-process",
-      controlsApplied: [
-        "no-shell",
-        "cwd-boundary",
-        "bounded-output",
-        ...(workload.requestedProfile === "candidate-write" ? ["candidate-workspace"] : []),
-        ...(workload.networkPolicy === "disabled" ? ["network-unrestricted"] : ["network-policy-explicit"]),
-      ],
-      downgradeReasons:
-        workload.networkPolicy === "disabled" ? ["host-process execution cannot enforce network denial"] : [],
-      stdout: result.stdout,
-      stderr: result.stderr,
-      exitCode: result.exitCode ?? undefined,
-      timedOut: result.timedOut,
-      isCanceled: result.isCanceled || options.signal?.aborted === true,
-    };
+    return executionResult(
+      {
+        backend: "host-process",
+        controlsApplied: [
+          "no-shell",
+          "cwd-boundary",
+          "bounded-output",
+          ...(workload.requestedProfile === "candidate-write" ? ["candidate-workspace"] : []),
+          ...(workload.networkPolicy === "disabled" ? ["network-unrestricted"] : ["network-policy-explicit"]),
+        ],
+        downgradeReasons:
+          workload.networkPolicy === "disabled" ? ["host-process execution cannot enforce network denial"] : [],
+        stdout: result.stdout,
+        stderr: result.stderr,
+      },
+      result,
+      options.signal,
+    );
   } catch (cause: unknown) {
     return problem(
       options.signal?.aborted ? "measurement-cancelled" : "workload-executable-unavailable",
@@ -81,13 +92,13 @@ export async function executeWorkload(
   }
 }
 
-async function executeContainer(workload: WorkloadV1, options: RunnerOptions): Promise<WorkloadExecution | ProblemV1> {
+async function executeContainer(workload: WorkloadV2, options: RunnerOptions): Promise<WorkloadExecution | ProblemV1> {
   const runner = workload.runner;
   if (runner === undefined)
     return problem(
       "container-runner-missing",
       "container-exec requires an explicit runner configuration.",
-      "Add runner.runtime and, for Docker or Podman, an image reference containing @sha256:<digest> to WorkloadV1.",
+      "Add runner.runtime and, for Docker or Podman, an image reference containing @sha256:<digest> to WorkloadV2.",
     );
   if (runner.runtime === "bwrap" || runner.runtime === "nsjail")
     return executeLinuxSandbox(workload, options, runner.runtime);
@@ -95,7 +106,7 @@ async function executeContainer(workload: WorkloadV1, options: RunnerOptions): P
     return problem(
       "container-image-missing",
       "Docker and Podman execution requires an image reference.",
-      "Add runner.image with an immutable @sha256:<digest> reference to WorkloadV1.",
+      "Add runner.image with an immutable @sha256:<digest> reference to WorkloadV2.",
     );
   if (!runner.image.includes("@sha256:"))
     return problem(
@@ -166,24 +177,25 @@ async function executeContainer(workload: WorkloadV1, options: RunnerOptions): P
       shell: false,
       ...(options.signal === undefined ? {} : {cancelSignal: options.signal}),
     });
-    return {
-      backend: runner.runtime,
-      controlsApplied: [
-        "no-shell",
-        "cwd-boundary",
-        "bounded-output",
-        "network-none",
-        "filesystem-read-only",
-        ...(workload.resourceLimits?.memoryBytes === undefined ? [] : ["memory-limit"]),
-        ...(workload.resourceLimits?.maxProcesses === undefined ? [] : ["process-limit"]),
-      ],
-      downgradeReasons: [],
-      stdout: result.stdout,
-      stderr: result.stderr,
-      exitCode: result.exitCode ?? undefined,
-      timedOut: result.timedOut,
-      isCanceled: result.isCanceled || options.signal?.aborted === true,
-    };
+    return executionResult(
+      {
+        backend: runner.runtime,
+        controlsApplied: [
+          "no-shell",
+          "cwd-boundary",
+          "bounded-output",
+          "network-none",
+          "filesystem-read-only",
+          ...(workload.resourceLimits?.memoryBytes === undefined ? [] : ["memory-limit"]),
+          ...(workload.resourceLimits?.maxProcesses === undefined ? [] : ["process-limit"]),
+        ],
+        downgradeReasons: [],
+        stdout: result.stdout,
+        stderr: result.stderr,
+      },
+      result,
+      options.signal,
+    );
   } catch (cause: unknown) {
     return problem(
       options.signal?.aborted ? "measurement-cancelled" : "container-execution-failed",
@@ -194,7 +206,7 @@ async function executeContainer(workload: WorkloadV1, options: RunnerOptions): P
 }
 
 async function executeLinuxSandbox(
-  workload: WorkloadV1,
+  workload: WorkloadV2,
   options: RunnerOptions,
   runtime: "bwrap" | "nsjail",
 ): Promise<WorkloadExecution | ProblemV1> {
@@ -231,36 +243,37 @@ async function executeLinuxSandbox(
       shell: false,
       ...(options.signal === undefined ? {} : {cancelSignal: options.signal}),
     });
-    return {
-      backend: runtime,
-      controlsApplied:
-        runtime === "bwrap"
-          ? [
-              "no-shell",
-              "cwd-boundary",
-              "bounded-output",
-              "network-none",
-              "filesystem-read-only",
-              "pid-namespace",
-              "system-filesystem-read-only",
-              "private-tmp",
-              "die-with-parent",
-            ]
-          : [
-              "no-shell",
-              "cwd-boundary",
-              "bounded-output",
-              "network-no-interface",
-              "workspace-read-only",
-              "die-with-parent",
-            ],
-      stdout: result.stdout,
-      stderr: result.stderr,
-      downgradeReasons: [],
-      exitCode: result.exitCode ?? undefined,
-      timedOut: result.timedOut,
-      isCanceled: result.isCanceled || options.signal?.aborted === true,
-    };
+    return executionResult(
+      {
+        backend: runtime,
+        controlsApplied:
+          runtime === "bwrap"
+            ? [
+                "no-shell",
+                "cwd-boundary",
+                "bounded-output",
+                "network-none",
+                "filesystem-read-only",
+                "pid-namespace",
+                "system-filesystem-read-only",
+                "private-tmp",
+                "die-with-parent",
+              ]
+            : [
+                "no-shell",
+                "cwd-boundary",
+                "bounded-output",
+                "network-no-interface",
+                "workspace-read-only",
+                "die-with-parent",
+              ],
+        stdout: result.stdout,
+        stderr: result.stderr,
+        downgradeReasons: [],
+      },
+      result,
+      options.signal,
+    );
   } catch (cause: unknown) {
     return problem(
       options.signal?.aborted ? "measurement-cancelled" : "sandbox-execution-failed",
@@ -270,6 +283,16 @@ async function executeLinuxSandbox(
         : `Install ${runtime} and verify its namespace permissions.`,
     );
   }
+}
+
+function executionResult(
+  base: WorkloadExecutionBase,
+  result: ProcessResult,
+  signal: AbortSignal | undefined,
+): WorkloadExecution {
+  if (result.isCanceled || signal?.aborted === true) return {...base, outcome: "cancelled"};
+  if (result.timedOut) return {...base, outcome: "timed-out"};
+  return {...base, outcome: "completed", exitCode: result.exitCode ?? -1};
 }
 
 function bwrapArguments(

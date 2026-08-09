@@ -1,7 +1,7 @@
 import {readFile, readdir, stat} from "node:fs/promises";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
-import type {CoverageRecordV1, FindingV1, ProblemV1, ScanReportV1} from "../protocol/index.js";
+import type {CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
 import {parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../scanners/tree-sitter-structural.js";
 import {
@@ -47,7 +47,7 @@ export type ScanOptions = {
   readonly allowAdapterExecution?: boolean;
 };
 
-export type ScanRepositoryResult = ScanReportV1 & {readonly policyFindings: ReadonlyArray<FindingV1>};
+export type ScanRepositoryResult = ScanReportV2 & {readonly policyFindings: ReadonlyArray<FindingV2>};
 
 /** Scan one local repository without executing source code or contacting the network. */
 export async function scanRepository(inputRoot: string, options: ScanOptions): Promise<ScanRepositoryResult> {
@@ -79,7 +79,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     selectedScanners.has("auto") ||
     selectedScanners.has("python") ||
     selectedScanners.has("python-semantic");
-  const findings: FindingV1[] = [];
+  const findings: FindingV2[] = [];
   const skippedFiles: string[] = [];
   let analyzed = 0;
   let partial = false;
@@ -154,8 +154,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       parserEntry.unavailable += 1;
       partial = true;
     }
-    if (parserResult.error !== undefined) parserEntry.reasons.add(parserResult.error);
-    if (parserResult.error !== undefined)
+    if (parserResult.status !== "complete") {
+      parserEntry.reasons.add(parserResult.error);
       parseDiagnostics.push({
         schemaVersion: "footgun.problem.v1",
         code: parserResult.status === "unavailable" ? "parser-unavailable" : "partial-parse",
@@ -164,6 +164,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         detail: parserResult.error,
         recovery: "Inspect the file manually or verify the pinned grammar asset.",
       });
+    }
     parserCoverage.set(parserResult.language, parserEntry);
     if (runPython) {
       if (extensionOf(reportPath).toLowerCase() === ".py") {
@@ -196,6 +197,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       };
   findings.push(...semantic.findings);
   parseDiagnostics.push(...semantic.diagnostics);
+  const semanticIndex = semantic.state === "unavailable" ? undefined : semantic.index;
   const repository = await repositoryIdentity(root, files);
   const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
   const sourceDigest = sourceHasher.digest("hex");
@@ -291,10 +293,10 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         version: semanticScannerVersion,
         language: "typescript-javascript",
         filesDiscovered: analyzedFiles.filter(isTypeScriptPath).length,
-        filesAnalyzed: semantic.index?.coverage.filesIndexed ?? 0,
+        filesAnalyzed: semanticIndex?.coverage.filesIndexed ?? 0,
         parseStatus:
           semantic.state === "complete" ? "complete" : semantic.state === "partial" ? "partial" : "unavailable",
-        skippedFiles: [...(semantic.index?.coverage.skippedFiles ?? [])],
+        skippedFiles: [...(semanticIndex?.coverage.skippedFiles ?? [])],
         ...(semantic.diagnostics.length === 0
           ? {}
           : {reason: semantic.diagnostics.map((diagnostic) => diagnostic.message).join(" ")}),
@@ -313,8 +315,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             pythonSemanticUnavailable > 0 ? "unavailable" : pythonSemanticPartial > 0 ? "partial" : "complete",
           skippedFiles: pythonSemanticSkipped.sort(comparePortable),
         };
-  const report: ScanReportV1 = {
-    schemaVersion: "footgun.scan-report.v1",
+  const report: ScanReportV2 = {
+    schemaVersion: "footgun.scan-report.v2",
     tool: toolIdentity,
     repository,
     inventory,
@@ -328,7 +330,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
       ...adapterRun.coverage,
     ],
-    ...(semantic.index === undefined ? {} : {context: semantic.index}),
+    ...(semanticIndex === undefined ? {} : {context: semanticIndex}),
     diagnostics,
     timings: {startedAt, durationMs: Math.max(0, performance.now() - started)},
     assumptions: [
@@ -358,7 +360,7 @@ async function runConfiguredAdapters(
   signal?: AbortSignal,
   allowAdapterExecution = false,
 ): Promise<{
-  readonly findings: ReadonlyArray<FindingV1>;
+  readonly findings: ReadonlyArray<FindingV2>;
   readonly coverage: ReadonlyArray<CoverageRecordV1>;
   readonly diagnostics: ReadonlyArray<ProblemV1>;
   readonly rawArtifacts: ReadonlyArray<string>;
@@ -391,7 +393,7 @@ async function runConfiguredAdapters(
       rawArtifactDigests: {},
     };
   const loaded = await loadExternalAdapters(manifestPaths, root, signal, allowAdapterExecution);
-  const findings: FindingV1[] = [];
+  const findings: FindingV2[] = [];
   const coverage: CoverageRecordV1[] = [];
   const diagnostics: ProblemV1[] = [...loaded.diagnostics];
   const rawArtifacts: string[] = [];
@@ -602,7 +604,7 @@ function sourceLanguage(path: string): string {
 async function repositoryIdentity(
   root: string,
   analyzedFiles: ReadonlyArray<string>,
-): Promise<ScanReportV1["repository"]> {
+): Promise<ScanReportV2["repository"]> {
   const info = await stat(root);
   const repositoryRoot = info.isDirectory() ? root : resolve(root, "..");
   const revisionResult = await execa("git", ["rev-parse", "HEAD"], {
@@ -637,7 +639,7 @@ async function repositoryIdentity(
   };
 }
 
-function compareFindings(left: FindingV1, right: FindingV1): number {
+function compareFindings(left: FindingV2, right: FindingV2): number {
   const severity = {high: 0, medium: 1, low: 2, info: 3};
   return (
     severity[left.severity] - severity[right.severity] ||
@@ -648,8 +650,8 @@ function compareFindings(left: FindingV1, right: FindingV1): number {
   );
 }
 
-function relateFindings(findings: ReadonlyArray<FindingV1>): FindingV1[] {
-  const result: FindingV1[] = [];
+function relateFindings(findings: ReadonlyArray<FindingV2>): FindingV2[] {
+  const result: FindingV2[] = [];
   const exact = new Set<string>();
   for (const finding of findings) {
     const exactKey = `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`;
@@ -688,7 +690,7 @@ function findingFamily(ruleId: string): string {
   return ruleId;
 }
 
-function scannerDisagreements(findings: ReadonlyArray<FindingV1>): ReadonlyArray<ProblemV1> {
+function scannerDisagreements(findings: ReadonlyArray<FindingV2>): ReadonlyArray<ProblemV1> {
   const scanners = new Map<string, Set<string>>();
   for (const finding of findings) {
     const key = `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`;

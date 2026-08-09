@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.adapter-result.v1"
+      "const": "footgun.adapter-result.v2"
     },
     "requestId": {
       "type": "string",
@@ -28,7 +28,7 @@
         "properties": {
           "schemaVersion": {
             "type": "string",
-            "const": "footgun.finding.v1"
+            "const": "footgun.finding.v2"
           },
           "id": {
             "type": "string",
@@ -172,7 +172,7 @@
               "properties": {
                 "schemaVersion": {
                   "type": "string",
-                  "const": "footgun.evidence.v1"
+                  "const": "footgun.evidence.v2"
                 },
                 "id": {
                   "type": "string",
@@ -192,6 +192,18 @@
                     "unknown"
                   ]
                 },
+                "claimClass": {
+                  "type": "string",
+                  "enum": [
+                    "static-fact",
+                    "theoretical-estimate",
+                    "empirical-scaling",
+                    "constant-factor",
+                    "system-bottleneck",
+                    "behavioral",
+                    "unknown"
+                  ]
+                },
                 "summary": {
                   "type": "string",
                   "minLength": 1
@@ -202,6 +214,15 @@
                 "digest": {
                   "type": "string",
                   "pattern": "^[a-f0-9]{64}$"
+                },
+                "provenance": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -437,5 +458,6 @@
     "rawArtifacts",
     "rawArtifactDigests"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

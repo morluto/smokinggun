@@ -2,13 +2,21 @@ import {execa} from "execa";
 
 type IsolationBackend = "docker" | "podman" | "bwrap" | "nsjail";
 
-export type IsolationCapability = {
+type AvailableIsolationCapability = {
   readonly backend: IsolationBackend;
-  readonly available: boolean;
-  readonly executable?: string;
+  readonly available: true;
+  readonly executable: string;
   readonly version?: string;
-  readonly reason?: string;
 };
+
+type UnavailableIsolationCapability = {
+  readonly backend: IsolationBackend;
+  readonly available: false;
+  readonly executable?: string;
+  readonly reason: string;
+};
+
+export type IsolationCapability = AvailableIsolationCapability | UnavailableIsolationCapability;
 
 /** Probe optional isolation binaries without starting a workload or contacting a service. */
 export async function probeIsolation(signal?: AbortSignal): Promise<ReadonlyArray<IsolationCapability>> {
