@@ -16,6 +16,7 @@ import {isWithinRoot, portablePath} from "../paths.js";
 
 export const semanticScannerId = "footgun.typescript-semantic";
 export const semanticScannerVersion = "1.0.0";
+const semanticWorkerOldGenerationLimitMb = 768;
 
 export type TypeScriptSemanticResult = TypeScriptIndexResult & {
   readonly findings: ReadonlyArray<FindingV2>;
@@ -46,7 +47,12 @@ export async function scanTypeScript(
   signal?.throwIfAborted();
   const workerUrl = new URL("./typescript-semantic-worker.js", import.meta.url);
   if (!existsSync(fileURLToPath(workerUrl))) return scanTypeScriptSynchronously(root, files, signal);
-  return runTypeScriptWorker(workerUrl, root, files, signal);
+  try {
+    return await runTypeScriptWorker(workerUrl, root, files, signal);
+  } catch (cause: unknown) {
+    if (signal?.aborted) throw cause;
+    return {state: "unavailable", diagnostics: [workerFailureProblem(cause)], findings: []};
+  }
 }
 
 /** Analyze one selected TypeScript source set with one shared compiler Program and TypeChecker. */
@@ -152,7 +158,11 @@ function runTypeScriptWorker(
   signal?: AbortSignal,
 ): Promise<TypeScriptSemanticResult> {
   return new Promise((resolveResult, rejectResult) => {
-    const worker = new Worker(workerUrl, {workerData: {root, files}});
+    const worker = new Worker(workerUrl, {
+      workerData: {root, files},
+      execArgv: withoutWorkerHeapOverrides(process.execArgv),
+      resourceLimits: {maxOldGenerationSizeMb: semanticWorkerOldGenerationLimitMb},
+    });
     let settled = false;
     const settle = (action: () => void): void => {
       if (settled) return;
@@ -178,6 +188,42 @@ function runTypeScriptWorker(
       if (code !== 0) settle(() => rejectResult(new Error(`TypeScript semantic worker exited with code ${code}.`)));
     });
   });
+}
+
+function withoutWorkerHeapOverrides(arguments_: ReadonlyArray<string>): string[] {
+  const result: string[] = [];
+  let skipValue = false;
+  for (const argument of arguments_) {
+    if (skipValue) {
+      skipValue = false;
+      continue;
+    }
+    if (
+      argument === "--max-old-space-size" ||
+      argument === "--max-old-space-size-percentage" ||
+      argument.startsWith("--max-old-space-size=") ||
+      argument.startsWith("--max-old-space-size-percentage=")
+    ) {
+      skipValue = !argument.includes("=");
+      continue;
+    }
+    result.push(argument);
+  }
+  return result;
+}
+
+function workerFailureProblem(cause: unknown): ProblemV1 {
+  const detail = cause instanceof Error ? cause.message : "Unknown TypeScript semantic worker failure.";
+  const reachedMemoryLimit = detail.includes("memory limit");
+  return {
+    schemaVersion: "footgun.problem.v1",
+    code: reachedMemoryLimit ? "typescript-semantic-resource-limit" : "typescript-semantic-worker-failed",
+    message: reachedMemoryLimit
+      ? "TypeScript semantic analysis exceeded its worker memory limit."
+      : "TypeScript semantic analysis worker failed.",
+    detail,
+    recovery: "Use a narrower --only scope or rerun with --scanner structural.",
+  };
 }
 
 const collectionOperationNames = new Set([
