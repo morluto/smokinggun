@@ -3,11 +3,12 @@ import {join, resolve, relative, isAbsolute} from "node:path";
 import {cp, lstat, mkdir, mkdtemp, realpath, stat} from "node:fs/promises";
 import {
   Protocol,
+  isScalingWorkload,
   type MeasurementV1,
   type ProblemV1,
-  type ScalingAnalysisV1,
   type ScalingAnalysisV2,
-  type WorkloadV1,
+  type ScalingAnalysisV3,
+  type WorkloadV2,
 } from "../protocol/index.js";
 import {executeWorkload} from "./runner.js";
 import {stableJson} from "../serialization.js";
@@ -26,10 +27,17 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
   if (!parsed.success)
     return problem(
       "invalid-workload",
-      "The workload is not a valid WorkloadV1 descriptor.",
+      "The workload is not a valid WorkloadV2 descriptor.",
       "Provide strict JSON with command, cwd, repetitions, timeoutMs, and execution profile.",
     );
-  const workload = parsed.data;
+  return measureParsedWorkload(parsed.data, options);
+}
+
+/** Execute a workload already parsed at the caller's boundary. */
+export async function measureParsedWorkload(
+  workload: WorkloadV2,
+  options: MeasurementOptions,
+): Promise<MeasurementV1 | ProblemV1> {
   if (workload.requestedProfile === "read-only")
     return problem(
       "execution-profile-unavailable",
@@ -46,17 +54,11 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       `The ${workload.requestedProfile} execution profile is unavailable in this build.`,
       "Use local-exec, candidate-write, or container-exec with an explicit runner.",
     );
-  if (workload.inputSizeParameterization !== undefined)
+  if (isScalingWorkload(workload))
     return problem(
       "scaling-profile-unavailable",
-      "This runner does not silently collapse an input-size series into one measurement.",
-      "Measure one declared input point at a time or use a scaling-capable runner.",
-    );
-  if (workload.multiParameterization !== undefined)
-    return problem(
-      "scaling-profile-unavailable",
-      "This runner does not silently collapse a multi-parameter series into one measurement.",
-      "Use measureMultiScaling for a declared multi-parameter scaling plan.",
+      "This runner does not silently collapse a scaling series into one measurement.",
+      "Use the scaling runner that matches the declared parameterization.",
     );
   if (
     workload.resourceLimits?.cpuMs !== undefined ||
@@ -121,13 +123,13 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
     controlsApplied = [...result.controlsApplied];
     downgradeReasons = [...result.downgradeReasons];
     const elapsed = performance.now() - started;
-    if (result.isCanceled || options.signal?.aborted)
+    if (result.outcome === "cancelled")
       return problem(
         "measurement-cancelled",
         "The workload measurement was cancelled.",
         "Rerun the measurement when the local process is ready.",
       );
-    if (result.timedOut)
+    if (result.outcome === "timed-out")
       return problem(
         "measurement-timeout",
         "The workload exceeded its timeout.",
@@ -141,13 +143,7 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       );
     const producedArtifactProblem = await validateProducedArtifacts(workload.expectedArtifacts, executionRoot);
     if (producedArtifactProblem !== undefined) return producedArtifactProblem;
-    evaluateBehaviorChecks(
-      workload.behaviorChecks,
-      behaviorChecks,
-      result.exitCode ?? -1,
-      result.stdout,
-      result.stderr,
-    );
+    evaluateBehaviorChecks(workload.behaviorChecks, behaviorChecks, result.exitCode, result.stdout, result.stderr);
     if (index >= workload.warmups) samples.push(elapsed);
   }
   const sorted = [...samples].sort((left, right) => left - right);
@@ -288,7 +284,7 @@ function evaluateBehaviorChecks(
 
 async function createCandidateWorkspace(
   sourceRoot: string,
-  workload: WorkloadV1,
+  workload: WorkloadV2,
   workspaceRoot: string,
   digest: string,
 ): Promise<string> {
@@ -333,7 +329,7 @@ export function parseMeasurement(input: unknown): MeasurementV1 | ProblemV1 {
 
 export function parseMeasurementArtifact(
   input: unknown,
-): MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2 | ProblemV1 {
+): MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3 | ProblemV1 {
   const multiScaling = Protocol.multiScaling.safeParse(input);
   if (multiScaling.success) return multiScaling.data;
   const scaling = Protocol.scaling.safeParse(input);
@@ -343,7 +339,7 @@ export function parseMeasurementArtifact(
     ? measurement.data
     : problem(
         "invalid-measurement-artifact",
-        "The artifact is not a valid MeasurementV1 or ScalingAnalysisV1.",
+        "The artifact is not a valid MeasurementV1 or ScalingAnalysisV2.",
         "Regenerate it with `smokinggun measure`.",
       );
 }

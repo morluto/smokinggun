@@ -2,7 +2,7 @@ import {createHash} from "node:crypto";
 import {isAbsolute, normalize, relative, resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {z} from "zod";
-import type {ScanReportV1, FindingV1, ProtocolProblemV1} from "../protocol/index.js";
+import type {ScanReportV2, FindingV2, ProtocolProblemV1} from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
 import {toolIdentity} from "../tool-identity.js";
@@ -50,7 +50,7 @@ export function importSarif(
   root: string,
   configDigest: string,
   rawArtifact?: string,
-): ScanReportV1 | ProtocolProblemV1 {
+): ScanReportV2 | ProtocolProblemV1 {
   const parsed = sarifDocument.safeParse(input);
   if (!parsed.success || parsed.data.version !== "2.1.0")
     return {
@@ -60,8 +60,8 @@ export function importSarif(
       message: "The artifact is not SARIF 2.1.0.",
       recovery: "Pass a SARIF 2.1.0 document or generate one with `smokinggun scan --format sarif`.",
     };
-  const findings: FindingV1[] = [];
-  const diagnostics: ScanReportV1["diagnostics"] = [];
+  const findings: FindingV2[] = [];
+  const diagnostics: ScanReportV2["diagnostics"] = [];
   const scannerNames: string[] = [];
   for (const [runIndex, run] of parsed.data.runs.entries()) {
     const driver = run.tool.driver;
@@ -111,7 +111,7 @@ export function importSarif(
         runProperties: run.properties,
       });
       findings.push({
-        schemaVersion: "footgun.finding.v1",
+        schemaVersion: "footgun.finding.v2",
         id,
         scanner: `sarif:${scanner}`,
         scannerVersion: driver.version ?? "unknown",
@@ -148,7 +148,7 @@ export function importSarif(
   );
   const analyzedPaths = new Set(findings.map((finding) => finding.location.path));
   return {
-    schemaVersion: "footgun.scan-report.v1",
+    schemaVersion: "footgun.scan-report.v2",
     tool: toolIdentity,
     repository: {root: ".", revision: null, dirty: false},
     configDigest,

@@ -1,14 +1,16 @@
 import {scannerId, scannerVersion} from "./structural.js";
 import type {ExternalScannerDescriptor} from "./external.js";
 
-export type ScannerDescriptor = {
+type ScannerDescriptorBase = {
   readonly id: string;
   readonly version: string;
   readonly kind: "built-in" | "adapter";
   readonly capabilities: ReadonlyArray<string>;
-  readonly availability: "available" | "unavailable" | "invalid";
-  readonly reason?: string;
 };
+
+export type ScannerDescriptor =
+  | (ScannerDescriptorBase & {readonly availability: "available"})
+  | (ScannerDescriptorBase & {readonly availability: "unavailable" | "invalid"; readonly reason: string});
 
 /** Return the installed scanner capabilities without probing the network. */
 export function listScanners(

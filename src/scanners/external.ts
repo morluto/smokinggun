@@ -4,16 +4,12 @@ import {execa} from "execa";
 import {Protocol, type AdapterManifestV1, type ProblemV1} from "../protocol/index.js";
 import {executionEnvironment, redactSensitive} from "../execution/environment.js";
 import {comparePortable} from "../paths.js";
+import type {ScannerDescriptor} from "./registry.js";
 
-export type ExternalScannerDescriptor = {
-  readonly id: string;
-  readonly version: string;
+export type ExternalScannerDescriptor = ScannerDescriptor & {
   readonly kind: "adapter";
-  readonly capabilities: ReadonlyArray<string>;
-  readonly availability: "available" | "unavailable" | "invalid";
   readonly manifestPath: string;
   readonly tool?: AdapterManifestV1["tool"];
-  readonly reason?: string;
 };
 
 export type LoadedExternalAdapter = {
@@ -21,6 +17,10 @@ export type LoadedExternalAdapter = {
   readonly path: string;
   readonly descriptor: ExternalScannerDescriptor;
 };
+
+type ExternalAdapterProbe =
+  | {readonly available: true; readonly version?: string}
+  | {readonly available: false; readonly reason: string};
 
 export async function loadExternalAdapters(
   paths: ReadonlyArray<string>,
@@ -130,16 +130,26 @@ export async function loadExternalAdapters(
       continue;
     }
     const probe = await probeExternalAdapter(parsed.data, root, signal);
-    const descriptor: ExternalScannerDescriptor = {
-      id: parsed.data.id,
-      version: probe.version ?? parsed.data.version,
-      kind: "adapter",
-      capabilities: parsed.data.capabilities,
-      availability: probe.available ? "available" : "unavailable",
-      manifestPath: inputPath,
-      ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
-      ...(probe.reason === undefined ? {} : {reason: probe.reason}),
-    };
+    const descriptor: ExternalScannerDescriptor = probe.available
+      ? {
+          id: parsed.data.id,
+          version: probe.version ?? parsed.data.version,
+          kind: "adapter",
+          capabilities: parsed.data.capabilities,
+          availability: "available",
+          manifestPath: inputPath,
+          ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+        }
+      : {
+          id: parsed.data.id,
+          version: parsed.data.version,
+          kind: "adapter",
+          capabilities: parsed.data.capabilities,
+          availability: "unavailable",
+          manifestPath: inputPath,
+          ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+          reason: probe.reason,
+        };
     descriptors.push(descriptor);
     adapters.push({manifest: parsed.data, path: inputPath, descriptor});
   }
@@ -154,7 +164,7 @@ async function probeExternalAdapter(
   manifest: AdapterManifestV1,
   root: string,
   signal?: AbortSignal,
-): Promise<{readonly available: boolean; readonly version?: string; readonly reason?: string}> {
+): Promise<ExternalAdapterProbe> {
   const command = manifest.probeCommand ?? [manifest.command[0] ?? "", "--version"];
   const executable = command[0];
   if (executable === undefined || executable === "") return {available: false, reason: "The adapter command is empty."};

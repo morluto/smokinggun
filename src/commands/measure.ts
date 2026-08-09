@@ -3,14 +3,21 @@ import {ExitError} from "@oclif/core/errors";
 import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
 import {readFile, mkdir, writeFile} from "node:fs/promises";
 import {join} from "node:path";
-import {measureWorkload} from "../execution/measure.js";
-import {measureMultiScaling, measureScaling} from "../execution/scaling.js";
+import {measureParsedWorkload} from "../execution/measure.js";
+import {measureParsedMultiScaling, measureParsedScaling} from "../execution/scaling.js";
 import {writeResult} from "../cli/output.js";
 import {renderCommandResult} from "../cli/command-output.js";
 import {recordInvestigationSnapshot, requireLatestInvestigation} from "../investigations/store.js";
 import {createHash} from "node:crypto";
 import {comparePortable} from "../paths.js";
-import type {MeasurementV1, ScalingAnalysisV1, ScalingAnalysisV2} from "../protocol/index.js";
+import {
+  Protocol,
+  isMultiScalingWorkload,
+  isSingleScalingWorkload,
+  type MeasurementV1,
+  type ScalingAnalysisV2,
+  type ScalingAnalysisV3,
+} from "../protocol/index.js";
 import {stableJson} from "../serialization.js";
 
 export default class Measure extends BaseCommand {
@@ -19,7 +26,7 @@ export default class Measure extends BaseCommand {
     ...globalFlags,
     execute: Flags.boolean({description: "Authorize local workload execution.", default: false}),
     yes: Flags.boolean({description: "Acknowledge a documented prompt; does not authorize execution.", default: false}),
-    workload: Flags.string({description: "WorkloadV1 JSON file."}),
+    workload: Flags.string({description: "WorkloadV2 JSON file."}),
   };
   static override args = {investigation: Args.string({required: true})};
 
@@ -41,31 +48,36 @@ export default class Measure extends BaseCommand {
     try {
       await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
       const raw = await readFile(parsed.flags.workload, "utf8");
-      const workload: unknown = JSON.parse(raw);
-      const measurement =
-        typeof workload === "object" &&
-        workload !== null &&
-        "multiParameterization" in workload &&
-        workload.multiParameterization !== undefined
-          ? await measureMultiScaling(workload, {
+      const parsedWorkload = Protocol.workload.safeParse(JSON.parse(raw) as unknown);
+      if (!parsedWorkload.success)
+        this.emitProblem(
+          {
+            schemaVersion: "footgun.problem.v1",
+            code: "invalid-workload",
+            message: "The workload is not a valid WorkloadV2 descriptor.",
+            recovery: "Provide strict JSON with command, cwd, repetitions, timeoutMs, and execution profile.",
+          },
+          1,
+          context,
+        );
+      const workload = parsedWorkload.data;
+      const measurement = isMultiScalingWorkload(workload)
+        ? await measureParsedMultiScaling(workload, {
+            root: context.config.cwd,
+            workspaceRoot: context.artifacts,
+            signal: context.signal,
+          })
+        : isSingleScalingWorkload(workload)
+          ? await measureParsedScaling(workload, {
               root: context.config.cwd,
               workspaceRoot: context.artifacts,
               signal: context.signal,
             })
-          : typeof workload === "object" &&
-              workload !== null &&
-              "inputSizeParameterization" in workload &&
-              workload.inputSizeParameterization !== undefined
-            ? await measureScaling(workload, {
-                root: context.config.cwd,
-                workspaceRoot: context.artifacts,
-                signal: context.signal,
-              })
-            : await measureWorkload(workload, {
-                root: context.config.cwd,
-                workspaceRoot: context.artifacts,
-                signal: context.signal,
-              });
+          : await measureParsedWorkload(workload, {
+              root: context.config.cwd,
+              workspaceRoot: context.artifacts,
+              signal: context.signal,
+            });
       if ("code" in measurement)
         this.emitProblem(measurement, unavailableExecutionCode(measurement.code) ? 3 : 1, context);
       const storedMeasurement = attachInvestigation(measurement, parsed.args.investigation);
@@ -83,15 +95,15 @@ export default class Measure extends BaseCommand {
         evidence: [
           ...investigation.bundle.evidence,
           {
-            schemaVersion: "footgun.evidence.v1" as const,
+            schemaVersion: "footgun.evidence.v2" as const,
             id: `${parsed.args.investigation}:measurement:${id}`,
             kind: "measurement" as const,
             claimClass:
-              measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
+              measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
                 ? ("empirical-scaling" as const)
                 : ("constant-factor" as const),
             summary:
-              measurement.schemaVersion === "footgun.scaling.v1" || measurement.schemaVersion === "footgun.scaling.v2"
+              measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
                 ? "Parameterized scaling measurement"
                 : "Repeated local workload measurement",
             artifact: `../measurements/${id}.json`,
@@ -101,9 +113,9 @@ export default class Measure extends BaseCommand {
       };
       await recordInvestigationSnapshot(context.artifacts, nextBundle);
       const human =
-        measurement.schemaVersion === "footgun.scaling.v1"
+        measurement.schemaVersion === "footgun.scaling.v2"
           ? `Scaling measurement ${id}\nParameter: ${measurement.parameter}\nPoints: ${measurement.points.length}\nSelected model: ${measurement.selectedModel ?? "inconclusive"}\nArtifact: ${path}`
-          : measurement.schemaVersion === "footgun.scaling.v2"
+          : measurement.schemaVersion === "footgun.scaling.v3"
             ? `Scaling measurement ${id}\nParameters: ${measurement.parameters.join(", ")}\nCoordinates: ${measurement.points.length}\nArtifact: ${path}`
             : `Measurement ${id}\nMedian: ${measurement.medianMs.toFixed(3)} ms\nSamples: ${measurement.samplesMs.length}\nBehavior validated: ${measurement.behaviorValidated}\nArtifact: ${path}`;
       const rendered = renderCommandResult(
@@ -132,7 +144,7 @@ export default class Measure extends BaseCommand {
           schemaVersion: "footgun.problem.v1",
           code: "measurement-failed",
           message,
-          recovery: "Check the WorkloadV1 JSON and rerun with --execute.",
+          recovery: "Check the WorkloadV2 JSON and rerun with --execute.",
         },
         1,
         context,
@@ -141,11 +153,10 @@ export default class Measure extends BaseCommand {
   }
 }
 
-function attachInvestigation(
-  value: MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2,
+function attachInvestigation<T extends MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3>(
+  value: T,
   investigation: string,
-): (MeasurementV1 | ScalingAnalysisV1 | ScalingAnalysisV2) & {readonly investigation: string} {
-  if (value.schemaVersion === "footgun.measurement.v1") return {...value, investigation};
+): T & {readonly investigation: string} {
   return {...value, investigation};
 }
 

@@ -1,15 +1,15 @@
 import {createHash, randomUUID} from "node:crypto";
 import {mkdir, readFile, rename, writeFile} from "node:fs/promises";
 import {join} from "node:path";
-import {Protocol, type InvestigationBundleV1, type InvestigationPointerV1} from "../protocol/index.js";
+import {Protocol, type InvestigationBundleV2, type InvestigationPointerV1} from "../protocol/index.js";
 import {stableJson} from "../serialization.js";
 
 type StoredInvestigation = {
-  readonly bundle: InvestigationBundleV1;
+  readonly bundle: InvestigationBundleV2;
   readonly digest: string;
 };
 
-const reportAttachableStates = new Set<InvestigationBundleV1["state"]>([
+const reportAttachableStates = new Set<InvestigationBundleV2["state"]>([
   "scanned",
   "context-resolved",
   "measurement-planned",
@@ -18,7 +18,7 @@ const reportAttachableStates = new Set<InvestigationBundleV1["state"]>([
   "behavior-validated",
 ]);
 
-export function canAttachReport(bundle: InvestigationBundleV1): boolean {
+export function canAttachReport(bundle: InvestigationBundleV2): boolean {
   return reportAttachableStates.has(bundle.state);
 }
 
@@ -50,7 +50,7 @@ export async function requireLatestInvestigation(dataRoot: string, id: string): 
 }
 
 /** Store a content-addressed bundle snapshot and atomically advance its pointer. */
-export async function recordInvestigationSnapshot(dataRoot: string, bundle: InvestigationBundleV1): Promise<string> {
+export async function recordInvestigationSnapshot(dataRoot: string, bundle: InvestigationBundleV2): Promise<string> {
   const parsed = Protocol.investigation.parse(bundle);
   const latest = await loadLatestInvestigation(dataRoot, parsed.id);
   if (
@@ -82,7 +82,7 @@ export async function recordInvestigationSnapshot(dataRoot: string, bundle: Inve
   return digest;
 }
 
-const terminalStates = new Set<InvestigationBundleV1["state"]>([
+const terminalStates = new Set<InvestigationBundleV2["state"]>([
   "blocked",
   "inconclusive",
   "unavailable",
@@ -90,10 +90,10 @@ const terminalStates = new Set<InvestigationBundleV1["state"]>([
   "failed",
 ]);
 
-function isAllowedTransition(from: InvestigationBundleV1["state"], to: InvestigationBundleV1["state"]): boolean {
+function isAllowedTransition(from: InvestigationBundleV2["state"], to: InvestigationBundleV2["state"]): boolean {
   if (terminalStates.has(from)) return false;
   if (terminalStates.has(to)) return true;
-  const transitions: Record<InvestigationBundleV1["state"], ReadonlyArray<InvestigationBundleV1["state"]>> = {
+  const transitions: Record<InvestigationBundleV2["state"], ReadonlyArray<InvestigationBundleV2["state"]>> = {
     created: ["inventoried"],
     inventoried: ["scanned", "measurement-planned"],
     scanned: ["context-resolved", "measurement-planned", "baseline-measured", "reported"],
@@ -117,7 +117,7 @@ function investigationDirectory(dataRoot: string, id: string): string {
   return join(dataRoot, "investigations", id);
 }
 
-function digestBundle(bundle: InvestigationBundleV1): string {
+function digestBundle(bundle: InvestigationBundleV2): string {
   return createHash("sha256").update(stableJson(bundle)).digest("hex");
 }
 

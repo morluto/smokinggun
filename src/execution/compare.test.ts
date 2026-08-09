@@ -1,18 +1,14 @@
 import {expect, it} from "vitest";
 import {buildScalingComparison} from "./compare.js";
-import type {ScalingAnalysisV1} from "../protocol/index.js";
+import type {ScalingAnalysisV2} from "../protocol/index.js";
 
 it("compares scaling points deterministically", () => {
   const base = scaling("base", [10, 20]);
   const candidate = scaling("candidate", [8, 21]);
-  const result = buildScalingComparison(
-    base,
-    candidate,
-    "baseline.json",
-    "candidate.json",
+  const result = buildScalingComparison(base, candidate, "baseline.json", "candidate.json", [
     "a".repeat(64),
     "b".repeat(64),
-  );
+  ]);
   expect(result.mode).toBe("scaling");
   expect(result.points?.map((point) => point.improvement)).toEqual([true, false]);
   expect(result.improvement).toBe(false);
@@ -23,36 +19,35 @@ it("compares scaling points deterministically", () => {
 it("uses immutable artifact digests in comparison identity", () => {
   const baseline = scaling("base", [10, 20]);
   const candidate = scaling("candidate", [8, 16]);
-  const first = buildScalingComparison(
-    baseline,
-    candidate,
-    "baseline.json",
-    "candidate.json",
+  const first = buildScalingComparison(baseline, candidate, "baseline.json", "candidate.json", [
     "b".repeat(64),
     "c".repeat(64),
-  );
-  const replacedCandidate = buildScalingComparison(
-    baseline,
-    candidate,
-    "baseline.json",
-    "candidate.json",
+  ]);
+  const replacedCandidate = buildScalingComparison(baseline, candidate, "baseline.json", "candidate.json", [
     "b".repeat(64),
     "d".repeat(64),
-  );
+  ]);
   expect(first.id).not.toBe(replacedCandidate.id);
+});
+
+it("omits both provenance fields when comparison artifacts are unavailable", () => {
+  const result = buildScalingComparison(
+    scaling("base", [10]),
+    scaling("candidate", [8]),
+    "baseline.json",
+    "candidate.json",
+  );
+  expect("baselineDigest" in result).toBe(false);
+  expect("candidateDigest" in result).toBe(false);
 });
 
 it("blocks promotion when recorded Node runtimes differ", () => {
   const baseline = scaling("base", [10, 20]);
   const candidate = {...scaling("candidate", [8, 16]), environment: {node: "20", platform: "test", arch: "test"}};
-  const result = buildScalingComparison(
-    baseline,
-    candidate,
-    "baseline.json",
-    "candidate.json",
+  const result = buildScalingComparison(baseline, candidate, "baseline.json", "candidate.json", [
     "b".repeat(64),
     "c".repeat(64),
-  );
+  ]);
   expect(result.comparability).toMatchObject({status: "cross-machine"});
   expect(result.promotion).toBe("blocked");
   expect(result.promotionReasons).toContain("cross-machine-results-not-comparable");
@@ -70,23 +65,19 @@ it("blocks scaling promotion when a point has an isolation downgrade", () => {
       downgradeReasons: ["host-process execution cannot enforce network denial"],
     },
   };
-  const result = buildScalingComparison(
-    base,
-    candidate,
-    "baseline.json",
-    "candidate.json",
+  const result = buildScalingComparison(base, candidate, "baseline.json", "candidate.json", [
     "a".repeat(64),
     "b".repeat(64),
-  );
+  ]);
   expect(result.promotion).toBe("blocked");
   expect(result.promotionReasons).toContain(
     "execution-control-downgrade:host-process execution cannot enforce network denial",
   );
 });
 
-function scaling(id: string, medians: ReadonlyArray<number>): ScalingAnalysisV1 {
+function scaling(id: string, medians: ReadonlyArray<number>): ScalingAnalysisV2 {
   return {
-    schemaVersion: "footgun.scaling.v1",
+    schemaVersion: "footgun.scaling.v2",
     id: `scale_${id === "base" ? "a".repeat(16) : "b".repeat(16)}`,
     workloadDigest: "a".repeat(64),
     parameter: "items",

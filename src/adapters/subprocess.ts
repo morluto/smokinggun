@@ -3,7 +3,7 @@ import {constants} from "node:fs";
 import {lstat, open, realpath} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
-import {Protocol, type AdapterResultV1, type ProblemV1} from "../protocol/index.js";
+import {Protocol, type AdapterResultV2, type ProblemV1} from "../protocol/index.js";
 import {executionEnvironment, redactCommand, redactSensitive} from "../execution/environment.js";
 import {isWithinRoot, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
@@ -22,7 +22,7 @@ export async function runSubprocessAdapter(
   manifestInput: unknown,
   requestInput: unknown,
   options: AdapterRunOptions,
-): Promise<AdapterResultV1 | ProblemV1> {
+): Promise<AdapterResultV2 | ProblemV1> {
   const manifest = Protocol.adapterManifest.safeParse(manifestInput);
   if (!manifest.success)
     return problem("invalid-adapter-manifest", "The adapter manifest is invalid.", "Fix the manifest and retry.");
@@ -47,7 +47,7 @@ export async function runSubprocessAdapter(
     command: redactCommand(manifest.data.command, options.root),
   };
   const requestDigest = createHash("sha256").update(stableJson(request.data)).digest("hex");
-  const failure = (state: AdapterResultV1["state"], message: string): AdapterResultV1 => ({
+  const failure = (state: AdapterResultV2["state"], message: string): AdapterResultV2 => ({
     ...failedAdapter(request.data.requestId, state, message, requestDigest),
     adapter: identity,
     ...(request.data.configDigest === undefined ? {} : {configDigest: request.data.configDigest}),
@@ -80,7 +80,7 @@ export async function runSubprocessAdapter(
     if (!parsed.success)
       return problem(
         "invalid-adapter-result",
-        "The adapter result does not satisfy AdapterResultV1.",
+        "The adapter result does not satisfy AdapterResultV2.",
         "Update the adapter to the supported protocol version.",
       );
     if (parsed.data.requestId !== request.data.requestId)
@@ -129,17 +129,10 @@ export async function runSubprocessAdapter(
 }
 
 async function checkArtifacts(
-  result: AdapterResultV1,
+  result: AdapterResultV2,
   root: string,
   maxArtifactBytes: number,
 ): Promise<ProblemV1 | undefined> {
-  for (const artifact of Object.keys(result.rawArtifactDigests))
-    if (!result.rawArtifacts.includes(artifact))
-      return problem(
-        "artifact-digest-undeclared",
-        "An adapter declared a digest for an artifact it did not return.",
-        "Return digests only for rawArtifacts entries.",
-      );
   const realRoot = await realpath(root).catch(() => resolve(root));
   for (const artifact of result.rawArtifacts) {
     if (isAbsolute(artifact))
@@ -221,7 +214,7 @@ async function checkArtifacts(
   return undefined;
 }
 
-function checkFindingLocations(result: AdapterResultV1, root: string): ProblemV1 | undefined {
+function checkFindingLocations(result: AdapterResultV2, root: string): ProblemV1 | undefined {
   for (const finding of result.findings) {
     const normalized = portablePath(finding.location.path);
     if (isAbsolute(finding.location.path) || normalized === ".." || normalized.startsWith("../"))
@@ -242,12 +235,12 @@ function checkFindingLocations(result: AdapterResultV1, root: string): ProblemV1
 
 function failedAdapter(
   requestId: string,
-  state: AdapterResultV1["state"],
+  state: AdapterResultV2["state"],
   message: string,
   requestDigest?: string,
-): AdapterResultV1 {
+): AdapterResultV2 {
   return {
-    schemaVersion: "footgun.adapter-result.v1",
+    schemaVersion: "footgun.adapter-result.v2",
     requestId,
     state,
     findings: [],

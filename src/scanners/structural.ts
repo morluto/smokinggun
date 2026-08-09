@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import type {FindingV1, LocationV1} from "../protocol/index.js";
+import type {FindingV2, LocationV1} from "../protocol/index.js";
 
 export const scannerId = "footgun.structural";
 export const scannerVersion = "1.0.0";
@@ -61,16 +61,20 @@ export function isSupportedExtension(extension: string): boolean {
   return textExtensions.has(extension.toLowerCase());
 }
 
-export function scanSource(
-  path: string,
-  text: string,
-): {
-  readonly findings: ReadonlyArray<FindingV1>;
-  readonly parseStatus: "complete" | "partial";
-  readonly reason?: string;
-} {
+export type StructuralScanResult =
+  | {
+      readonly findings: ReadonlyArray<FindingV2>;
+      readonly parseStatus: "complete";
+    }
+  | {
+      readonly findings: ReadonlyArray<FindingV2>;
+      readonly parseStatus: "partial";
+      readonly reason: string;
+    };
+
+export function scanSource(path: string, text: string): StructuralScanResult {
   const lines = text.split(/\r?\n/);
-  const findings: FindingV1[] = [];
+  const findings: FindingV2[] = [];
   const extension = extensionOf(path);
   const python = extension === ".py";
   const masked = maskRegexLiterals(
@@ -221,15 +225,15 @@ export function makeFinding(
   path: string,
   line: number,
   ruleId: string,
-  severity: FindingV1["severity"],
+  severity: FindingV2["severity"],
   message: string,
   suggestion: string,
   assumptions: ReadonlyArray<string>,
-): FindingV1 {
+): FindingV2 {
   const id = `fg_${createHash("sha256").update(`${path}\0${line}\0${ruleId}\0${message}`).digest("hex").slice(0, 16)}`;
   const location: LocationV1 = {path, startLine: line, startColumn: 0, endLine: line, endColumn: 1};
   return {
-    schemaVersion: "footgun.finding.v1",
+    schemaVersion: "footgun.finding.v2",
     id,
     scanner: scannerId,
     scannerVersion,
@@ -253,7 +257,7 @@ export function makeFinding(
   };
 }
 
-function dedupeFindings(findings: ReadonlyArray<FindingV1>): ReadonlyArray<FindingV1> {
+function dedupeFindings(findings: ReadonlyArray<FindingV2>): ReadonlyArray<FindingV2> {
   const seen = new Set<string>();
   return findings
     .filter((finding) => {
@@ -264,7 +268,7 @@ function dedupeFindings(findings: ReadonlyArray<FindingV1>): ReadonlyArray<Findi
     .sort(compareFindings);
 }
 
-function compareFindings(left: FindingV1, right: FindingV1): number {
+function compareFindings(left: FindingV2, right: FindingV2): number {
   if (left.location.path !== right.location.path) return left.location.path < right.location.path ? -1 : 1;
   if (left.location.startLine !== right.location.startLine) return left.location.startLine - right.location.startLine;
   if (left.ruleId !== right.ruleId) return left.ruleId < right.ruleId ? -1 : 1;

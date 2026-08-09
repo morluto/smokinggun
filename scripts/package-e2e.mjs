@@ -138,7 +138,7 @@ try {
     {cwd: target, env: {...consumerEnv, npm_config_registry: registry}, maxBuffer: 1_000_000},
   );
   const scan = JSON.parse(npxScan.stdout);
-  if (scan.schemaVersion !== "footgun.scan-report.v1" || npxScan.stderr.length !== 0)
+  if (scan.schemaVersion !== "footgun.scan-report.v2" || npxScan.stderr.length !== 0)
     throw new Error("npx did not run the packed CLI against a project outside the checkout");
 
   const scanners = await run(

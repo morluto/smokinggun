@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.benchmark-record.v1"
+      "const": "footgun.benchmark-record.v2"
     },
     "id": {
       "type": "string",
@@ -83,5 +83,6 @@
     "sourceUnit",
     "metadata"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

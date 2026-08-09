@@ -4,7 +4,7 @@ import {measureMultiScaling, measureScaling} from "./scaling.js";
 it("measures every declared input point and records candidate fits", async () => {
   const result = await measureScaling(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.exit(0)", "0"],
       cwd: ".",
       environment: {},
@@ -30,7 +30,7 @@ it("measures every declared input point and records candidate fits", async () =>
 it("rejects a parameter index that cannot be substituted", async () => {
   const result = await measureScaling(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath],
       cwd: ".",
       environment: {},
@@ -45,13 +45,13 @@ it("rejects a parameter index that cannot be substituted", async () => {
     },
     {root: process.cwd()},
   );
-  expect("code" in result && result.code).toBe("scaling-command-index-invalid");
+  expect("code" in result && result.code).toBe("invalid-workload");
 });
 
 it("measures a bounded Cartesian coordinate grid deterministically", async () => {
   const result = await measureMultiScaling(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.exit(0)", "0", "0"],
       cwd: ".",
       environment: {},
@@ -74,7 +74,7 @@ it("measures a bounded Cartesian coordinate grid deterministically", async () =>
   );
   expect("code" in result).toBe(false);
   if ("code" in result) return;
-  expect(result.schemaVersion).toBe("footgun.scaling.v2");
+  expect(result.schemaVersion).toBe("footgun.scaling.v3");
   expect(result.points.map((point) => point.coordinates)).toEqual([
     {paths: 1, terms: 4},
     {paths: 1, terms: 8},
@@ -86,7 +86,7 @@ it("measures a bounded Cartesian coordinate grid deterministically", async () =>
 it("rejects Cartesian plans beyond the declared bound", async () => {
   const result = await measureMultiScaling(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.exit(0)", "0", "0"],
       cwd: ".",
       environment: {},
@@ -107,7 +107,7 @@ it("rejects Cartesian plans beyond the declared bound", async () => {
     },
     {root: process.cwd()},
   );
-  expect("code" in result && result.code).toBe("scaling-points-limit-exceeded");
+  expect("code" in result && result.code).toBe("invalid-workload");
 });
 
 it("preserves cancelled and remaining coordinates", async () => {
@@ -115,7 +115,7 @@ it("preserves cancelled and remaining coordinates", async () => {
   controller.abort();
   const result = await measureMultiScaling(
     {
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", "process.exit(0)", "0", "0"],
       cwd: ".",
       environment: {},

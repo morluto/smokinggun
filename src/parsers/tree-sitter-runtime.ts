@@ -2,23 +2,37 @@ import {createRequire} from "node:module";
 import {fileURLToPath} from "node:url";
 import {Language, Parser, type Node, type Tree} from "web-tree-sitter";
 
-export type ParserCapability = {
-  readonly runtime: "available" | "unavailable";
-  readonly grammars: "available" | "unavailable";
-  readonly languages: ReadonlyArray<string>;
-  readonly reason?: string;
-};
+export type ParserCapability =
+  | {readonly runtime: "available"; readonly grammars: "available"; readonly languages: ReadonlyArray<string>}
+  | {
+      readonly runtime: "available";
+      readonly grammars: "unavailable";
+      readonly languages: ReadonlyArray<string>;
+      readonly reason: string;
+    }
+  | {
+      readonly runtime: "unavailable";
+      readonly grammars: "unavailable";
+      readonly languages: ReadonlyArray<string>;
+      readonly reason: string;
+    };
 
-export type ParseCoverage = {
+type CompleteParseCoverage = {
   readonly language: string;
-  readonly status: "complete" | "partial" | "unavailable";
-  readonly error?: string;
+  readonly status: "complete";
 };
 
-export type TreeSitterInspection<T> = {
-  readonly coverage: ParseCoverage;
-  readonly value?: T;
+type IncompleteParseCoverage = {
+  readonly language: string;
+  readonly status: "partial" | "unavailable";
+  readonly error: string;
 };
+
+export type ParseCoverage = CompleteParseCoverage | IncompleteParseCoverage;
+
+export type TreeSitterInspection<T> =
+  | {readonly _tag: "inspected"; readonly coverage: CompleteParseCoverage; readonly value: T}
+  | {readonly _tag: "unavailable"; readonly coverage: IncompleteParseCoverage};
 
 const grammarRoot = fileURLToPath(new URL("../../grammars/", import.meta.url));
 const runtimeWasm = createRequire(import.meta.url).resolve("web-tree-sitter/web-tree-sitter.wasm");
@@ -47,8 +61,7 @@ const languages = new Map<GrammarName, Promise<Language>>();
 /** Parse source with the pinned grammar when one is available. */
 export async function parseWithTreeSitter(path: string, source: string, signal?: AbortSignal): Promise<ParseCoverage> {
   const language = languageForPath(path);
-  if (language === undefined)
-    return {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."};
+  if (language === undefined) return unavailableCoverage("unknown", "No pinned grammar matches this file extension.");
   try {
     await initialize(signal);
     const parser = new Parser();
@@ -61,20 +74,16 @@ export async function parseWithTreeSitter(path: string, source: string, signal?:
           if (signal?.aborted) throw new Error("Tree-sitter parsing cancelled.");
         },
       });
-      if (tree === null) return {language, status: "unavailable", error: "Tree-sitter cancelled parsing."};
+      if (tree === null) return unavailableCoverage(language, "Tree-sitter cancelled parsing.");
       return tree.rootNode.hasError
-        ? {language, status: "partial", error: "The grammar reported one or more syntax errors."}
+        ? partialCoverage(language, "The grammar reported one or more syntax errors.")
         : {language, status: "complete"};
     } finally {
       tree?.delete();
       parser.delete();
     }
   } catch (cause: unknown) {
-    return {
-      language,
-      status: "unavailable",
-      error: cause instanceof Error ? cause.message : "Tree-sitter parsing failed.",
-    };
+    return unavailableCoverage(language, cause instanceof Error ? cause.message : "Tree-sitter parsing failed.");
   }
 }
 
@@ -88,7 +97,8 @@ export async function inspectWithTreeSitter<T>(
   const language = languageForPath(path);
   if (language === undefined)
     return {
-      coverage: {language: "unknown", status: "unavailable", error: "No pinned grammar matches this file extension."},
+      _tag: "unavailable",
+      coverage: unavailableCoverage("unknown", "No pinned grammar matches this file extension."),
     };
   try {
     await initialize(signal);
@@ -102,22 +112,25 @@ export async function inspectWithTreeSitter<T>(
           if (signal?.aborted) throw new Error("Tree-sitter parsing cancelled.");
         },
       });
-      if (tree === null) return {coverage: {language, status: "unavailable", error: "Tree-sitter cancelled parsing."}};
+      if (tree === null)
+        return {_tag: "unavailable", coverage: unavailableCoverage(language, "Tree-sitter cancelled parsing.")};
       const coverage: ParseCoverage = tree.rootNode.hasError
-        ? {language, status: "partial", error: "The grammar reported one or more syntax errors."}
+        ? partialCoverage(language, "The grammar reported one or more syntax errors.")
         : {language, status: "complete"};
-      return tree.rootNode.hasError ? {coverage} : {coverage, value: inspect(tree.rootNode, language)};
+      return coverage.status === "complete"
+        ? {_tag: "inspected", coverage, value: inspect(tree.rootNode, language)}
+        : {_tag: "unavailable", coverage};
     } finally {
       tree?.delete();
       parser.delete();
     }
   } catch (cause: unknown) {
     return {
-      coverage: {
+      _tag: "unavailable",
+      coverage: unavailableCoverage(
         language,
-        status: "unavailable",
-        error: cause instanceof Error ? cause.message : "Tree-sitter inspection failed.",
-      },
+        cause instanceof Error ? cause.message : "Tree-sitter inspection failed.",
+      ),
     };
   }
 }
@@ -143,13 +156,13 @@ export async function probeTreeSitter(): Promise<ParserCapability> {
         languages: [],
         reason: "No pinned WASM grammar could be loaded.",
       };
+    if (available.length === Object.keys(grammarFiles).length)
+      return {runtime: "available", grammars: "available", languages: available};
     return {
       runtime: "available",
-      grammars: available.length === Object.keys(grammarFiles).length ? "available" : "unavailable",
+      grammars: "unavailable",
       languages: available,
-      ...(available.length === Object.keys(grammarFiles).length
-        ? {}
-        : {reason: "One or more pinned WASM grammars could not be loaded."}),
+      reason: "One or more pinned WASM grammars could not be loaded.",
     };
   } catch (cause: unknown) {
     return {
@@ -223,4 +236,12 @@ function languageForPath(path: string): GrammarName | undefined {
 
 function isGrammarName(value: string): value is GrammarName {
   return Object.hasOwn(grammarFiles, value);
+}
+
+function partialCoverage(language: string, error: string): IncompleteParseCoverage {
+  return {language, status: "partial", error};
+}
+
+function unavailableCoverage(language: string, error: string): IncompleteParseCoverage {
+  return {language, status: "unavailable", error};
 }

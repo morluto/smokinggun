@@ -52,7 +52,7 @@ Create a durable investigation bundle when it will help organize evidence:
 smokinggun investigate <path>
 ```
 
-Before executing any repository workload, obtain explicit user authorization. A measurement must include a declared `WorkloadV1` descriptor and the `--execute` flag. `--yes` confirms an ordinary command choice; it never authorizes workload execution.
+Before executing any repository workload, obtain explicit user authorization. A measurement must include a declared `WorkloadV2` descriptor and the `--execute` flag. `--yes` confirms an ordinary command choice; it never authorizes workload execution.
 
 Keep baseline and candidate measurements tied to their workload, environment, artifacts, and behavior checks. Use `smokinggun compare <baseline> <candidate>` only after checking that both sides are comparable. Report what was not measured and which assumptions remain unresolved.
 

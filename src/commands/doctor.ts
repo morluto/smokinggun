@@ -75,10 +75,12 @@ const registryResult = z.union([
   z.strictObject({version: z.string().optional(), dist: z.strictObject({integrity: z.string().optional()}).optional()}),
 ]);
 
-async function checkRegistry(
-  cwd: string,
-  signal: AbortSignal,
-): Promise<{readonly state: "available" | "unavailable"; readonly version?: string; readonly integrity?: string}> {
+type RegistryCheck =
+  | {readonly state: "not-requested"}
+  | {readonly state: "available"; readonly version?: string; readonly integrity?: string}
+  | {readonly state: "unavailable"};
+
+async function checkRegistry(cwd: string, signal: AbortSignal): Promise<RegistryCheck> {
   try {
     const result = await execa("npm", ["view", "smokinggun", "version", "dist.integrity", "--json"], {
       cwd,

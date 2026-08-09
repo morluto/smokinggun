@@ -1,12 +1,12 @@
 import {inspectWithTreeSitter, type ParseCoverage} from "../parsers/tree-sitter-runtime.js";
 import {makeFinding} from "./structural.js";
-import type {FindingV1, ProblemV1} from "../protocol/index.js";
+import type {FindingV2, ProblemV1} from "../protocol/index.js";
 
 export const pythonSemanticScannerId = "footgun.python-semantic";
 export const pythonSemanticScannerVersion = "1.0.0";
 
 export type PythonSemanticResult = {
-  readonly findings: ReadonlyArray<FindingV1>;
+  readonly findings: ReadonlyArray<FindingV2>;
   readonly coverage: ParseCoverage;
   readonly diagnostics: ReadonlyArray<ProblemV1>;
 };
@@ -22,7 +22,7 @@ export async function scanPythonSemantic(
     path,
     source,
     (root) => {
-      const findings: FindingV1[] = [];
+      const findings: FindingV2[] = [];
       const seen = new Set<string>();
       const visit = (node: import("web-tree-sitter").Node, loopDepth: number): void => {
         const isLoop = node.type === "for_statement" || node.type === "while_statement";
@@ -67,7 +67,7 @@ export async function scanPythonSemantic(
     signal,
   );
   return {
-    findings: result.value ?? [],
+    findings: result._tag === "inspected" ? result.value : [],
     coverage: result.coverage,
     diagnostics:
       result.coverage.status === "complete"

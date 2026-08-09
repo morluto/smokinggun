@@ -13,7 +13,7 @@ try {
   const report = JSON.parse(scan.stdout);
   if (
     scan.code !== 0 ||
-    report.schemaVersion !== "footgun.scan-report.v1" ||
+    report.schemaVersion !== "footgun.scan-report.v2" ||
     scan.stderr.length !== 0 ||
     scan.stdout.includes("\u001b") ||
     scan.stdout.includes("SmokingGun scan:")
@@ -55,14 +55,12 @@ try {
   const investigationValue = JSON.parse(investigation.stdout);
   if (
     investigation.code !== 0 ||
-    investigationValue.schemaVersion !== "footgun.investigation-bundle.v1" ||
+    investigationValue.schemaVersion !== "footgun.investigation-bundle.v2" ||
     !["inventoried", "scanned", "context-resolved"].includes(investigationValue.state) ||
     investigation.stderr.length !== 0
   )
     throw new Error("investigation lifecycle contract failed");
-  const storedScan = await readFile(
-    join(root, ".cli-smoke-data", "investigations", investigationValue.id, "scan-report.json"),
-  );
+  const storedScan = await readFile(join(sandbox, "data", "investigations", investigationValue.id, "scan-report.json"));
   const storedScanDigest = createHash("sha256").update(storedScan).digest("hex");
   const scanEvidence = investigationValue.evidence.find((evidence) => evidence.artifact === "scan-report.json");
   if (scanEvidence?.digest !== storedScanDigest)
@@ -122,7 +120,7 @@ try {
   const renderedValue = JSON.parse(renderedReport.stdout);
   if (
     renderedReport.code !== 0 ||
-    renderedValue.schemaVersion !== "footgun.scan-report.v1" ||
+    renderedValue.schemaVersion !== "footgun.scan-report.v2" ||
     renderedReport.stderr.length !== 0
   )
     throw new Error("report JSON contract failed");
@@ -167,7 +165,7 @@ try {
   const comparisonValue = JSON.parse(comparison.stdout);
   if (
     comparison.code !== 0 ||
-    comparisonValue.schemaVersion !== "footgun.comparison.v1" ||
+    comparisonValue.schemaVersion !== "footgun.comparison.v2" ||
     comparisonValue.promotion !== "eligible" ||
     comparison.stderr.length !== 0
   )
@@ -183,7 +181,7 @@ try {
   const policy = await run([entry, "scan", "fixtures/corpus/typescript", "--format", "json", "--fail-on", "finding"]);
   if (
     policy.code !== 4 ||
-    JSON.parse(policy.stdout).schemaVersion !== "footgun.scan-report.v1" ||
+    JSON.parse(policy.stdout).schemaVersion !== "footgun.scan-report.v2" ||
     policy.stderr.length !== 0
   )
     throw new Error("fail-on exit contract failed");
@@ -191,7 +189,7 @@ try {
   const strictIncomplete = await run([entry, "scan", "fixtures/edge/malformed.ts", "--format", "json", "--strict"]);
   if (
     strictIncomplete.code !== 3 ||
-    JSON.parse(strictIncomplete.stdout).schemaVersion !== "footgun.scan-report.v1" ||
+    JSON.parse(strictIncomplete.stdout).schemaVersion !== "footgun.scan-report.v2" ||
     strictIncomplete.stderr.length !== 0 ||
     strictIncomplete.stdout.trim().split("\n").length === 0
   )
@@ -282,7 +280,7 @@ try {
   await writeFile(
     workload,
     JSON.stringify({
-      schemaVersion: "footgun.workload.v1",
+      schemaVersion: "footgun.workload.v2",
       command: [process.execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`],
       cwd: ".",
       environment: {},
@@ -357,7 +355,7 @@ function run(args, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: root,
-      env: {...process.env, ...extraEnv, SMOKINGGUN_DATA_DIR: `${root}/.cli-smoke-data`},
+      env: {...process.env, ...extraEnv, SMOKINGGUN_DATA_DIR: join(sandbox, "data")},
       shell: false,
     });
     let stdout = "";

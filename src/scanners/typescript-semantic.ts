@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import * as ts from "typescript";
-import type {FindingV1, LocationV1, ProblemV1} from "../protocol/index.js";
+import type {FindingV2, LocationV1, ProblemV1} from "../protocol/index.js";
 import {buildTypeScriptIndex, type TypeScriptIndexResult} from "../context/index.js";
 import {isWithinRoot, portablePath} from "../paths.js";
 
@@ -9,7 +9,7 @@ export const semanticScannerId = "footgun.typescript-semantic";
 export const semanticScannerVersion = "1.0.0";
 
 export type TypeScriptSemanticResult = TypeScriptIndexResult & {
-  readonly findings: ReadonlyArray<FindingV1>;
+  readonly findings: ReadonlyArray<FindingV2>;
 };
 
 /** Use the TypeScript compiler API for symbol-aware collection and call facts. */
@@ -22,7 +22,7 @@ export function scanTypeScript(
   const sourcePaths = files.filter((path) => isTypeScriptPath(path)).map((path) => resolve(path));
   if (sourcePaths.length === 0 || indexResult.state === "unavailable") return {...indexResult, findings: []};
   const selectedPaths = new Set(sourcePaths);
-  const findings: FindingV1[] = [];
+  const findings: FindingV2[] = [];
   try {
     const program = ts.createProgram(sourcePaths, {
       allowJs: true,
@@ -103,7 +103,7 @@ export function scanTypeScript(
       state: "partial",
       diagnostics: [...indexResult.diagnostics, diagnostic],
       findings: dedupe(findings),
-      ...(indexResult.index === undefined ? {} : {index: indexResult.index}),
+      index: indexResult.index,
     };
   }
 }
@@ -125,12 +125,12 @@ function makeFinding(
   path: string,
   sourceFile: ts.SourceFile,
   node: ts.Node,
-  confidence: FindingV1["confidence"],
+  confidence: FindingV2["confidence"],
   message: string,
   suggestion: string,
   assumptions: ReadonlyArray<string>,
   ruleId: string,
-): FindingV1 {
+): FindingV2 {
   const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   const line = start.line + 1;
   const id = `fg_${createHash("sha256")
@@ -145,7 +145,7 @@ function makeFinding(
     endColumn: start.character + Math.max(1, node.getWidth(sourceFile)),
   };
   return {
-    schemaVersion: "footgun.finding.v1",
+    schemaVersion: "footgun.finding.v2",
     id,
     scanner: semanticScannerId,
     scannerVersion: semanticScannerVersion,
@@ -187,7 +187,7 @@ function isTypeScriptPath(path: string): boolean {
   return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(extension);
 }
 
-function dedupe(findings: ReadonlyArray<FindingV1>): ReadonlyArray<FindingV1> {
+function dedupe(findings: ReadonlyArray<FindingV2>): ReadonlyArray<FindingV2> {
   const seen = new Set<string>();
   return findings.filter((finding) => {
     if (seen.has(finding.id)) return false;

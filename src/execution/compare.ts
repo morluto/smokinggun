@@ -1,15 +1,23 @@
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
-import type {ComparisonV1, MeasurementV1, ScalingAnalysisV1, ScalingAnalysisV2} from "../protocol/index.js";
+import type {
+  MeasurementComparisonV2,
+  MeasurementV1,
+  ScalingAnalysisV2,
+  ScalingAnalysisV3,
+  ScalingComparisonV2,
+} from "../protocol/index.js";
+
+export type ComparisonArtifactDigests = readonly [baselineDigest: string, candidateDigest: string];
 
 export function buildMeasurementComparison(
   baseline: MeasurementV1,
   candidate: MeasurementV1,
   baselinePath: string,
   candidatePath: string,
-  baselineDigest?: string,
-  candidateDigest?: string,
-): ComparisonV1 {
+  digests?: ComparisonArtifactDigests,
+): MeasurementComparisonV2 {
+  const [baselineDigest, candidateDigest] = digests ?? [];
   const deltaPercent =
     baseline.medianMs === 0 ? 0 : ((candidate.medianMs - baseline.medianMs) / baseline.medianMs) * 100;
   const improvement = isImprovement(
@@ -26,10 +34,10 @@ export function buildMeasurementComparison(
     downgradeReasons: [...baseline.isolation.downgradeReasons, ...candidate.isolation.downgradeReasons],
     digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
   });
-  return {
-    schemaVersion: "footgun.comparison.v1",
+  const comparison = {
+    schemaVersion: "footgun.comparison.v2" as const,
     id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
-    mode: "measurement",
+    mode: "measurement" as const,
     baseline: baselinePath,
     candidate: candidatePath,
     workloadDigest: baseline.workloadDigest,
@@ -39,22 +47,24 @@ export function buildMeasurementComparison(
     improvement,
     behaviorValidated: baseline.behaviorValidated && candidate.behaviorValidated,
     statisticalPolicy: baseline.statisticalPolicy,
-    ...(baselineDigest === undefined ? {} : {baselineDigest}),
-    ...(candidateDigest === undefined ? {} : {candidateDigest}),
     comparability: comparability(baseline.environment, candidate.environment),
     promotion: promotionStatus(reasons),
     promotionReasons: reasons,
   };
+  if (digests === undefined) return comparison;
+  return {...comparison, baselineDigest: digests[0], candidateDigest: digests[1]};
 }
 
 export function buildScalingComparison(
-  baseline: ScalingAnalysisV1,
-  candidate: ScalingAnalysisV1,
+  baseline: ScalingAnalysisV2,
+  candidate: ScalingAnalysisV2,
   baselinePath: string,
   candidatePath: string,
-  baselineDigest?: string,
-  candidateDigest?: string,
-): ComparisonV1 {
+  digests?: ComparisonArtifactDigests,
+): ScalingComparisonV2 {
+  const [baselineDigest, candidateDigest] = digests ?? [];
+  const firstPoint = baseline.points[0];
+  if (firstPoint === undefined) throw new Error("A scaling comparison requires at least one baseline point.");
   const points = baseline.points.map((point, index) => {
     const other = candidate.points[index];
     const deltaPercent = point.medianMs === 0 ? 0 : (((other?.medianMs ?? 0) - point.medianMs) / point.medianMs) * 100;
@@ -83,10 +93,10 @@ export function buildScalingComparison(
     ),
     digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
   });
-  return {
-    schemaVersion: "footgun.comparison.v1",
+  const comparison = {
+    schemaVersion: "footgun.comparison.v2" as const,
     id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
-    mode: "scaling",
+    mode: "scaling" as const,
     baseline: baselinePath,
     candidate: candidatePath,
     workloadDigest: baseline.workloadDigest,
@@ -95,23 +105,25 @@ export function buildScalingComparison(
     comparability: comparability(baseline.environment, candidate.environment),
     promotion: promotionStatus(reasons),
     promotionReasons: reasons,
-    ...(baselineDigest === undefined ? {} : {baselineDigest}),
-    ...(candidateDigest === undefined ? {} : {candidateDigest}),
     points,
-    ...(baseline.points[0] === undefined ? {} : {statisticalPolicy: baseline.points[0].statisticalPolicy}),
+    statisticalPolicy: firstPoint.statisticalPolicy,
     ...(baseline.selectedModel === undefined ? {} : {baselineModel: baseline.selectedModel}),
     ...(candidate.selectedModel === undefined ? {} : {candidateModel: candidate.selectedModel}),
   };
+  if (digests === undefined) return comparison;
+  return {...comparison, baselineDigest: digests[0], candidateDigest: digests[1]};
 }
 
 export function buildMultiScalingComparison(
-  baseline: ScalingAnalysisV2,
-  candidate: ScalingAnalysisV2,
+  baseline: ScalingAnalysisV3,
+  candidate: ScalingAnalysisV3,
   baselinePath: string,
   candidatePath: string,
-  baselineDigest?: string,
-  candidateDigest?: string,
-): ComparisonV1 {
+  digests?: ComparisonArtifactDigests,
+): ScalingComparisonV2 {
+  const [baselineDigest, candidateDigest] = digests ?? [];
+  const firstPoint = baseline.points[0];
+  if (firstPoint === undefined) throw new Error("A scaling comparison requires at least one baseline point.");
   const points = baseline.points.map((point, index) => {
     const other = candidate.points[index];
     const deltaPercent = point.medianMs === 0 ? 0 : (((other?.medianMs ?? 0) - point.medianMs) / point.medianMs) * 100;
@@ -139,10 +151,10 @@ export function buildMultiScalingComparison(
     ),
     digestsAvailable: baselineDigest !== undefined && candidateDigest !== undefined,
   });
-  return {
-    schemaVersion: "footgun.comparison.v1",
+  const comparison = {
+    schemaVersion: "footgun.comparison.v2" as const,
     id: comparisonIdFor(baselinePath, candidatePath, baseline.workloadDigest, baselineDigest, candidateDigest),
-    mode: "scaling",
+    mode: "scaling" as const,
     baseline: baselinePath,
     candidate: candidatePath,
     workloadDigest: baseline.workloadDigest,
@@ -153,11 +165,11 @@ export function buildMultiScalingComparison(
     comparability: comparability(baseline.environment, candidate.environment),
     promotion: promotionStatus(reasons),
     promotionReasons: reasons,
-    ...(baselineDigest === undefined ? {} : {baselineDigest}),
-    ...(candidateDigest === undefined ? {} : {candidateDigest}),
     points,
-    ...(baseline.points[0] === undefined ? {} : {statisticalPolicy: baseline.points[0].statisticalPolicy}),
+    statisticalPolicy: firstPoint.statisticalPolicy,
   };
+  if (digests === undefined) return comparison;
+  return {...comparison, baselineDigest: digests[0], candidateDigest: digests[1]};
 }
 
 type Environment = {readonly node: string; readonly platform: string; readonly arch: string};

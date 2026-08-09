@@ -12,11 +12,13 @@ import type {
 } from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
 
-export type ScipImportResult = {
-  readonly state: "complete" | "partial" | "unavailable";
-  readonly index?: ContextIndexV1;
-  readonly diagnostics: ReadonlyArray<ProblemV1>;
-};
+export type ScipImportResult =
+  | {
+      readonly state: "complete" | "partial";
+      readonly index: ContextIndexV1;
+      readonly diagnostics: ReadonlyArray<ProblemV1>;
+    }
+  | {readonly state: "unavailable"; readonly diagnostics: ReadonlyArray<ProblemV1>};
 
 /** Import a SCIP protobuf index as bounded, repository-relative local context. */
 export async function importScip(path: string, root: string): Promise<ScipImportResult> {
