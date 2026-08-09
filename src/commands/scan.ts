@@ -37,9 +37,9 @@ export default class Scan extends BaseCommand {
     const context = await this.context(parsed.flags);
     try {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
-      const scanner = parsed.flags.scanner as ReadonlyArray<string> | undefined;
-      const only = parsed.flags.only as ReadonlyArray<string> | undefined;
-      const adapter = parsed.flags.adapter as ReadonlyArray<string> | undefined;
+      const scanner = parseOptionalStringArrayFlag(parsed.flags.scanner, "scanner");
+      const only = parseOptionalStringArrayFlag(parsed.flags.only, "only");
+      const adapter = parseOptionalStringArrayFlag(parsed.flags.adapter, "adapter");
       const adapterManifests = [
         ...context.config.adapters,
         ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
@@ -113,6 +113,12 @@ export default class Scan extends BaseCommand {
       );
     }
   }
+}
+
+function parseOptionalStringArrayFlag(input: unknown, name: string): ReadonlyArray<string> | undefined {
+  if (input === undefined) return undefined;
+  if (Array.isArray(input) && input.every((value): value is string => typeof value === "string")) return input;
+  throw new Error(`The ${name} flag was not parsed as a string array.`);
 }
 
 function matchesFailPolicy(finding: {readonly ruleId: string; readonly severity: string}, policy: string): boolean {
