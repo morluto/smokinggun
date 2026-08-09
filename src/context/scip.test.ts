@@ -4,6 +4,7 @@ import {join} from "node:path";
 import {create, toBinary} from "@bufbuild/protobuf";
 import {IndexSchema, ProtocolVersion, SymbolInformation_Kind, SymbolRole, TextEncoding} from "@scip-code/scip";
 import {expect, it} from "vitest";
+import {Protocol} from "../protocol/index.js";
 import {importScip} from "./scip.js";
 
 it("imports SCIP definitions and references with repository-relative coverage", async () => {
@@ -70,6 +71,32 @@ it("does not expose invalid SCIP document paths in context coverage or diagnosti
     expect(result.state).toBe("partial");
     expect(result.index?.coverage.skippedFiles).toEqual([]);
     expect(JSON.stringify(result)).not.toContain("/host/private.ts");
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+it("marks duplicate SCIP document paths as partial before constructing the context index", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "footgun-scip-"));
+  try {
+    const artifact = join(directory, "index.scip");
+    await writeFile(
+      artifact,
+      toBinary(
+        IndexSchema,
+        create(IndexSchema, {
+          documents: [
+            {language: "TypeScript", relativePath: "src/main.ts"},
+            {language: "TypeScript", relativePath: "src/main.ts"},
+          ],
+        }),
+      ),
+    );
+    const result = await importScip(artifact, directory);
+    expect(result.state).toBe("partial");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({code: "scip-document-duplicate"}));
+    expect(result.index?.coverage).toMatchObject({filesDiscovered: 2, filesIndexed: 1, parseStatus: "partial"});
+    expect(result.index === undefined ? false : Protocol.contextIndex.safeParse(result.index).success).toBe(true);
   } finally {
     await rm(directory, {recursive: true, force: true});
   }

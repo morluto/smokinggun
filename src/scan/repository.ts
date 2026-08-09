@@ -228,7 +228,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   parseDiagnostics.push(...adapterRun.diagnostics);
   parseDiagnostics.push(...scannerDisagreements(findings));
   const policyFindings = relateFindings(findings).sort(compareFindings);
-  const allFindings = policyFindings.slice(0, options.maxFindings ?? 80);
+  const allFindings = pruneFindingRelations(policyFindings.slice(0, options.maxFindings ?? 80));
   const scopeMatchedNothing = hasUnmatchedExplicitScope(
     options.scope,
     files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
@@ -435,10 +435,15 @@ async function runConfiguredAdapters(
   const rawArtifacts: string[] = [];
   const rawArtifactDigests: Record<string, string> = {};
   const sourceTargets = files.map((file) => portablePath(relative(root, file))).sort(comparePortable);
+  const invalidCoverageIdentities = new Set<string>();
   for (const descriptor of loaded.descriptors) {
     if (descriptor.availability !== "invalid") continue;
+    const scanner = `footgun.adapter:${descriptor.id}`;
+    const identity = `${scanner}\0${descriptor.version}\0mixed`;
+    if (invalidCoverageIdentities.has(identity)) continue;
+    invalidCoverageIdentities.add(identity);
     coverage.push({
-      scanner: `footgun.adapter:${descriptor.id}`,
+      scanner,
       version: descriptor.version,
       language: "mixed",
       filesDiscovered: files.length,
@@ -681,6 +686,14 @@ function relateFindings(findings: ReadonlyArray<FindingV2>): FindingV2[] {
   return result.map((finding, index) => ({
     ...finding,
     relatedFindings: [...(relatedFindingIds[index] ?? [])].sort(comparePortable),
+  }));
+}
+
+function pruneFindingRelations(findings: ReadonlyArray<FindingV2>): FindingV2[] {
+  const retainedIds = new Set(findings.map((finding) => finding.id));
+  return findings.map((finding) => ({
+    ...finding,
+    relatedFindings: finding.relatedFindings.filter((id) => retainedIds.has(id)),
   }));
 }
 

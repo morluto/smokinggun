@@ -35,6 +35,7 @@ export async function importScip(path: string, root: string): Promise<ScipImport
     const references: ContextReferenceV1[] = [];
     const calls: ContextCallV1[] = [];
     const files: string[] = [];
+    const indexedPaths = new Set<string>();
     for (const document of parsed.documents) {
       const documentPath = portableRelative(document.relativePath);
       if (documentPath === undefined) {
@@ -58,6 +59,17 @@ export async function importScip(path: string, root: string): Promise<ScipImport
         );
         continue;
       }
+      if (indexedPaths.has(documentPath)) {
+        diagnostics.push(
+          problem(
+            "scip-document-duplicate",
+            "A SCIP index contains the same repository-relative document more than once.",
+            "Emit each repository-relative document once before importing the index.",
+          ),
+        );
+        continue;
+      }
+      indexedPaths.add(documentPath);
       files.push(documentPath);
       const symbols = new Map(document.symbols.map((symbol) => [symbol.symbol, symbol]));
       for (const occurrence of document.occurrences) {

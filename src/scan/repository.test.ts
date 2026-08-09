@@ -58,7 +58,47 @@ describe("repository scan seam", () => {
       expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "findings-truncated"}));
       expect(result.report.findings).toHaveLength(1);
       expect(result.policyFindings).toHaveLength(3);
+      expect(result.report.findings[0]?.relatedFindings).toEqual([]);
+      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
       expect(JSON.parse(JSON.stringify(result.report))).not.toHaveProperty("policyFindings");
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("coalesces coverage for manifests with an ambiguous adapter identity", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-duplicate-adapter-"));
+    try {
+      await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
+      const manifest = (path: string) =>
+        writeFile(
+          path,
+          JSON.stringify({
+            schemaVersion: "footgun.adapter-manifest.v1",
+            id: "duplicate-adapter",
+            version: "1.0.0",
+            command: [execPath, "--version"],
+            capabilities: ["static-scan"],
+            limits: {timeoutMs: 1_000, maxOutputBytes: 1_000, maxArtifactBytes: 1_000},
+          }),
+          "utf8",
+        );
+      const first = join(root, "first-adapter.json");
+      const second = join(root, "second-adapter.json");
+      await Promise.all([manifest(first), manifest(second)]);
+      const adapters = await parseExternalAdapters([first, second], root);
+      const result = await scanRepository(root, {
+        ...defaultScanOptions,
+        adapters,
+        configDigest: "e".repeat(64),
+      });
+      expect(
+        result.report.coverage.filter((record) => record.scanner === "footgun.adapter:duplicate-adapter"),
+      ).toHaveLength(1);
+      expect(result.report.diagnostics.filter((diagnostic) => diagnostic.code === "duplicate-adapter-id")).toHaveLength(
+        2,
+      );
+      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
     } finally {
       await rm(root, {recursive: true, force: true});
     }
