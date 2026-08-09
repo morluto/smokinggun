@@ -71,11 +71,47 @@ const coverageFields = {
   skippedFiles: z.array(portableRepositoryChildPathSchema),
 };
 
-const completeCoverageSchema = z.strictObject({
-  ...coverageFields,
-  parseStatus: z.literal("complete"),
-  reason: z.string().min(1).optional(),
-});
+type CoverageInvariantInput = {
+  readonly filesDiscovered: number;
+  readonly filesAnalyzed: number;
+  readonly parseStatus: "complete" | "partial" | "failed" | "unavailable";
+  readonly skippedFiles: ReadonlyArray<string>;
+};
+
+function requireCoverageInvariants(coverage: CoverageInvariantInput, context: z.RefinementCtx): void {
+  if (coverage.filesAnalyzed > coverage.filesDiscovered)
+    context.addIssue({
+      code: "custom",
+      path: ["filesAnalyzed"],
+      message: "Coverage cannot analyze more files than it discovered.",
+    });
+  if (coverage.parseStatus === "complete" && coverage.filesAnalyzed !== coverage.filesDiscovered)
+    context.addIssue({
+      code: "custom",
+      path: ["filesAnalyzed"],
+      message: "Complete coverage must analyze every discovered file.",
+    });
+  if (coverage.parseStatus === "complete" && coverage.skippedFiles.length > 0)
+    context.addIssue({
+      code: "custom",
+      path: ["skippedFiles"],
+      message: "Complete coverage cannot list skipped files.",
+    });
+  if (new Set(coverage.skippedFiles).size !== coverage.skippedFiles.length)
+    context.addIssue({
+      code: "custom",
+      path: ["skippedFiles"],
+      message: "Skipped coverage paths must be unique.",
+    });
+}
+
+const completeCoverageSchema = z
+  .strictObject({
+    ...coverageFields,
+    parseStatus: z.literal("complete"),
+    reason: z.string().min(1).optional(),
+  })
+  .superRefine(requireCoverageInvariants);
 
 const incompleteCoverageSchema = z.strictObject({
   ...coverageFields,
@@ -85,32 +121,7 @@ const incompleteCoverageSchema = z.strictObject({
 
 const coverageSchema = z
   .discriminatedUnion("parseStatus", [completeCoverageSchema, incompleteCoverageSchema])
-  .superRefine((coverage, context) => {
-    if (coverage.filesAnalyzed > coverage.filesDiscovered)
-      context.addIssue({
-        code: "custom",
-        path: ["filesAnalyzed"],
-        message: "Coverage cannot analyze more files than it discovered.",
-      });
-    if (coverage.parseStatus === "complete" && coverage.filesAnalyzed !== coverage.filesDiscovered)
-      context.addIssue({
-        code: "custom",
-        path: ["filesAnalyzed"],
-        message: "Complete coverage must analyze every discovered file.",
-      });
-    if (coverage.parseStatus === "complete" && coverage.skippedFiles.length > 0)
-      context.addIssue({
-        code: "custom",
-        path: ["skippedFiles"],
-        message: "Complete coverage cannot list skipped files.",
-      });
-    if (new Set(coverage.skippedFiles).size !== coverage.skippedFiles.length)
-      context.addIssue({
-        code: "custom",
-        path: ["skippedFiles"],
-        message: "Skipped coverage paths must be unique.",
-      });
-  });
+  .superRefine(requireCoverageInvariants);
 
 const evidenceFields = {
   schemaVersion: version("footgun.evidence.v2"),

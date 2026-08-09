@@ -100,6 +100,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const runStructural = runsBuiltInScanner(options.selection, "structural");
   const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
   const runPython = runsBuiltInScanner(options.selection, "python-semantic");
+  const selectedPythonFiles = runPython ? files.filter((file) => extensionOf(file).toLowerCase() === ".py") : [];
   const findings: FindingV2[] = [];
   const skippedFiles: string[] = [];
   let analyzed = 0;
@@ -119,7 +120,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       reasons: Set<string>;
     }
   >();
-  let pythonSemanticDiscovered = 0;
   let pythonSemanticAnalyzed = 0;
   let pythonSemanticPartial = 0;
   let pythonSemanticUnavailable = 0;
@@ -130,7 +130,12 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     try {
       source = await readFile(file, "utf8");
     } catch {
-      skippedFiles.push(portablePath(relative(pathRoot, file)));
+      const reportPath = portablePath(relative(pathRoot, file));
+      skippedFiles.push(reportPath);
+      if (runPython && extensionOf(reportPath).toLowerCase() === ".py") {
+        pythonSemanticUnavailable += 1;
+        pythonSemanticSkipped.push(reportPath);
+      }
       continue;
     }
     const reportPath = portablePath(relative(pathRoot, file));
@@ -191,7 +196,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     }
     if (runPython) {
       if (extensionOf(reportPath).toLowerCase() === ".py") {
-        pythonSemanticDiscovered += 1;
         const pythonResult = await scanPythonSemantic(reportPath, source, options.signal);
         findings.push(...pythonResult.findings);
         parseDiagnostics.push(...pythonResult.diagnostics);
@@ -247,7 +251,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             ...skippedSymlinkPaths.map((file) => portablePath(relative(pathRoot, file))),
           ].sort(comparePortable),
         },
-        scopeMatchedNothing || skippedSymlinkPaths.length > 0 || partial
+        scopeMatchedNothing || skippedFiles.length > 0 || skippedSymlinkPaths.length > 0 || partial
           ? "partial"
           : files.length > 0 && analyzed === 0
             ? "unavailable"
@@ -255,9 +259,11 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         partialReason ??
           (scopeMatchedNothing
             ? "The explicit --only filter matched no supported source paths."
-            : skippedSymlinkPaths.length > 0
-              ? "Symlinks were skipped to preserve the repository boundary."
-              : undefined),
+            : skippedFiles.length > 0
+              ? "One or more selected source files could not be read."
+              : skippedSymlinkPaths.length > 0
+                ? "Symlinks were skipped to preserve the repository boundary."
+                : undefined),
       )
     : undefined;
   const diagnostics: ProblemV1[] = [
@@ -348,14 +354,14 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         )
       : undefined;
   const pythonCoverage: CoverageRecordV1 | undefined =
-    !runPython || (pythonSemanticDiscovered === 0 && !explicitlyRequiresScanner(options.selection, "python-semantic"))
+    !runPython || (selectedPythonFiles.length === 0 && !explicitlyRequiresScanner(options.selection, "python-semantic"))
       ? undefined
       : coverageRecord(
           {
             scanner: pythonSemanticScannerId,
             version: pythonSemanticScannerVersion,
             language: "python",
-            filesDiscovered: pythonSemanticDiscovered,
+            filesDiscovered: selectedPythonFiles.length,
             filesAnalyzed: pythonSemanticAnalyzed,
             skippedFiles: pythonSemanticSkipped.sort(comparePortable),
           },

@@ -1,4 +1,4 @@
-import {mkdir, mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
+import {chmod, mkdir, mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
 import {execFileSync} from "node:child_process";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
@@ -62,6 +62,53 @@ describe("repository scan seam", () => {
       expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
       expect(JSON.parse(JSON.stringify(result.report))).not.toHaveProperty("policyFindings");
     } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("marks unreadable source files as incomplete coverage", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-unreadable-"));
+    const unreadable = join(root, "unreadable.ts");
+    try {
+      await writeFile(join(root, "readable.ts"), "export const value = 1;\n", "utf8");
+      await writeFile(unreadable, "export const value = 2;\n", "utf8");
+      await chmod(unreadable, 0o000);
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64)});
+      expect(result.report.coverage[0]).toMatchObject({
+        filesDiscovered: 2,
+        filesAnalyzed: 1,
+        parseStatus: "partial",
+        skippedFiles: ["unreadable.ts"],
+      });
+      expect(result.report.coverage[0]?.reason).toContain("could not be read");
+      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
+    } finally {
+      await chmod(unreadable, 0o600).catch(() => undefined);
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("counts unreadable Python files before semantic scanning", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-unreadable-python-"));
+    const unreadable = join(root, "unreadable.py");
+    try {
+      await writeFile(unreadable, "value = 1\n", "utf8");
+      await chmod(unreadable, 0o000);
+      const selection = parseScannerSelection(["footgun.python-semantic"], []);
+      if ("schemaVersion" in selection) throw new Error(selection.message);
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64), selection});
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({
+          scanner: "footgun.python-semantic",
+          filesDiscovered: 1,
+          filesAnalyzed: 0,
+          parseStatus: "unavailable",
+          skippedFiles: ["unreadable.py"],
+        }),
+      );
+      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
+    } finally {
+      await chmod(unreadable, 0o600).catch(() => undefined);
       await rm(root, {recursive: true, force: true});
     }
   });
