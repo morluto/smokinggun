@@ -48,6 +48,7 @@ describe("SARIF import boundary", () => {
     });
     expect(result.rawArtifacts).toHaveLength(1);
     expect(result.diagnostics[0]?.code).toBe("sarif-invocation-failed");
+    expect(result.coverage[0]?.parseStatus).toBe("partial");
     expect(result.filesModified).toEqual([]);
   });
 
@@ -68,6 +69,7 @@ describe("SARIF import boundary", () => {
     expect("code" in outside).toBe(false);
     if (!("code" in outside))
       expect(outside.diagnostics.map((diagnostic) => diagnostic.code)).toContain("sarif-path-outside-root");
+    if (!("code" in outside)) expect(outside.coverage[0]?.parseStatus).toBe("partial");
     const malformed = importSarif({version: "2.0.0", runs: []}, "/repo", "a".repeat(64));
     expect("code" in malformed && malformed.code).toBe("invalid-sarif");
   });
@@ -99,5 +101,42 @@ describe("SARIF import boundary", () => {
     if ("code" in result) return;
     expect(result.findings).toHaveLength(2);
     expect(result.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
+  });
+
+  it("keeps a reused SARIF fingerprint distinct across locations and removes exact duplicates", () => {
+    const result = importSarif(
+      {
+        version: "2.1.0",
+        runs: [
+          {
+            tool: {driver: {name: "tool"}},
+            results: [
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/first.ts"}, region: {startLine: 1}}}],
+              },
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/second.ts"}, region: {startLine: 1}}}],
+              },
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/second.ts"}, region: {startLine: 1}}}],
+              },
+            ],
+          },
+        ],
+      },
+      "/repo",
+      "a".repeat(64),
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.findings).toHaveLength(2);
+    expect(new Set(result.findings.map((finding) => finding.id)).size).toBe(2);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain("sarif-finding-duplicate");
   });
 });

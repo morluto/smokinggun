@@ -1,9 +1,9 @@
 import {readFile} from "node:fs/promises";
-import {resolve} from "node:path";
+import {isAbsolute, relative, resolve} from "node:path";
 import {execa} from "execa";
 import {Protocol, type AdapterManifestV1, type ProblemV1} from "../protocol/index.js";
 import {executionEnvironment, redactSensitive} from "../execution/environment.js";
-import {comparePortable} from "../paths.js";
+import {comparePortable, portablePath} from "../paths.js";
 import type {ScannerDescriptor} from "./registry.js";
 
 export type ExternalScannerDescriptor = ScannerDescriptor & {
@@ -18,41 +18,76 @@ export type LoadedExternalAdapter = {
   readonly descriptor: ExternalScannerDescriptor;
 };
 
+export type LoadedExternalAdapters = {
+  readonly adapters: ReadonlyArray<LoadedExternalAdapter>;
+  readonly descriptors: ReadonlyArray<ExternalScannerDescriptor>;
+  readonly diagnostics: ReadonlyArray<ProblemV1>;
+};
+
+export type ParsedExternalAdapter = {
+  readonly manifest: AdapterManifestV1;
+  readonly path: string;
+};
+
+export type ParsedExternalAdapters = {
+  readonly adapters: ReadonlyArray<ParsedExternalAdapter>;
+  readonly invalidDescriptors: ReadonlyArray<ExternalScannerDescriptor>;
+  readonly diagnostics: ReadonlyArray<ProblemV1>;
+};
+
+export type AdapterExecutionAuthorization =
+  | {readonly _tag: "AdapterExecutionNotAuthorized"}
+  | {readonly _tag: "AdapterExecutionAuthorized"};
+
+export const adapterExecutionNotAuthorized: AdapterExecutionAuthorization = {
+  _tag: "AdapterExecutionNotAuthorized",
+};
+
+export const adapterExecutionAuthorized: AdapterExecutionAuthorization = {
+  _tag: "AdapterExecutionAuthorized",
+};
+
+export function noExternalAdapters(): ParsedExternalAdapters {
+  return {adapters: [], invalidDescriptors: [], diagnostics: []};
+}
+
 type ExternalAdapterProbe =
   | {readonly available: true; readonly version?: string}
   | {readonly available: false; readonly reason: string};
 
-export async function loadExternalAdapters(
+/** Parse adapter manifests without probing or executing their declared commands. */
+export async function parseExternalAdapters(
   paths: ReadonlyArray<string>,
   root: string,
   signal?: AbortSignal,
-  allowExecution = false,
-): Promise<{
-  readonly adapters: ReadonlyArray<LoadedExternalAdapter>;
-  readonly descriptors: ReadonlyArray<ExternalScannerDescriptor>;
-  readonly diagnostics: ReadonlyArray<ProblemV1>;
-}> {
-  const adapters: LoadedExternalAdapter[] = [];
-  const descriptors: ExternalScannerDescriptor[] = [];
+): Promise<ParsedExternalAdapters> {
+  const parsedAdapters: ParsedExternalAdapter[] = [];
+  const invalidDescriptors: ExternalScannerDescriptor[] = [];
   const diagnostics: ProblemV1[] = [];
-  for (const inputPath of [...new Set(paths)].sort()) {
+  for (const inputPath of [...new Set(paths.map((path) => resolve(root, path)))].sort(comparePortable)) {
     signal?.throwIfAborted();
-    const path = resolve(root, inputPath);
+    const manifestPath = portableManifestPath(root, inputPath);
+    const manifestLabel = manifestPath ?? "the supplied external manifest";
     let input: unknown;
     try {
-      input = JSON.parse(await readFile(path, "utf8"));
+      input = JSON.parse(await readFile(inputPath, "utf8"));
     } catch (cause: unknown) {
       const detail = cause instanceof Error ? redactSensitive(cause.message) : "The manifest could not be read.";
       diagnostics.push(
-        problem("adapter-manifest-read-failed", `Could not read adapter manifest ${inputPath}.`, detail, inputPath),
+        problem(
+          "adapter-manifest-read-failed",
+          `Could not read adapter manifest ${manifestLabel}.`,
+          detail,
+          manifestPath,
+        ),
       );
-      descriptors.push({
+      invalidDescriptors.push({
         id: inputPath,
         version: "unknown",
         kind: "adapter",
         capabilities: [],
         availability: "invalid",
-        manifestPath: inputPath,
+        manifestPath: manifestLabel,
         reason: detail,
       });
       continue;
@@ -61,103 +96,156 @@ export async function loadExternalAdapters(
     if (!parsed.success) {
       const detail = parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
       diagnostics.push(
-        problem("invalid-adapter-manifest", `Adapter manifest ${inputPath} is invalid.`, detail, inputPath),
+        problem("invalid-adapter-manifest", `Adapter manifest ${manifestLabel} is invalid.`, detail, manifestPath),
       );
-      descriptors.push({
+      invalidDescriptors.push({
         id: inputPath,
         version: "unknown",
         kind: "adapter",
         capabilities: [],
         availability: "invalid",
-        manifestPath: inputPath,
+        manifestPath: manifestLabel,
         reason: detail,
       });
       continue;
     }
-    if (!allowExecution) {
+    parsedAdapters.push({manifest: parsed.data, path: inputPath});
+  }
+  const adapterPathsById = new Map<string, string[]>();
+  for (const adapter of parsedAdapters) {
+    const pathsForId = adapterPathsById.get(adapter.manifest.id) ?? [];
+    pathsForId.push(adapter.path);
+    adapterPathsById.set(adapter.manifest.id, pathsForId);
+  }
+  const adapters: ParsedExternalAdapter[] = [];
+  for (const adapter of parsedAdapters) {
+    const pathsForId = adapterPathsById.get(adapter.manifest.id) ?? [];
+    if (pathsForId.length === 1) {
+      adapters.push(adapter);
+      continue;
+    }
+    const detail = `Adapter ID ${adapter.manifest.id} is declared by multiple manifests: ${pathsForId
+      .map((path) => portableManifestPath(root, path) ?? "an external manifest")
+      .sort(comparePortable)
+      .join(", ")}.`;
+    const manifestPath = portableManifestPath(root, adapter.path);
+    diagnostics.push(problem("duplicate-adapter-id", "Adapter manifest IDs must be unique.", detail, manifestPath));
+    invalidDescriptors.push({
+      id: adapter.manifest.id,
+      version: adapter.manifest.version,
+      kind: "adapter",
+      capabilities: adapter.manifest.capabilities,
+      availability: "invalid",
+      manifestPath: manifestPath ?? "external manifest",
+      ...(adapter.manifest.tool === undefined ? {} : {tool: adapter.manifest.tool}),
+      reason: detail,
+    });
+  }
+  return {
+    adapters: adapters.sort((left, right) => comparePortable(left.manifest.id, right.manifest.id)),
+    invalidDescriptors: invalidDescriptors.sort((left, right) => comparePortable(left.id, right.id)),
+    diagnostics,
+  };
+}
+
+/** Probe parsed adapters only under the explicit authorization carried by the caller. */
+export async function resolveExternalAdapters(
+  parsed: ParsedExternalAdapters,
+  root: string,
+  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+): Promise<LoadedExternalAdapters> {
+  const {signal} = options;
+  const executionAuthorized = options.authorization._tag === "AdapterExecutionAuthorized";
+  const adapters: LoadedExternalAdapter[] = [];
+  const descriptors: ExternalScannerDescriptor[] = [...parsed.invalidDescriptors];
+  const diagnostics: ProblemV1[] = [...parsed.diagnostics];
+  for (const adapter of parsed.adapters) {
+    signal?.throwIfAborted();
+    const {manifest, path} = adapter;
+    const manifestPath = portableManifestPath(root, path);
+    if (!executionAuthorized) {
       const reason =
         "Adapter execution requires explicit authorization; rerun with --allow-adapter-execution to probe it.";
       diagnostics.push(
         problem(
           "adapter-execution-required",
-          `Adapter ${parsed.data.id} was not probed or executed.`,
+          `Adapter ${manifest.id} was not probed or executed.`,
           reason,
-          inputPath,
+          manifestPath,
         ),
       );
       const descriptor: ExternalScannerDescriptor = {
-        id: parsed.data.id,
-        version: parsed.data.version,
+        id: manifest.id,
+        version: manifest.version,
         kind: "adapter",
-        capabilities: parsed.data.capabilities,
+        capabilities: manifest.capabilities,
         availability: "unavailable",
-        manifestPath: inputPath,
-        ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+        manifestPath: manifestPath ?? "external manifest",
+        ...(manifest.tool === undefined ? {} : {tool: manifest.tool}),
         reason,
       };
       descriptors.push(descriptor);
-      adapters.push({manifest: parsed.data, path: inputPath, descriptor});
+      adapters.push({manifest, path, descriptor});
       continue;
     }
-    if (parsed.data.sideEffects.includes("network")) {
+    if (manifest.sideEffects.includes("network")) {
       const reason = "Network-capable adapters are blocked by SmokingGun's offline static policy.";
       diagnostics.push(
-        problem("adapter-network-blocked", `Adapter ${parsed.data.id} was not probed or executed.`, reason, inputPath),
+        problem("adapter-network-blocked", `Adapter ${manifest.id} was not probed or executed.`, reason, manifestPath),
       );
-      descriptors.push({
-        id: parsed.data.id,
-        version: parsed.data.version,
+      const descriptor: ExternalScannerDescriptor = {
+        id: manifest.id,
+        version: manifest.version,
         kind: "adapter",
-        capabilities: parsed.data.capabilities,
+        capabilities: manifest.capabilities,
         availability: "unavailable",
-        manifestPath: inputPath,
-        ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+        manifestPath: manifestPath ?? "external manifest",
+        ...(manifest.tool === undefined ? {} : {tool: manifest.tool}),
         reason,
-      });
-      adapters.push({
-        manifest: parsed.data,
-        path: inputPath,
-        descriptor: {
-          id: parsed.data.id,
-          version: parsed.data.version,
-          kind: "adapter",
-          capabilities: parsed.data.capabilities,
-          availability: "unavailable",
-          manifestPath: inputPath,
-          reason,
-        },
-      });
+      };
+      descriptors.push(descriptor);
+      adapters.push({manifest, path, descriptor});
       continue;
     }
-    const probe = await probeExternalAdapter(parsed.data, root, signal);
+    const probe = await probeExternalAdapter(manifest, root, signal);
     const descriptor: ExternalScannerDescriptor = probe.available
       ? {
-          id: parsed.data.id,
-          version: probe.version ?? parsed.data.version,
+          id: manifest.id,
+          version: probe.version ?? manifest.version,
           kind: "adapter",
-          capabilities: parsed.data.capabilities,
+          capabilities: manifest.capabilities,
           availability: "available",
-          manifestPath: inputPath,
-          ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+          manifestPath: manifestPath ?? "external manifest",
+          ...(manifest.tool === undefined ? {} : {tool: manifest.tool}),
         }
       : {
-          id: parsed.data.id,
-          version: parsed.data.version,
+          id: manifest.id,
+          version: manifest.version,
           kind: "adapter",
-          capabilities: parsed.data.capabilities,
+          capabilities: manifest.capabilities,
           availability: "unavailable",
-          manifestPath: inputPath,
-          ...(parsed.data.tool === undefined ? {} : {tool: parsed.data.tool}),
+          manifestPath: manifestPath ?? "external manifest",
+          ...(manifest.tool === undefined ? {} : {tool: manifest.tool}),
           reason: probe.reason,
         };
     descriptors.push(descriptor);
-    adapters.push({manifest: parsed.data, path: inputPath, descriptor});
+    adapters.push({manifest, path, descriptor});
   }
   return {
     adapters: adapters.sort((left, right) => comparePortable(left.manifest.id, right.manifest.id)),
     descriptors: descriptors.sort((left, right) => comparePortable(left.id, right.id)),
     diagnostics,
   };
+}
+
+/** Parse and resolve external adapters in one call for library consumers that need both steps. */
+export async function loadExternalAdapters(
+  paths: ReadonlyArray<string>,
+  root: string,
+  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+): Promise<LoadedExternalAdapters> {
+  const parsed = await parseExternalAdapters(paths, root, options.signal);
+  return resolveExternalAdapters(parsed, root, options);
 }
 
 async function probeExternalAdapter(
@@ -204,4 +292,17 @@ function problem(code: string, message: string, detail: string, path?: string): 
     ...(path === undefined ? {} : {path}),
     recovery: "Fix the manifest or install the declared adapter executable.",
   };
+}
+
+function portableManifestPath(root: string, path: string): string | undefined {
+  const relativePath = relative(resolve(root), resolve(path));
+  if (relativePath === "") return ".";
+  if (
+    relativePath === ".." ||
+    relativePath.startsWith("../") ||
+    relativePath.startsWith("..\\") ||
+    isAbsolute(relativePath)
+  )
+    return undefined;
+  return portablePath(relativePath);
 }

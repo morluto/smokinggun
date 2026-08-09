@@ -31,7 +31,7 @@ it("meets the labeled corpus precision and recall gate for the shipped rules", a
         ? treeStructural.findings
         : scanSource(testCase.path, source).findings
     ).map((finding) => finding.ruleId);
-    const semantic = scanTypeScript(corpus, [file]).findings.map((finding) => finding.ruleId);
+    const semantic = (await scanTypeScript(corpus, [file])).findings.map((finding) => finding.ruleId);
     if (testCase.language === "python")
       semantic.push(...(await scanPythonSemantic(testCase.path, source)).findings.map((finding) => finding.ruleId));
     const expected = new Set([...(testCase.expectedStructural ?? []), ...(testCase.expectedSemantic ?? [])]);

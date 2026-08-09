@@ -1,7 +1,6 @@
-import {readFile, stat} from "node:fs/promises";
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {renderScanReport} from "../reports/render.js";
 import {parseScanReport} from "../protocol/index.js";
 import {writeResult, shouldPrint} from "../cli/output.js";
@@ -11,10 +10,16 @@ import {importPerfettoSummary, importPerfettoTrace, importPprof} from "../adapte
 import {printResult} from "../cli/command-output.js";
 import {createHash} from "node:crypto";
 import type {RuntimeContext} from "../cli/context.js";
-import {canAttachReport, loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
-import {comparePortable} from "../paths.js";
+import {
+  appendInvestigationEvidence,
+  appendInvestigationReport,
+  canAttachReport,
+  loadLatestInvestigation,
+  recordParsedInvestigationSnapshot,
+} from "../investigations/store.js";
 import {resolve} from "node:path";
 import {z} from "zod";
+import {readArtifactBytes} from "../artifacts/store.js";
 
 export default class Report extends BaseCommand {
   static override description = "Render a normalized scan artifact.";
@@ -38,7 +43,7 @@ export default class Report extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Report);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     try {
       if (parsed.flags.investigation !== undefined) {
         try {
@@ -74,10 +79,15 @@ export default class Report extends BaseCommand {
           2,
           context,
         );
-      const artifactBytes = await readBoundedArtifact(parsed.args.artifact);
+      const artifactBytes = await readArtifactBytes(parsed.args.artifact);
       const raw = artifactBytes.toString("utf8");
-      const storedArtifact = await context.artifactStore.put(parsed.args.artifact);
-      const artifactReference = storedArtifact.reference;
+      const artifactDigest = createHash("sha256").update(artifactBytes).digest("hex");
+      const artifactReference = `artifact://sha256/${artifactDigest}`;
+      const storeValidatedArtifact = async (): Promise<void> => {
+        const stored = await context.artifactStore.putBytes(parsed.args.artifact, artifactBytes);
+        if (stored.reference !== artifactReference || stored.digest !== artifactDigest)
+          throw new Error("The artifact store did not preserve the validated input bytes.");
+      };
       const input: unknown =
         parsed.flags.profile === "pprof" || (parsed.flags.profile === "perfetto" && !looksLikeJson(raw))
           ? undefined
@@ -98,9 +108,10 @@ export default class Report extends BaseCommand {
         const benchmark = importBenchmark(input, {
           tool,
           rawArtifact: artifactReference,
-          rawArtifactDigest: storedArtifact.digest,
+          rawArtifactDigest: artifactDigest,
         });
         if ("code" in benchmark) this.emitProblem(benchmark, 2, context);
+        await storeValidatedArtifact();
         await printResult(
           benchmark,
           `Imported ${benchmark.tool} benchmark records: ${benchmark.records.length}`,
@@ -114,6 +125,7 @@ export default class Report extends BaseCommand {
         if (parsed.flags.profile === "pprof") {
           const profile = importPprof(artifactBytes, {sourceArtifact});
           if ("code" in profile) this.emitProblem(profile, 2, context);
+          await storeValidatedArtifact();
           await printResult(
             profile,
             `Imported pprof profile: ${profile.sampleCount} samples, ${profile.topFunctions.length} top functions`,
@@ -137,6 +149,7 @@ export default class Report extends BaseCommand {
               trace.code === "trace-processor-unavailable" || trace.code === "trace-processor-timeout" ? 3 : 2,
               context,
             );
+          await storeValidatedArtifact();
           await printResult(trace, `Imported Perfetto summary: ${trace.rows.length} rows`, context);
           await recordReportedArtifact(context, parsed.flags.investigation, sourceArtifact, "trace");
         }
@@ -148,6 +161,7 @@ export default class Report extends BaseCommand {
           ? importSarif(input, context.config.cwd, context.config.digest, artifactReference)
           : scanReport;
       if ("_tag" in parsedReport) this.emitProblem(parsedReport, 2, context);
+      await storeValidatedArtifact();
       const rendered = renderScanReport(parsedReport, context.config.format);
       await writeResult(rendered, context);
       if (shouldPrint(context.config.format, context.config.quiet)) this.emit(rendered, context);
@@ -178,13 +192,6 @@ export default class Report extends BaseCommand {
       );
     }
   }
-}
-
-async function readBoundedArtifact(path: string, maxBytes = 100 * 1024 * 1024): Promise<Buffer> {
-  const info = await stat(path);
-  if (!info.isFile()) throw new Error("The report input must be a regular file.");
-  if (info.size > maxBytes) throw new Error(`The report input exceeds the ${maxBytes} byte artifact limit.`);
-  return readFile(path);
 }
 
 function isSarifDocument(input: unknown): boolean {
@@ -220,18 +227,15 @@ async function recordReportedArtifact(
   const next = {
     ...stored.bundle,
     state: "reported" as const,
-    reports: [...new Set([...stored.bundle.reports, artifact])].sort(comparePortable),
-    evidence: [
-      ...stored.bundle.evidence,
-      {
-        schemaVersion: "footgun.evidence.v2" as const,
-        id: `${investigationId}:report:${artifact}`,
-        kind,
-        claimClass,
-        summary: `Rendered ${kind} artifact`,
-        artifact,
-      },
-    ],
+    reports: appendInvestigationReport(stored.bundle.reports, artifact),
+    evidence: appendInvestigationEvidence(stored.bundle.evidence, {
+      schemaVersion: "footgun.evidence.v2" as const,
+      id: `${investigationId}:report:${artifact}`,
+      kind,
+      claimClass,
+      summary: `Rendered ${kind} artifact`,
+      artifact,
+    }),
   };
-  await recordInvestigationSnapshot(context.artifacts, next);
+  await recordParsedInvestigationSnapshot(context.artifacts, next);
 }

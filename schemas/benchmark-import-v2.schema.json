@@ -1,124 +1,433 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "schemaVersion": {
-      "type": "string",
-      "const": "footgun.benchmark-import.v2"
-    },
-    "tool": {
-      "type": "string",
-      "enum": [
-        "hyperfine",
-        "pyperf",
-        "google-benchmark",
-        "criterion",
-        "jmh"
-      ]
-    },
-    "records": {
-      "minItems": 1,
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "footgun.benchmark-record.v2"
-          },
-          "id": {
-            "type": "string",
-            "pattern": "^bench_[a-f0-9]{16}$"
-          },
-          "tool": {
-            "type": "string",
-            "enum": [
-              "hyperfine",
-              "pyperf",
-              "google-benchmark",
-              "criterion",
-              "jmh"
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.benchmark-import.v2"
+        },
+        "tool": {
+          "type": "string",
+          "enum": [
+            "hyperfine",
+            "pyperf",
+            "google-benchmark",
+            "criterion",
+            "jmh"
+          ]
+        },
+        "records": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.benchmark-record.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^bench_[a-f0-9]{16}$"
+                  },
+                  "tool": {
+                    "type": "string",
+                    "enum": [
+                      "hyperfine",
+                      "pyperf",
+                      "google-benchmark",
+                      "criterion",
+                      "jmh"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "samplesMs": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "medianMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "meanMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sourceUnit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "metadata": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "rawArtifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rawArtifactDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "tool",
+                  "name",
+                  "samplesMs",
+                  "medianMs",
+                  "meanMs",
+                  "sourceUnit",
+                  "metadata",
+                  "rawArtifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.benchmark-record.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^bench_[a-f0-9]{16}$"
+                  },
+                  "tool": {
+                    "type": "string",
+                    "enum": [
+                      "hyperfine",
+                      "pyperf",
+                      "google-benchmark",
+                      "criterion",
+                      "jmh"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "samplesMs": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "medianMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "meanMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sourceUnit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "metadata": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "rawArtifact": {
+                    "not": {}
+                  },
+                  "rawArtifactDigest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "tool",
+                  "name",
+                  "samplesMs",
+                  "medianMs",
+                  "meanMs",
+                  "sourceUnit",
+                  "metadata"
+                ],
+                "additionalProperties": false
+              }
             ]
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "samplesMs": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "number",
-              "minimum": 0
-            }
-          },
-          "medianMs": {
-            "type": "number",
-            "minimum": 0
-          },
-          "meanMs": {
-            "type": "number",
-            "minimum": 0
-          },
-          "sourceUnit": {
-            "type": "string",
-            "minLength": 1
-          },
-          "rawArtifact": {
-            "type": "string"
-          },
-          "rawArtifactDigest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "metadata": {
-            "default": {},
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            }
           }
         },
-        "required": [
-          "schemaVersion",
-          "id",
-          "tool",
-          "name",
-          "samplesMs",
-          "medianMs",
-          "meanMs",
-          "sourceUnit",
-          "metadata"
-        ],
-        "additionalProperties": false
-      }
+        "rawArtifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rawArtifactDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "tool",
+        "records",
+        "rawArtifact"
+      ],
+      "additionalProperties": false
     },
-    "rawArtifact": {
-      "type": "string"
-    },
-    "rawArtifactDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.benchmark-import.v2"
+        },
+        "tool": {
+          "type": "string",
+          "enum": [
+            "hyperfine",
+            "pyperf",
+            "google-benchmark",
+            "criterion",
+            "jmh"
+          ]
+        },
+        "records": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.benchmark-record.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^bench_[a-f0-9]{16}$"
+                  },
+                  "tool": {
+                    "type": "string",
+                    "enum": [
+                      "hyperfine",
+                      "pyperf",
+                      "google-benchmark",
+                      "criterion",
+                      "jmh"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "samplesMs": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "medianMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "meanMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sourceUnit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "metadata": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "rawArtifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rawArtifactDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "tool",
+                  "name",
+                  "samplesMs",
+                  "medianMs",
+                  "meanMs",
+                  "sourceUnit",
+                  "metadata",
+                  "rawArtifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.benchmark-record.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "pattern": "^bench_[a-f0-9]{16}$"
+                  },
+                  "tool": {
+                    "type": "string",
+                    "enum": [
+                      "hyperfine",
+                      "pyperf",
+                      "google-benchmark",
+                      "criterion",
+                      "jmh"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "samplesMs": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "medianMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "meanMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sourceUnit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "metadata": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
+                  },
+                  "rawArtifact": {
+                    "not": {}
+                  },
+                  "rawArtifactDigest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "tool",
+                  "name",
+                  "samplesMs",
+                  "medianMs",
+                  "meanMs",
+                  "sourceUnit",
+                  "metadata"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifact": {
+          "not": {}
+        },
+        "rawArtifactDigest": {
+          "not": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "tool",
+        "records"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "schemaVersion",
-    "tool",
-    "records"
   ],
-  "additionalProperties": false,
   "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

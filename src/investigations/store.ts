@@ -1,8 +1,15 @@
-import {createHash, randomUUID} from "node:crypto";
-import {mkdir, readFile, rename, writeFile} from "node:fs/promises";
+import {createHash} from "node:crypto";
+import {mkdir, readFile, writeFile} from "node:fs/promises";
 import {join} from "node:path";
-import {Protocol, type InvestigationBundleV2, type InvestigationPointerV1} from "../protocol/index.js";
+import {
+  Protocol,
+  type EvidenceRecordV2,
+  type InvestigationBundleV2,
+  type InvestigationPointerV1,
+} from "../protocol/index.js";
+import {comparePortable} from "../paths.js";
 import {stableJson} from "../serialization.js";
+import {writeFileAtomically} from "../files.js";
 
 type StoredInvestigation = {
   readonly bundle: InvestigationBundleV2;
@@ -18,8 +25,47 @@ const reportAttachableStates = new Set<InvestigationBundleV2["state"]>([
   "behavior-validated",
 ]);
 
+const baselineMeasurementSourceStates = new Set<InvestigationBundleV2["state"]>([
+  "scanned",
+  "context-resolved",
+  "measurement-planned",
+]);
+
+const contextSourceStates = new Set<InvestigationBundleV2["state"]>([
+  "scanned",
+  "context-resolved",
+  "measurement-planned",
+]);
+
 export function canAttachReport(bundle: InvestigationBundleV2): boolean {
   return reportAttachableStates.has(bundle.state);
+}
+
+/** Whether this bundle can transition to a retained baseline measurement. */
+export function canRecordBaselineMeasurement(bundle: InvestigationBundleV2): boolean {
+  return baselineMeasurementSourceStates.has(bundle.state);
+}
+
+/** Whether this bundle can retain imported semantic context. */
+export function canRecordContext(bundle: InvestigationBundleV2): boolean {
+  return contextSourceStates.has(bundle.state);
+}
+
+/** Add evidence once by stable ID, rejecting attempts to silently redefine existing evidence. */
+export function appendInvestigationEvidence(
+  evidence: ReadonlyArray<EvidenceRecordV2>,
+  next: EvidenceRecordV2,
+): EvidenceRecordV2[] {
+  const existing = evidence.find((record) => record.id === next.id);
+  if (existing === undefined) return [...evidence, next];
+  if (stableJson(existing) !== stableJson(next))
+    throw new Error(`Investigation evidence ${next.id} conflicts with an existing record.`);
+  return [...evidence];
+}
+
+/** Add a report once and preserve the protocol's canonical portable-path order. */
+export function appendInvestigationReport(reports: ReadonlyArray<string>, next: string): string[] {
+  return [...new Set([...reports, next])].sort(comparePortable);
 }
 
 /** Read the newest immutable investigation snapshot, falling back to its initial bundle. */
@@ -33,6 +79,8 @@ export async function loadLatestInvestigation(dataRoot: string, id: string): Pro
     if (snapshotText === undefined) throw new Error(`Investigation snapshot ${pointer.bundleDigest} is missing.`);
     const snapshotInput: unknown = JSON.parse(snapshotText);
     const bundle = Protocol.investigation.parse(snapshotInput);
+    if (digestBundle(bundle) !== pointer.bundleDigest)
+      throw new Error(`Investigation snapshot ${pointer.bundleDigest} does not match its content digest.`);
     return {bundle, digest: pointer.bundleDigest};
   }
   const bundleText = await readOptional(join(directory, "bundle.json"));
@@ -49,24 +97,31 @@ export async function requireLatestInvestigation(dataRoot: string, id: string): 
   return investigation;
 }
 
-/** Store a content-addressed bundle snapshot and atomically advance its pointer. */
-export async function recordInvestigationSnapshot(dataRoot: string, bundle: InvestigationBundleV2): Promise<string> {
-  const parsed = Protocol.investigation.parse(bundle);
-  const latest = await loadLatestInvestigation(dataRoot, parsed.id);
+/** Validate untrusted bundle input before storing an immutable snapshot. */
+export async function recordInvestigationSnapshot(dataRoot: string, bundleInput: unknown): Promise<string> {
+  return recordParsedInvestigationSnapshot(dataRoot, Protocol.investigation.parse(bundleInput));
+}
+
+/** Store a bundle that has already crossed the investigation schema boundary. */
+export async function recordParsedInvestigationSnapshot(
+  dataRoot: string,
+  bundle: InvestigationBundleV2,
+): Promise<string> {
+  const latest = await loadLatestInvestigation(dataRoot, bundle.id);
   if (
     latest !== undefined &&
-    latest.bundle.state !== parsed.state &&
-    !isAllowedTransition(latest.bundle.state, parsed.state)
+    latest.bundle.state !== bundle.state &&
+    !isAllowedTransition(latest.bundle.state, bundle.state)
   ) {
-    throw new Error(`Invalid investigation transition from ${latest.bundle.state} to ${parsed.state}.`);
+    throw new Error(`Invalid investigation transition from ${latest.bundle.state} to ${bundle.state}.`);
   }
-  const digest = digestBundle(parsed);
-  const directory = investigationDirectory(dataRoot, parsed.id);
+  const digest = digestBundle(bundle);
+  const directory = investigationDirectory(dataRoot, bundle.id);
   const snapshots = join(directory, "snapshots");
   await mkdir(snapshots, {recursive: true});
   const snapshotPath = join(snapshots, `${digest}.json`);
   try {
-    await writeFile(snapshotPath, `${JSON.stringify(parsed, null, 2)}\n`, {encoding: "utf8", flag: "wx"});
+    await writeFile(snapshotPath, `${JSON.stringify(bundle, null, 2)}\n`, {encoding: "utf8", flag: "wx"});
   } catch (cause: unknown) {
     if (!isErrno(cause, "EEXIST")) throw cause;
   }
@@ -76,9 +131,7 @@ export async function recordInvestigationSnapshot(dataRoot: string, bundle: Inve
     updatedAt: new Date().toISOString(),
   };
   const pointerPath = join(directory, "latest.json");
-  const temporary = `${pointerPath}.${randomUUID()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(pointer, null, 2)}\n`, "utf8");
-  await rename(temporary, pointerPath);
+  await writeFileAtomically(pointerPath, `${JSON.stringify(pointer, null, 2)}\n`);
   return digest;
 }
 

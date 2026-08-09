@@ -1,8 +1,8 @@
-import {readFile, readdir, stat} from "node:fs/promises";
+import {lstat, readFile, readdir, stat} from "node:fs/promises";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
-import type {CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
-import {parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
+import type {AdapterRequestV1, CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
+import {grammarLanguageForPath, parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../scanners/tree-sitter-structural.js";
 import {
   scanPythonSemantic,
@@ -11,12 +11,43 @@ import {
 } from "../scanners/python-semantic.js";
 import {isSupportedExtension, scanSource, scannerId, scannerVersion} from "../scanners/structural.js";
 import {scanTypeScript, semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
-import {comparePortable, portablePath} from "../paths.js";
+import {comparePortable, isWithinRoot, portablePath} from "../paths.js";
 import {buildRepositoryInventory} from "./inventory.js";
-import {loadExternalAdapters} from "../scanners/external.js";
-import {runSubprocessAdapter} from "../adapters/subprocess.js";
+import {
+  resolveExternalAdapters,
+  type AdapterExecutionAuthorization,
+  type ParsedExternalAdapters,
+} from "../scanners/external.js";
+import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
 import {createHash} from "node:crypto";
 import {toolIdentity} from "../tool-identity.js";
+import {
+  explicitlyRequiresScanner,
+  hasUnmatchedExplicitScope,
+  matchesScanScope,
+  runsAdapter,
+  runsBuiltInScanner,
+  type ScanScope,
+  type ScannerSelection,
+} from "./selection.js";
+
+type CoverageDetails = Pick<
+  CoverageRecordV1,
+  "scanner" | "version" | "language" | "filesDiscovered" | "filesAnalyzed" | "skippedFiles"
+>;
+
+function coverageRecord(
+  details: CoverageDetails,
+  parseStatus: CoverageRecordV1["parseStatus"],
+  reason?: string,
+): CoverageRecordV1 {
+  if (parseStatus === "complete") return {...details, parseStatus, ...(reason === undefined ? {} : {reason})};
+  return {
+    ...details,
+    parseStatus,
+    reason: reason ?? "The scanner reported incomplete coverage without a specific reason.",
+  };
+}
 
 const defaultExcludes = new Set([
   ".git",
@@ -38,47 +69,39 @@ const defaultExcludes = new Set([
 
 export type ScanOptions = {
   readonly configDigest: string;
+  readonly selection: ScannerSelection;
+  readonly scope: ScanScope;
   readonly excludes?: ReadonlyArray<string>;
   readonly maxFindings?: number;
   readonly signal?: AbortSignal;
-  readonly scanners?: ReadonlyArray<string>;
-  readonly only?: ReadonlyArray<string>;
-  readonly adapterManifests?: ReadonlyArray<string>;
-  readonly allowAdapterExecution?: boolean;
+  readonly adapters: ParsedExternalAdapters;
+  readonly adapterAuthorization: AdapterExecutionAuthorization;
 };
 
-export type ScanRepositoryResult = ScanReportV2 & {readonly policyFindings: ReadonlyArray<FindingV2>};
+export type ScanRepositoryResult = {
+  readonly report: ScanReportV2;
+  readonly policyFindings: ReadonlyArray<FindingV2>;
+};
 
 /** Scan one local repository without executing source code or contacting the network. */
 export async function scanRepository(inputRoot: string, options: ScanOptions): Promise<ScanRepositoryResult> {
   const started = performance.now();
   const startedAt = new Date().toISOString();
   const root = resolve(inputRoot);
+  if ((await lstat(root)).isSymbolicLink()) throw new Error("The scan root cannot be a symlink.");
   const rootInfo = await stat(root);
   const pathRoot = rootInfo.isDirectory() ? root : resolve(root, "..");
   const excludes = new Set([...defaultExcludes, ...(options.excludes ?? [])]);
   const discovered = await collectFiles(root, excludes, options.signal);
-  const discoveredFiles = discovered.files;
-  const files = discoveredFiles.filter((file) => matchesOnlyFilter(file, options.only));
-  const skippedSourceSymlinks = discovered.symlinks.filter((file) => matchesOnlyFilter(file, options.only));
-  const selectedScanners = normalizeScannerSelection(options.scanners);
-  const runStructural =
-    selectedScanners === undefined ||
-    selectedScanners.has("auto") ||
-    selectedScanners.has("structural") ||
-    selectedScanners.has(scannerId) ||
-    selectedScanners.has("tree-sitter");
-  const runTypeScript =
-    selectedScanners === undefined ||
-    selectedScanners.has("auto") ||
-    selectedScanners.has("typescript") ||
-    selectedScanners.has("typescript-semantic") ||
-    selectedScanners.has(semanticScannerId);
-  const runPython =
-    selectedScanners === undefined ||
-    selectedScanners.has("auto") ||
-    selectedScanners.has("python") ||
-    selectedScanners.has("python-semantic");
+  const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
+  const files = discovered.files.filter(inScope);
+  const skippedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
+  const skippedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
+  const runStructural = runsBuiltInScanner(options.selection, "structural");
+  const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
+  const runPython = runsBuiltInScanner(options.selection, "python-semantic");
+  const selectedTypeScriptFiles = runTypeScript ? files.filter(isTypeScriptPath) : [];
+  const selectedPythonFiles = runPython ? files.filter((file) => extensionOf(file).toLowerCase() === ".py") : [];
   const findings: FindingV2[] = [];
   const skippedFiles: string[] = [];
   let analyzed = 0;
@@ -98,7 +121,19 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       reasons: Set<string>;
     }
   >();
-  let pythonSemanticDiscovered = 0;
+  const parserEntryFor = (language: string) => {
+    const entry = parserCoverage.get(language) ?? {
+      discovered: 0,
+      analyzed: 0,
+      partial: 0,
+      unavailable: 0,
+      skipped: [],
+      reasons: new Set<string>(),
+    };
+    parserCoverage.set(language, entry);
+    return entry;
+  };
+  const typeScriptSemanticSkipped: string[] = [];
   let pythonSemanticAnalyzed = 0;
   let pythonSemanticPartial = 0;
   let pythonSemanticUnavailable = 0;
@@ -109,7 +144,23 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     try {
       source = await readFile(file, "utf8");
     } catch {
-      skippedFiles.push(portablePath(relative(pathRoot, file)));
+      const reportPath = portablePath(relative(pathRoot, file));
+      skippedFiles.push(reportPath);
+      if (runStructural) {
+        const language = grammarLanguageForPath(file);
+        if (language !== undefined) {
+          const parserEntry = parserEntryFor(language);
+          parserEntry.discovered += 1;
+          parserEntry.unavailable += 1;
+          parserEntry.skipped.push(reportPath);
+          parserEntry.reasons.add("One or more selected source files could not be read.");
+        }
+      }
+      if (runTypeScript && isTypeScriptPath(file)) typeScriptSemanticSkipped.push(reportPath);
+      if (runPython && extensionOf(reportPath).toLowerCase() === ".py") {
+        pythonSemanticUnavailable += 1;
+        pythonSemanticSkipped.push(reportPath);
+      }
       continue;
     }
     const reportPath = portablePath(relative(pathRoot, file));
@@ -135,40 +186,34 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         recovery: "Inspect the file manually or rerun after fixing the syntax.",
       });
     }
-    const parserResult = treeStructural?.coverage ?? (await parseWithTreeSitter(reportPath, source, options.signal));
-    const parserEntry = parserCoverage.get(parserResult.language) ?? {
-      discovered: 0,
-      analyzed: 0,
-      partial: 0,
-      unavailable: 0,
-      skipped: [],
-      reasons: new Set<string>(),
-    };
-    parserEntry.discovered += 1;
-    if (parserResult.status === "complete") parserEntry.analyzed += 1;
-    if (parserResult.status === "partial") {
-      parserEntry.partial += 1;
-      partial = true;
+    if (runStructural) {
+      const parserResult = treeStructural?.coverage ?? (await parseWithTreeSitter(reportPath, source, options.signal));
+      const parserEntry = parserEntryFor(parserResult.language);
+      parserEntry.discovered += 1;
+      if (parserResult.status === "complete") parserEntry.analyzed += 1;
+      if (parserResult.status === "partial") {
+        parserEntry.partial += 1;
+        partial = true;
+      }
+      if (parserResult.status === "unavailable") {
+        parserEntry.unavailable += 1;
+        partial = true;
+      }
+      if (parserResult.status !== "complete") {
+        parserEntry.reasons.add(parserResult.error);
+        parseDiagnostics.push({
+          schemaVersion: "footgun.problem.v1",
+          code: parserResult.status === "unavailable" ? "parser-unavailable" : "partial-parse",
+          message: `Tree-sitter coverage is ${parserResult.status} for ${reportPath}.`,
+          path: reportPath,
+          detail: parserResult.error,
+          recovery: "Inspect the file manually or verify the pinned grammar asset.",
+        });
+      }
+      parserCoverage.set(parserResult.language, parserEntry);
     }
-    if (parserResult.status === "unavailable") {
-      parserEntry.unavailable += 1;
-      partial = true;
-    }
-    if (parserResult.status !== "complete") {
-      parserEntry.reasons.add(parserResult.error);
-      parseDiagnostics.push({
-        schemaVersion: "footgun.problem.v1",
-        code: parserResult.status === "unavailable" ? "parser-unavailable" : "partial-parse",
-        message: `Tree-sitter coverage is ${parserResult.status} for ${reportPath}.`,
-        path: reportPath,
-        detail: parserResult.error,
-        recovery: "Inspect the file manually or verify the pinned grammar asset.",
-      });
-    }
-    parserCoverage.set(parserResult.language, parserEntry);
     if (runPython) {
       if (extensionOf(reportPath).toLowerCase() === ".py") {
-        pythonSemanticDiscovered += 1;
         const pythonResult = await scanPythonSemantic(reportPath, source, options.signal);
         findings.push(...pythonResult.findings);
         parseDiagnostics.push(...pythonResult.diagnostics);
@@ -182,68 +227,84 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     }
   }
   const semantic = runTypeScript
-    ? scanTypeScript(pathRoot, analyzedFiles, options.signal)
-    : {
-        state: "unavailable" as const,
-        diagnostics: [
-          {
-            schemaVersion: "footgun.problem.v1" as const,
-            code: "scanner-skipped",
-            message: "TypeScript semantic scanning was not selected.",
-            recovery: "Select the TypeScript scanner explicitly to enable semantic analysis.",
-          },
-        ],
-        findings: [],
-      };
+    ? await scanTypeScript(pathRoot, analyzedFiles, options.signal)
+    : {state: "unavailable" as const, diagnostics: [], findings: []};
   findings.push(...semantic.findings);
   parseDiagnostics.push(...semantic.diagnostics);
   const semanticIndex = semantic.state === "unavailable" ? undefined : semantic.index;
+  const semanticSkippedFiles = [
+    ...new Set([...(semanticIndex?.coverage.skippedFiles ?? []), ...typeScriptSemanticSkipped]),
+  ].sort(comparePortable);
+  const semanticReasons = [
+    ...semantic.diagnostics.map((diagnostic) => diagnostic.message),
+    ...(typeScriptSemanticSkipped.length === 0
+      ? []
+      : ["One or more selected TypeScript source files could not be read."]),
+  ];
   const repository = await repositoryIdentity(root, files);
   const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
   const sourceDigest = sourceHasher.digest("hex");
   const adapterRun = await runConfiguredAdapters(
-    options.adapterManifests ?? [],
+    options.adapters,
     pathRoot,
     options.configDigest,
     repository.revision,
     sourceDigest,
     files,
-    selectedScanners,
+    options.selection,
+    options.adapterAuthorization,
     options.signal,
-    options.allowAdapterExecution ?? false,
   );
   findings.push(...adapterRun.findings);
   parseDiagnostics.push(...adapterRun.diagnostics);
   parseDiagnostics.push(...scannerDisagreements(findings));
   const policyFindings = relateFindings(findings).sort(compareFindings);
-  const allFindings = policyFindings.slice(0, options.maxFindings ?? 80);
-  const coverage: CoverageRecordV1 = {
-    scanner: scannerId,
-    version: scannerVersion,
-    language: "mixed",
-    filesDiscovered: files.length + skippedSourceSymlinks.length,
-    filesAnalyzed: runStructural ? analyzed : 0,
-    parseStatus: !runStructural
-      ? "unavailable"
-      : files.length > 0 && analyzed === 0
-        ? "unavailable"
-        : partial || skippedSourceSymlinks.length > 0
+  const allFindings = pruneFindingRelations(policyFindings.slice(0, options.maxFindings ?? 80));
+  const scopeMatchedNothing = hasUnmatchedExplicitScope(
+    options.scope,
+    files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
+  );
+  const skippedSymlinkPaths = [...skippedSourceSymlinks, ...skippedDirectorySymlinks];
+  const coverage: CoverageRecordV1 | undefined = runStructural
+    ? coverageRecord(
+        {
+          scanner: scannerId,
+          version: scannerVersion,
+          language: "mixed",
+          filesDiscovered: files.length + skippedSourceSymlinks.length,
+          filesAnalyzed: analyzed,
+          skippedFiles: [
+            ...skippedFiles,
+            ...skippedSymlinkPaths.map((file) => portablePath(relative(pathRoot, file))),
+          ].sort(comparePortable),
+        },
+        scopeMatchedNothing || skippedFiles.length > 0 || skippedSymlinkPaths.length > 0 || partial
           ? "partial"
-          : "complete",
-    skippedFiles: (!runStructural
-      ? files.map((file) => portablePath(relative(pathRoot, file)))
-      : [...skippedFiles, ...skippedSourceSymlinks.map((file) => portablePath(relative(pathRoot, file)))]
-    ).sort(comparePortable),
-    ...(partialReason === undefined
-      ? !runStructural
-        ? {reason: "Structural scanner was not selected."}
-        : skippedSourceSymlinks.length > 0
-          ? {reason: "Source symlinks were skipped to preserve the repository boundary."}
-          : {}
-      : {reason: partialReason}),
-  };
+          : files.length > 0 && analyzed === 0
+            ? "unavailable"
+            : "complete",
+        partialReason ??
+          (scopeMatchedNothing
+            ? "The explicit --only filter matched no supported source paths."
+            : skippedFiles.length > 0
+              ? "One or more selected source files could not be read."
+              : skippedSymlinkPaths.length > 0
+                ? "Symlinks were skipped to preserve the repository boundary."
+                : undefined),
+      )
+    : undefined;
   const diagnostics: ProblemV1[] = [
     ...parseDiagnostics,
+    ...(scopeMatchedNothing
+      ? [
+          {
+            schemaVersion: "footgun.problem.v1" as const,
+            code: "scan-scope-unmatched",
+            message: "The explicit --only filter matched no supported source paths.",
+            recovery: "Use a scan-root-relative path or a supported language or extension filter.",
+          },
+        ]
+      : []),
     ...skippedFiles.map((path): ProblemV1 => ({
       schemaVersion: "footgun.problem.v1",
       code: "file-unavailable",
@@ -251,12 +312,12 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       path,
       recovery: "Check file permissions and rerun the scan.",
     })),
-    ...skippedSourceSymlinks.map((path): ProblemV1 => ({
+    ...skippedSymlinkPaths.map((path): ProblemV1 => ({
       schemaVersion: "footgun.problem.v1",
       code: "symlink-skipped",
-      message: `Skipped source symlink ${portablePath(relative(pathRoot, path))}.`,
+      message: `Skipped symlink ${portablePath(relative(pathRoot, path))}.`,
       path: portablePath(relative(pathRoot, path)),
-      recovery: "Replace the symlink with a regular source file before scanning.",
+      recovery: "Replace the symlink with content inside the scan root before scanning.",
     })),
     ...(allFindings.length === policyFindings.length
       ? []
@@ -271,50 +332,79 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   ];
   const parserRecords = [...parserCoverage.entries()]
     .sort(([left], [right]) => comparePortable(left, right))
-    .map(([language, entry]): CoverageRecordV1 => ({
-      scanner: "footgun.tree-sitter",
-      version: "0.26.11",
-      language,
-      filesDiscovered:
-        entry.discovered + skippedSourceSymlinks.filter((file) => sourceLanguage(file) === language).length,
-      filesAnalyzed: entry.analyzed,
-      parseStatus: entry.unavailable > 0 ? "unavailable" : entry.partial > 0 ? "partial" : "complete",
-      skippedFiles: [
+    .map(([language, entry]): CoverageRecordV1 => {
+      const parserSkippedFiles = [
         ...entry.skipped,
         ...skippedSourceSymlinks
           .filter((file) => sourceLanguage(file) === language)
           .map((file) => portablePath(relative(pathRoot, file))),
-      ].sort(comparePortable),
-      ...(entry.reasons.size === 0 ? {} : {reason: [...entry.reasons].sort(comparePortable).join(" ")}),
-    }));
-  const semanticCoverage: CoverageRecordV1 | undefined = analyzedFiles.some((file) => isTypeScriptPath(file))
-    ? {
-        scanner: semanticScannerId,
-        version: semanticScannerVersion,
-        language: "typescript-javascript",
-        filesDiscovered: analyzedFiles.filter(isTypeScriptPath).length,
-        filesAnalyzed: semanticIndex?.coverage.filesIndexed ?? 0,
-        parseStatus:
-          semantic.state === "complete" ? "complete" : semantic.state === "partial" ? "partial" : "unavailable",
-        skippedFiles: [...(semanticIndex?.coverage.skippedFiles ?? [])],
-        ...(semantic.diagnostics.length === 0
-          ? {}
-          : {reason: semantic.diagnostics.map((diagnostic) => diagnostic.message).join(" ")}),
-      }
-    : undefined;
+      ].sort(comparePortable);
+      return coverageRecord(
+        {
+          scanner: "footgun.tree-sitter",
+          version: "0.26.11",
+          language,
+          filesDiscovered:
+            entry.discovered + skippedSourceSymlinks.filter((file) => sourceLanguage(file) === language).length,
+          filesAnalyzed: entry.analyzed,
+          skippedFiles: parserSkippedFiles,
+        },
+        entry.unavailable > 0
+          ? "unavailable"
+          : scopeMatchedNothing || entry.partial > 0 || parserSkippedFiles.length > 0
+            ? "partial"
+            : "complete",
+        entry.reasons.size === 0 ? undefined : [...entry.reasons].sort(comparePortable).join(" "),
+      );
+    });
+  const semanticCoverage: CoverageRecordV1 | undefined =
+    runTypeScript &&
+    (analyzedFiles.some((file) => isTypeScriptPath(file)) ||
+      explicitlyRequiresScanner(options.selection, "typescript-semantic"))
+      ? coverageRecord(
+          {
+            scanner: semanticScannerId,
+            version: semanticScannerVersion,
+            language: "typescript-javascript",
+            filesDiscovered: selectedTypeScriptFiles.length,
+            filesAnalyzed: semanticIndex?.coverage.filesIndexed ?? 0,
+            skippedFiles: semanticSkippedFiles,
+          },
+          semantic.state === "unavailable"
+            ? "unavailable"
+            : scopeMatchedNothing || semantic.state === "partial" || semanticSkippedFiles.length > 0
+              ? "partial"
+              : "complete",
+          semanticReasons.length === 0 ? undefined : semanticReasons.join(" "),
+        )
+      : undefined;
   const pythonCoverage: CoverageRecordV1 | undefined =
-    pythonSemanticDiscovered === 0
+    !runPython || (selectedPythonFiles.length === 0 && !explicitlyRequiresScanner(options.selection, "python-semantic"))
       ? undefined
-      : {
-          scanner: pythonSemanticScannerId,
-          version: pythonSemanticScannerVersion,
-          language: "python",
-          filesDiscovered: pythonSemanticDiscovered,
-          filesAnalyzed: pythonSemanticAnalyzed,
-          parseStatus:
-            pythonSemanticUnavailable > 0 ? "unavailable" : pythonSemanticPartial > 0 ? "partial" : "complete",
-          skippedFiles: pythonSemanticSkipped.sort(comparePortable),
-        };
+      : coverageRecord(
+          {
+            scanner: pythonSemanticScannerId,
+            version: pythonSemanticScannerVersion,
+            language: "python",
+            filesDiscovered: selectedPythonFiles.length,
+            filesAnalyzed: pythonSemanticAnalyzed,
+            skippedFiles: pythonSemanticSkipped.sort(comparePortable),
+          },
+          pythonSemanticUnavailable > 0
+            ? "unavailable"
+            : scopeMatchedNothing || pythonSemanticPartial > 0 || pythonSemanticSkipped.length > 0
+              ? "partial"
+              : "complete",
+          scopeMatchedNothing ? "The explicit --only filter matched no supported Python source paths." : undefined,
+        );
+  const coverageRecords = [
+    ...(coverage === undefined ? [] : [coverage]),
+    ...parserRecords,
+    ...(semanticCoverage === undefined ? [] : [semanticCoverage]),
+    ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
+    ...adapterRun.coverage,
+  ];
+  const resolvedCoverage = resolveCoverageIdentityCollisions(coverageRecords);
   const report: ScanReportV2 = {
     schemaVersion: "footgun.scan-report.v2",
     tool: toolIdentity,
@@ -323,15 +413,9 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     sourceDigest,
     configDigest: options.configDigest,
     findings: allFindings,
-    coverage: [
-      coverage,
-      ...parserRecords,
-      ...(semanticCoverage === undefined ? [] : [semanticCoverage]),
-      ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
-      ...adapterRun.coverage,
-    ],
+    coverage: resolvedCoverage.records,
     ...(semanticIndex === undefined ? {} : {context: semanticIndex}),
-    diagnostics,
+    diagnostics: [...diagnostics, ...resolvedCoverage.diagnostics],
     timings: {startedAt, durationMs: Math.max(0, performance.now() - started)},
     assumptions: [
       "Structural findings are candidates; type, caller, workload, and runtime evidence were not inferred.",
@@ -346,19 +430,19 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       ? {}
       : {rawArtifactDigests: adapterRun.rawArtifactDigests}),
   };
-  return Object.defineProperty(report, "policyFindings", {value: policyFindings}) as ScanRepositoryResult;
+  return {report, policyFindings};
 }
 
 async function runConfiguredAdapters(
-  manifestPaths: ReadonlyArray<string>,
+  parsed: ParsedExternalAdapters,
   root: string,
   configDigest: string,
   revision: string | null,
   sourceDigest: string,
   files: ReadonlyArray<string>,
-  selected: ReadonlySet<string> | undefined,
+  selection: ScannerSelection,
+  authorization: AdapterExecutionAuthorization,
   signal?: AbortSignal,
-  allowAdapterExecution = false,
 ): Promise<{
   readonly findings: ReadonlyArray<FindingV2>;
   readonly coverage: ReadonlyArray<CoverageRecordV1>;
@@ -366,64 +450,44 @@ async function runConfiguredAdapters(
   readonly rawArtifacts: ReadonlyArray<string>;
   readonly rawArtifactDigests: Readonly<Record<string, string>>;
 }> {
-  const builtin = new Set([
-    "auto",
-    "structural",
-    "tree-sitter",
-    "typescript",
-    "typescript-semantic",
-    "python",
-    "python-semantic",
-    scannerId,
-    semanticScannerId,
-  ]);
-  if (manifestPaths.length === 0)
+  if (parsed.adapters.length === 0 && parsed.invalidDescriptors.length === 0 && parsed.diagnostics.length === 0)
     return {
       findings: [],
       coverage: [],
-      diagnostics: [...(selected ?? [])]
-        .filter((requested) => !builtin.has(requested))
-        .map((requested): ProblemV1 => ({
-          schemaVersion: "footgun.problem.v1",
-          code: "scanner-unavailable",
-          message: `Scanner ${requested} was explicitly requested but is not configured.`,
-          recovery: "Configure an adapter manifest or select a built-in scanner ID.",
-        })),
+      diagnostics: [],
       rawArtifacts: [],
       rawArtifactDigests: {},
     };
-  const loaded = await loadExternalAdapters(manifestPaths, root, signal, allowAdapterExecution);
+  const loaded = await resolveExternalAdapters(parsed, root, {
+    authorization,
+    ...(signal === undefined ? {} : {signal}),
+  });
   const findings: FindingV2[] = [];
   const coverage: CoverageRecordV1[] = [];
   const diagnostics: ProblemV1[] = [...loaded.diagnostics];
   const rawArtifacts: string[] = [];
   const rawArtifactDigests: Record<string, string> = {};
-  const configuredIds = new Set(loaded.adapters.map((adapter) => adapter.manifest.id));
+  const sourceTargets = files.map((file) => portablePath(relative(root, file))).sort(comparePortable);
+  const invalidCoverageIdentities = new Set<string>();
   for (const descriptor of loaded.descriptors) {
     if (descriptor.availability !== "invalid") continue;
+    const scanner = `footgun.adapter:${descriptor.id}`;
+    const identity = `${scanner}\0${descriptor.version}\0mixed`;
+    if (invalidCoverageIdentities.has(identity)) continue;
+    invalidCoverageIdentities.add(identity);
     coverage.push({
-      scanner: `footgun.adapter:${descriptor.id}`,
+      scanner,
       version: descriptor.version,
       language: "mixed",
       filesDiscovered: files.length,
       filesAnalyzed: 0,
       parseStatus: "unavailable",
-      skippedFiles: files.map((file) => portablePath(relative(root, file))).sort(comparePortable),
+      skippedFiles: sourceTargets,
       reason: descriptor.reason ?? "Adapter manifest validation failed.",
     });
   }
-  for (const requested of selected ?? []) {
-    if (builtin.has(requested)) continue;
-    if (!configuredIds.has(requested))
-      diagnostics.push({
-        schemaVersion: "footgun.problem.v1",
-        code: "scanner-unavailable",
-        message: `Scanner ${requested} was explicitly requested but is not configured.`,
-        recovery: "Configure an adapter manifest or select a built-in scanner ID.",
-      });
-  }
   for (const adapter of loaded.adapters) {
-    if (selected !== undefined && !selected.has("auto") && !selected.has(adapter.manifest.id)) continue;
+    if (!runsAdapter(selection, adapter.manifest.id)) continue;
     const language = adapter.manifest.languages.length === 1 ? (adapter.manifest.languages[0] ?? "mixed") : "mixed";
     if (adapter.descriptor.availability !== "available") {
       diagnostics.push({
@@ -440,12 +504,12 @@ async function runConfiguredAdapters(
         filesDiscovered: files.length,
         filesAnalyzed: 0,
         parseStatus: "unavailable",
-        skippedFiles: files.map((file) => portablePath(relative(root, file))).sort(comparePortable),
+        skippedFiles: sourceTargets,
         reason: adapter.descriptor.reason ?? "Capability probe failed.",
       });
       continue;
     }
-    const request = {
+    const request: AdapterRequestV1 = {
       schemaVersion: "footgun.adapter-request.v1" as const,
       requestId: `req_${createHash("sha256")
         .update(`${adapter.manifest.id}\0${configDigest}\0${revision ?? ""}\0${sourceDigest}\0${files.join("\0")}`)
@@ -454,7 +518,7 @@ async function runConfiguredAdapters(
       root,
       config: {scanner: adapter.manifest.id},
       operation: "scan" as const,
-      targets: files.map((file) => portablePath(relative(root, file))).sort(comparePortable),
+      targets: sourceTargets,
       revision,
       sourceDigest,
       configDigest,
@@ -465,12 +529,14 @@ async function runConfiguredAdapters(
         maxOutputBytes: adapter.manifest.limits.maxOutputBytes,
       },
     };
-    const result = await runSubprocessAdapter(adapter.manifest, request, {
+    const result = await runParsedSubprocessAdapter(adapter.manifest, request, {
       root,
       ...(signal === undefined ? {} : {signal}),
     });
     if ("code" in result) {
-      diagnostics.push({...result, path: adapter.path});
+      diagnostics.push(
+        isWithinRoot(root, adapter.path) ? {...result, path: portablePath(relative(root, adapter.path))} : result,
+      );
       coverage.push({
         scanner: `footgun.adapter:${adapter.manifest.id}`,
         version: adapter.manifest.version,
@@ -487,21 +553,18 @@ async function runConfiguredAdapters(
     coverage.push(
       ...(result.coverage.length === 0
         ? [
-            {
-              scanner: `footgun.adapter:${adapter.manifest.id}`,
-              version: adapter.manifest.version,
-              language,
-              filesDiscovered: files.length,
-              filesAnalyzed: result.state === "complete" ? files.length : 0,
-              parseStatus:
-                result.state === "complete"
-                  ? ("complete" as const)
-                  : result.state === "partial"
-                    ? ("partial" as const)
-                    : ("unavailable" as const),
-              skippedFiles: result.state === "complete" ? [] : [...request.targets],
-              ...(result.state === "complete" ? {} : {reason: `Adapter state: ${result.state}`}),
-            },
+            coverageRecord(
+              {
+                scanner: `footgun.adapter:${adapter.manifest.id}`,
+                version: adapter.manifest.version,
+                language,
+                filesDiscovered: files.length,
+                filesAnalyzed: result.state === "complete" ? files.length : 0,
+                skippedFiles: result.state === "complete" ? [] : [...request.targets],
+              },
+              result.state === "complete" ? "complete" : result.state === "partial" ? "partial" : "unavailable",
+              result.state === "complete" ? undefined : `Adapter state: ${result.state}`,
+            ),
           ]
         : result.coverage),
     );
@@ -529,12 +592,18 @@ async function collectFiles(
   root: string,
   excludes: ReadonlySet<string>,
   signal?: AbortSignal,
-): Promise<{readonly files: ReadonlyArray<string>; readonly symlinks: ReadonlyArray<string>}> {
+): Promise<{
+  readonly files: ReadonlyArray<string>;
+  readonly sourceSymlinks: ReadonlyArray<string>;
+  readonly directorySymlinks: ReadonlyArray<string>;
+}> {
   const files: string[] = [];
-  const symlinks: string[] = [];
+  const sourceSymlinks: string[] = [];
+  const directorySymlinks: string[] = [];
   const rootInfo = await stat(root);
-  if (rootInfo.isFile()) return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], symlinks};
-  if (!rootInfo.isDirectory()) return {files, symlinks};
+  if (rootInfo.isFile())
+    return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], sourceSymlinks, directorySymlinks};
+  if (!rootInfo.isDirectory()) return {files, sourceSymlinks, directorySymlinks};
   const visit = async (directory: string): Promise<void> => {
     signal?.throwIfAborted();
     const entries = await readdir(directory, {withFileTypes: true});
@@ -544,7 +613,9 @@ async function collectFiles(
       if (excludes.has(entry.name)) continue;
       const path = resolve(directory, entry.name);
       if (entry.isSymbolicLink()) {
-        if (isSupportedExtension(extensionOf(path))) symlinks.push(path);
+        const target = await stat(path).catch(() => undefined);
+        if (target?.isDirectory()) directorySymlinks.push(path);
+        else if (isSupportedExtension(extensionOf(path))) sourceSymlinks.push(path);
         continue;
       }
       if (entry.isDirectory()) {
@@ -553,39 +624,7 @@ async function collectFiles(
     }
   };
   await visit(root);
-  return {files, symlinks};
-}
-
-function normalizeScannerSelection(values: ReadonlyArray<string> | undefined): ReadonlySet<string> | undefined {
-  if (values === undefined || values.length === 0) return undefined;
-  return new Set(
-    values.flatMap((value) =>
-      value
-        .split(",")
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0),
-    ),
-  );
-}
-
-function matchesOnlyFilter(path: string, filters: ReadonlyArray<string> | undefined): boolean {
-  if (filters === undefined || filters.length === 0) return true;
-  const portable = portablePath(path);
-  const extension = extensionOf(path).toLowerCase();
-  return filters.some((filter) => {
-    const value = filter.startsWith("language:")
-      ? filter.slice("language:".length).toLowerCase()
-      : filter.toLowerCase();
-    const language =
-      extension === ".py"
-        ? "python"
-        : [".ts", ".tsx"].includes(extension)
-          ? "typescript"
-          : [".js", ".jsx", ".mjs", ".cjs"].includes(extension)
-            ? "javascript"
-            : extension.slice(1);
-    return value === language || value === extension || portable.endsWith(filter) || portable.includes(filter);
-  });
+  return {files, sourceSymlinks, directorySymlinks};
 }
 
 function extensionOf(path: string): string {
@@ -652,35 +691,96 @@ function compareFindings(left: FindingV2, right: FindingV2): number {
 
 function relateFindings(findings: ReadonlyArray<FindingV2>): FindingV2[] {
   const result: FindingV2[] = [];
+  const relatedFindingIds: Array<Set<string>> = [];
   const exact = new Set<string>();
+  const nearby = new Map<string, number[]>();
   for (const finding of findings) {
     const exactKey = `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`;
     if (exact.has(exactKey)) continue;
     exact.add(exactKey);
     const family = findingFamily(finding.ruleId);
-    const related = result
-      .filter(
-        (prior) =>
-          findingFamily(prior.ruleId) === family &&
-          prior.location.path === finding.location.path &&
-          Math.abs(prior.location.startLine - finding.location.startLine) <= 1,
-      )
-      .map((prior) => prior.id);
-    const relatedFindings = [...new Set([...finding.relatedFindings, ...related])].sort(comparePortable);
-    const next = {...finding, relatedFindings};
-    if (related.length > 0) {
-      for (let index = 0; index < result.length; index += 1) {
+    const key = `${family}\0${finding.location.path}`;
+    const related = new Set(finding.relatedFindings);
+    for (const offset of [-1, 0, 1])
+      for (const index of nearby.get(`${key}\0${finding.location.startLine + offset}`) ?? []) {
         const prior = result[index];
-        if (prior !== undefined && related.includes(prior.id))
-          result[index] = {
-            ...prior,
-            relatedFindings: [...new Set([...prior.relatedFindings, finding.id])].sort(comparePortable),
-          };
+        const priorRelated = relatedFindingIds[index];
+        if (prior === undefined || priorRelated === undefined) continue;
+        related.add(prior.id);
+        priorRelated.add(finding.id);
       }
-    }
-    result.push(next);
+    result.push({...finding, relatedFindings: []});
+    relatedFindingIds.push(related);
+    const lineKey = `${key}\0${finding.location.startLine}`;
+    const priorIndexes = nearby.get(lineKey) ?? [];
+    priorIndexes.push(result.length - 1);
+    nearby.set(lineKey, priorIndexes);
   }
-  return result;
+  return result.map((finding, index) => ({
+    ...finding,
+    relatedFindings: [...(relatedFindingIds[index] ?? [])].sort(comparePortable),
+  }));
+}
+
+function pruneFindingRelations(findings: ReadonlyArray<FindingV2>): FindingV2[] {
+  const retainedIds = new Set(findings.map((finding) => finding.id));
+  return findings.map((finding) => ({
+    ...finding,
+    relatedFindings: finding.relatedFindings.filter((id) => retainedIds.has(id)),
+  }));
+}
+
+function resolveCoverageIdentityCollisions(records: ReadonlyArray<CoverageRecordV1>): {
+  readonly records: CoverageRecordV1[];
+  readonly diagnostics: ProblemV1[];
+} {
+  const grouped = new Map<string, CoverageRecordV1[]>();
+  for (const record of records) {
+    const identity = `${record.scanner}\0${record.version}\0${record.language}`;
+    const matches = grouped.get(identity) ?? [];
+    matches.push(record);
+    grouped.set(identity, matches);
+  }
+  const resolved: CoverageRecordV1[] = [];
+  const diagnostics: ProblemV1[] = [];
+  for (const matches of grouped.values()) {
+    const first = matches[0];
+    if (first === undefined) continue;
+    if (matches.length === 1) {
+      resolved.push(first);
+      continue;
+    }
+    const skippedFiles = [...new Set(matches.flatMap((record) => record.skippedFiles))].sort(comparePortable);
+    const filesDiscovered = Math.max(...matches.map((record) => record.filesDiscovered));
+    const filesAnalyzed = Math.min(...matches.map((record) => record.filesAnalyzed));
+    const status = matches.some((record) => record.parseStatus === "failed")
+      ? "failed"
+      : matches.some((record) => record.parseStatus === "unavailable")
+        ? "unavailable"
+        : "partial";
+    const reason = `Multiple coverage records claimed ${first.scanner}@${first.version} for ${first.language}.`;
+    resolved.push(
+      coverageRecord(
+        {
+          scanner: first.scanner,
+          version: first.version,
+          language: first.language,
+          filesDiscovered,
+          filesAnalyzed,
+          skippedFiles,
+        },
+        status,
+        reason,
+      ),
+    );
+    diagnostics.push({
+      schemaVersion: "footgun.problem.v1",
+      code: "duplicate-coverage-identity",
+      message: reason,
+      recovery: "Configure each scanner or adapter to report a distinct coverage identity.",
+    });
+  }
+  return {records: resolved, diagnostics};
 }
 
 function findingFamily(ruleId: string): string {

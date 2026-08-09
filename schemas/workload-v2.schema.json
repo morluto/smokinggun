@@ -2,627 +2,4235 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "anyOf": [
     {
-      "type": "object",
-      "properties": {
-        "schemaVersion": {
-          "type": "string",
-          "const": "footgun.workload.v2"
-        },
-        "command": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "cwd": {
-          "type": "string",
-          "minLength": 1
-        },
-        "environment": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "inheritEnvironment": {
-          "type": "boolean"
-        },
-        "warmups": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repetitions": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "timeoutMs": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "datasetDigests": {
-          "default": {},
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "resourceLimits": {
+      "anyOf": [
+        {
           "type": "object",
           "properties": {
-            "cpuMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "memoryBytes": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "maxProcesses": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            }
-          },
-          "additionalProperties": false
-        },
-        "runner": {
-          "type": "object",
-          "properties": {
-            "runtime": {
+            "schemaVersion": {
               "type": "string",
-              "enum": [
-                "docker",
-                "podman",
-                "bwrap",
-                "nsjail"
-              ]
+              "const": "footgun.workload.v2"
             },
-            "image": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "runtime"
-          ],
-          "additionalProperties": false
-        },
-        "statisticalPolicy": {
-          "default": {
-            "kind": "median-improvement",
-            "minimumRelativeImprovement": 0
-          },
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": [
-                "median-improvement",
-                "non-overlapping-iqr"
-              ]
-            },
-            "minimumRelativeImprovement": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": [
-            "kind",
-            "minimumRelativeImprovement"
-          ],
-          "additionalProperties": false
-        },
-        "requestedProfile": {
-          "type": "string",
-          "enum": [
-            "read-only",
-            "local-exec",
-            "service-exec",
-            "container-exec",
-            "candidate-write"
-          ]
-        },
-        "expectedArtifacts": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "behaviorChecks": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "networkPolicy": {
-          "default": "disabled",
-          "type": "string",
-          "enum": [
-            "disabled",
-            "explicit"
-          ]
-        },
-        "candidateRoot": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "schemaVersion",
-        "command",
-        "cwd",
-        "environment",
-        "inheritEnvironment",
-        "warmups",
-        "repetitions",
-        "timeoutMs",
-        "datasetDigests",
-        "statisticalPolicy",
-        "requestedProfile",
-        "expectedArtifacts",
-        "behaviorChecks",
-        "networkPolicy"
-      ],
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "properties": {
-        "schemaVersion": {
-          "type": "string",
-          "const": "footgun.workload.v2"
-        },
-        "command": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "cwd": {
-          "type": "string",
-          "minLength": 1
-        },
-        "environment": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "inheritEnvironment": {
-          "type": "boolean"
-        },
-        "warmups": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repetitions": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "timeoutMs": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "datasetDigests": {
-          "default": {},
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "resourceLimits": {
-          "type": "object",
-          "properties": {
-            "cpuMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "memoryBytes": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "maxProcesses": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            }
-          },
-          "additionalProperties": false
-        },
-        "runner": {
-          "type": "object",
-          "properties": {
-            "runtime": {
-              "type": "string",
-              "enum": [
-                "docker",
-                "podman",
-                "bwrap",
-                "nsjail"
-              ]
-            },
-            "image": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "runtime"
-          ],
-          "additionalProperties": false
-        },
-        "statisticalPolicy": {
-          "default": {
-            "kind": "median-improvement",
-            "minimumRelativeImprovement": 0
-          },
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": [
-                "median-improvement",
-                "non-overlapping-iqr"
-              ]
-            },
-            "minimumRelativeImprovement": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": [
-            "kind",
-            "minimumRelativeImprovement"
-          ],
-          "additionalProperties": false
-        },
-        "requestedProfile": {
-          "type": "string",
-          "enum": [
-            "read-only",
-            "local-exec",
-            "service-exec",
-            "container-exec",
-            "candidate-write"
-          ]
-        },
-        "expectedArtifacts": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "behaviorChecks": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "networkPolicy": {
-          "default": "disabled",
-          "type": "string",
-          "enum": [
-            "disabled",
-            "explicit"
-          ]
-        },
-        "candidateRoot": {
-          "type": "string"
-        },
-        "inputSizeParameterization": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "minLength": 1
-            },
-            "values": {
+            "command": {
               "minItems": 1,
               "type": "array",
               "items": {
-                "type": "number"
+                "type": "string"
               }
             },
-            "commandIndex": {
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "read-only"
             }
           },
           "required": [
-            "name",
-            "values",
-            "commandIndex"
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "local-exec"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "service-exec"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "candidate-write"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "docker"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "podman"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "bwrap"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "nsjail"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner"
           ],
           "additionalProperties": false
         }
-      },
-      "required": [
-        "schemaVersion",
-        "command",
-        "cwd",
-        "environment",
-        "inheritEnvironment",
-        "warmups",
-        "repetitions",
-        "timeoutMs",
-        "datasetDigests",
-        "statisticalPolicy",
-        "requestedProfile",
-        "expectedArtifacts",
-        "behaviorChecks",
-        "networkPolicy",
-        "inputSizeParameterization"
-      ],
-      "additionalProperties": false
+      ]
     },
     {
-      "type": "object",
-      "properties": {
-        "schemaVersion": {
-          "type": "string",
-          "const": "footgun.workload.v2"
-        },
-        "command": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "cwd": {
-          "type": "string",
-          "minLength": 1
-        },
-        "environment": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "inheritEnvironment": {
-          "type": "boolean"
-        },
-        "warmups": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repetitions": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "timeoutMs": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "datasetDigests": {
-          "default": {},
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          }
-        },
-        "resourceLimits": {
+      "anyOf": [
+        {
           "type": "object",
           "properties": {
-            "cpuMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "memoryBytes": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "maxProcesses": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            }
-          },
-          "additionalProperties": false
-        },
-        "runner": {
-          "type": "object",
-          "properties": {
-            "runtime": {
+            "schemaVersion": {
               "type": "string",
-              "enum": [
-                "docker",
-                "podman",
-                "bwrap",
-                "nsjail"
-              ]
+              "const": "footgun.workload.v2"
             },
-            "image": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "runtime"
-          ],
-          "additionalProperties": false
-        },
-        "statisticalPolicy": {
-          "default": {
-            "kind": "median-improvement",
-            "minimumRelativeImprovement": 0
-          },
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "enum": [
-                "median-improvement",
-                "non-overlapping-iqr"
-              ]
-            },
-            "minimumRelativeImprovement": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": [
-            "kind",
-            "minimumRelativeImprovement"
-          ],
-          "additionalProperties": false
-        },
-        "requestedProfile": {
-          "type": "string",
-          "enum": [
-            "read-only",
-            "local-exec",
-            "service-exec",
-            "container-exec",
-            "candidate-write"
-          ]
-        },
-        "expectedArtifacts": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "behaviorChecks": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "networkPolicy": {
-          "default": "disabled",
-          "type": "string",
-          "enum": [
-            "disabled",
-            "explicit"
-          ]
-        },
-        "candidateRoot": {
-          "type": "string"
-        },
-        "multiParameterization": {
-          "type": "object",
-          "properties": {
-            "parameters": {
-              "minItems": 2,
-              "maxItems": 2,
+            "command": {
+              "minItems": 1,
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "values": {
-                    "minItems": 1,
-                    "type": "array",
-                    "items": {
-                      "type": "number"
-                    }
-                  },
-                  "commandIndex": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "read-only"
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
                   }
                 },
-                "required": [
-                  "name",
-                  "values",
-                  "commandIndex"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "coordinates": {
-              "minItems": 1,
-              "type": "array",
-              "items": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {
-                  "type": "number"
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
-              }
-            },
-            "maxPoints": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 64
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
-            "parameters",
-            "maxPoints"
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "local-exec"
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "service-exec"
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "candidate-write"
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "docker"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "podman"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "bwrap"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "inputSizeParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "nsjail"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            },
+            "inputSizeParameterization": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "values": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "commandIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "name",
+                "values",
+                "commandIndex"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "inputSizeParameterization"
           ],
           "additionalProperties": false
         }
-      },
-      "required": [
-        "schemaVersion",
-        "command",
-        "cwd",
-        "environment",
-        "inheritEnvironment",
-        "warmups",
-        "repetitions",
-        "timeoutMs",
-        "datasetDigests",
-        "statisticalPolicy",
-        "requestedProfile",
-        "expectedArtifacts",
-        "behaviorChecks",
-        "networkPolicy",
-        "multiParameterization"
-      ],
-      "additionalProperties": false
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "read-only"
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "local-exec"
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "service-exec"
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "runner": {
+              "not": {}
+            },
+            "candidateRoot": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "candidate-write"
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "docker"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "podman"
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "runtime",
+                "image"
+              ],
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "type": "object",
+              "properties": {
+                "memoryBytes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxProcesses": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "bwrap"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.workload.v2"
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1
+            },
+            "environment": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "type": "boolean"
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "datasetDigests": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "statisticalPolicy": {
+              "default": {
+                "kind": "median-improvement",
+                "minimumRelativeImprovement": 0
+              },
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "expectedArtifacts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "networkPolicy": {
+              "default": "disabled",
+              "type": "string",
+              "enum": [
+                "disabled",
+                "explicit"
+              ]
+            },
+            "candidateRoot": {
+              "not": {}
+            },
+            "resourceLimits": {
+              "not": {}
+            },
+            "requestedProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "runner": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string",
+                  "const": "nsjail"
+                }
+              },
+              "required": [
+                "runtime"
+              ],
+              "additionalProperties": false
+            },
+            "multiParameterization": {
+              "type": "object",
+              "properties": {
+                "parameters": {
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "values",
+                      "commandIndex"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "coordinates": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "maxPoints": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "parameters",
+                "maxPoints"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "command",
+            "cwd",
+            "environment",
+            "inheritEnvironment",
+            "warmups",
+            "repetitions",
+            "timeoutMs",
+            "datasetDigests",
+            "statisticalPolicy",
+            "expectedArtifacts",
+            "behaviorChecks",
+            "networkPolicy",
+            "requestedProfile",
+            "runner",
+            "multiParameterization"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   ],
   "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."

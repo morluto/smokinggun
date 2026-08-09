@@ -4,9 +4,7 @@ import {join} from "node:path";
 import type {OutputFormat, RuntimeConfig} from "../config.js";
 import {isConfigFailure, loadConfig, userDataDirectory} from "../config.js";
 import type {ProblemV1} from "../protocol/index.js";
-import {listScanners, type ScannerDescriptor} from "../scanners/registry.js";
-import {loadExternalAdapters} from "../scanners/external.js";
-import {storeArtifact, type StoredArtifact} from "../artifacts/store.js";
+import {storeArtifact, storeArtifactBytes, type StoredArtifact} from "../artifacts/store.js";
 
 export type GlobalFlags = {
   readonly cwd?: string;
@@ -33,8 +31,8 @@ export type RuntimeContext = {
   readonly artifactStore: {
     readonly root: string;
     readonly put: (path: string, maxBytes?: number) => Promise<StoredArtifact>;
+    readonly putBytes: (path: string, bytes: Uint8Array, maxBytes?: number) => Promise<StoredArtifact>;
   };
-  readonly scannerRegistry: () => ReadonlyArray<ScannerDescriptor>;
   readonly executionPolicy: {readonly network: "disabled"; readonly shell: false; readonly maxOutputBytes: number};
   readonly clock: {readonly now: () => number; readonly nowIso: () => string};
   readonly processRunner: typeof execa;
@@ -56,15 +54,17 @@ export async function createRuntimeContext(
   if (isConfigFailure(config)) return {...config, _tag: "ContextFailure", exitCode: 2};
   const artifacts = userDataDirectory();
   await mkdir(join(artifacts, "artifacts"), {recursive: true});
-  const external = await loadExternalAdapters(config.adapters, config.cwd, signal);
   const artifactRoot = join(artifacts, "artifacts");
   return {
     ...streams,
     config,
     signal,
     artifacts,
-    artifactStore: {root: artifactRoot, put: (path, maxBytes) => storeArtifact(path, artifactRoot, maxBytes)},
-    scannerRegistry: () => listScanners(external.descriptors),
+    artifactStore: {
+      root: artifactRoot,
+      put: (path, maxBytes) => storeArtifact(path, artifactRoot, maxBytes),
+      putBytes: (path, bytes, maxBytes) => storeArtifactBytes(path, bytes, artifactRoot, maxBytes),
+    },
     executionPolicy: {network: "disabled", shell: false, maxOutputBytes: 1_000_000},
     clock: {now: () => Date.now(), nowIso: () => new Date().toISOString()},
     processRunner: execa,

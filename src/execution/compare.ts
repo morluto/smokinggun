@@ -1,14 +1,71 @@
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
 import type {
+  MeasurementArtifactV1,
   MeasurementComparisonV2,
   MeasurementV1,
+  ProblemV1,
   ScalingAnalysisV2,
   ScalingAnalysisV3,
   ScalingComparisonV2,
 } from "../protocol/index.js";
 
 export type ComparisonArtifactDigests = readonly [baselineDigest: string, candidateDigest: string];
+
+export type ComparableMeasurementArtifacts =
+  | {
+      readonly kind: "measurement";
+      readonly baseline: MeasurementV1;
+      readonly candidate: MeasurementV1;
+    }
+  | {
+      readonly kind: "single-scaling";
+      readonly baseline: ScalingAnalysisV2;
+      readonly candidate: ScalingAnalysisV2;
+    }
+  | {
+      readonly kind: "multi-scaling";
+      readonly baseline: ScalingAnalysisV3;
+      readonly candidate: ScalingAnalysisV3;
+    };
+
+/** Pair parsed artifacts only when their concrete measurement kind and declared workload agree. */
+export function classifyComparableMeasurementArtifacts(
+  baseline: MeasurementArtifactV1,
+  candidate: MeasurementArtifactV1,
+): ComparableMeasurementArtifacts | ProblemV1 {
+  switch (baseline.schemaVersion) {
+    case "footgun.measurement.v1":
+      if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
+      if (baseline.workloadDigest !== candidate.workloadDigest) return workloadMismatch();
+      return {kind: "measurement", baseline, candidate};
+    case "footgun.scaling.v2":
+      if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
+      if (baseline.workloadDigest !== candidate.workloadDigest) return workloadMismatch();
+      if (
+        baseline.parameter !== candidate.parameter ||
+        !sameOrderedValues(
+          baseline.points.map((point) => point.value),
+          candidate.points.map((point) => point.value),
+        )
+      )
+        return scalingPointPlanMismatch();
+      return {kind: "single-scaling", baseline, candidate};
+    case "footgun.scaling.v3":
+      if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
+      if (baseline.workloadDigest !== candidate.workloadDigest) return workloadMismatch();
+      if (
+        baseline.parameters.join("\0") !== candidate.parameters.join("\0") ||
+        baseline.coordinatesDigest !== candidate.coordinatesDigest ||
+        !sameOrderedValues(
+          baseline.points.map((point) => canonicalCoordinates(point.coordinates)),
+          candidate.points.map((point) => canonicalCoordinates(point.coordinates)),
+        )
+      )
+        return scalingPointPlanMismatch();
+      return {kind: "multi-scaling", baseline, candidate};
+  }
+}
 
 export function buildMeasurementComparison(
   baseline: MeasurementV1,
@@ -65,8 +122,9 @@ export function buildScalingComparison(
   const [baselineDigest, candidateDigest] = digests ?? [];
   const firstPoint = baseline.points[0];
   if (firstPoint === undefined) throw new Error("A scaling comparison requires at least one baseline point.");
-  const points = baseline.points.map((point, index) => {
-    const other = candidate.points[index];
+  const candidateByValue = new Map(candidate.points.map((point) => [point.value, point]));
+  const points = baseline.points.map((point) => {
+    const other = candidateByValue.get(point.value);
     const deltaPercent = point.medianMs === 0 ? 0 : (((other?.medianMs ?? 0) - point.medianMs) / point.medianMs) * 100;
     const policy = point.statisticalPolicy;
     return {
@@ -82,10 +140,11 @@ export function buildScalingComparison(
     };
   });
   const improvement = points.length > 0 && points.every((point) => point.improvement);
+  const behaviorValidated =
+    baseline.points.every((point) => point.behaviorValidated) &&
+    candidate.points.every((point) => point.behaviorValidated);
   const reasons = promotionReasons({
-    behaviorValidated:
-      baseline.points.every((point) => point.behaviorValidated) &&
-      candidate.points.every((point) => point.behaviorValidated),
+    behaviorValidated,
     improvement,
     comparable: environmentsMatch(baseline.environment, candidate.environment),
     downgradeReasons: [...baseline.points, ...candidate.points].flatMap(
@@ -100,7 +159,7 @@ export function buildScalingComparison(
     baseline: baselinePath,
     candidate: candidatePath,
     workloadDigest: baseline.workloadDigest,
-    behaviorValidated: true,
+    behaviorValidated,
     improvement,
     comparability: comparability(baseline.environment, candidate.environment),
     promotion: promotionStatus(reasons),
@@ -124,8 +183,11 @@ export function buildMultiScalingComparison(
   const [baselineDigest, candidateDigest] = digests ?? [];
   const firstPoint = baseline.points[0];
   if (firstPoint === undefined) throw new Error("A scaling comparison requires at least one baseline point.");
-  const points = baseline.points.map((point, index) => {
-    const other = candidate.points[index];
+  const candidateByCoordinates = new Map(
+    candidate.points.map((point) => [canonicalCoordinates(point.coordinates), point]),
+  );
+  const points = baseline.points.map((point) => {
+    const other = candidateByCoordinates.get(canonicalCoordinates(point.coordinates));
     const deltaPercent = point.medianMs === 0 ? 0 : (((other?.medianMs ?? 0) - point.medianMs) / point.medianMs) * 100;
     return {
       value: point.value,
@@ -247,4 +309,40 @@ function comparisonIdFor(
     .update(stableJson({baseline, candidate, workload: workloadDigest, baselineDigest, candidateDigest}))
     .digest("hex")
     .slice(0, 16)}`;
+}
+
+function comparisonProblem(code: string, message: string, recovery: string): ProblemV1 {
+  return {schemaVersion: "footgun.problem.v1", code, message, recovery};
+}
+
+function measurementKindMismatch(): ProblemV1 {
+  return comparisonProblem(
+    "measurement-kind-mismatch",
+    "Baseline and candidate artifacts use different measurement kinds.",
+    "Compare two MeasurementV1 artifacts or two ScalingAnalysisV2 artifacts.",
+  );
+}
+
+function workloadMismatch(): ProblemV1 {
+  return comparisonProblem(
+    "workload-mismatch",
+    "Baseline and candidate measurements use different workload digests.",
+    "Measure both artifacts from the same immutable WorkloadV2 descriptor.",
+  );
+}
+
+function scalingPointPlanMismatch(): ProblemV1 {
+  return comparisonProblem(
+    "scaling-points-mismatch",
+    "Baseline and candidate scaling artifacts do not declare the same ordered input points.",
+    "Measure both artifacts from the same immutable parameterized WorkloadV2 descriptor.",
+  );
+}
+
+function sameOrderedValues<T>(left: ReadonlyArray<T>, right: ReadonlyArray<T>): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function canonicalCoordinates(coordinates: Readonly<Record<string, number>>): string {
+  return stableJson(coordinates);
 }

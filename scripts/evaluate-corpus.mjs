@@ -24,7 +24,7 @@ for (const testCase of cases) {
     ).map((finding) => finding.ruleId),
   );
   const semantic = new Set(
-    scanTypeScript(root, [resolve(root, testCase.path)]).findings.map((finding) => finding.ruleId),
+    (await scanTypeScript(root, [resolve(root, testCase.path)])).findings.map((finding) => finding.ruleId),
   );
   if (testCase.language === "python")
     for (const finding of (await scanPythonSemantic(testCase.path, source)).findings) semantic.add(finding.ruleId);

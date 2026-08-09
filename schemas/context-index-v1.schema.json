@@ -149,40 +149,117 @@
       }
     },
     "coverage": {
-      "type": "object",
-      "properties": {
-        "filesDiscovered": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "filesDiscovered": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "filesIndexed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "skippedFiles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "parseStatus": {
+              "type": "string",
+              "const": "complete"
+            }
+          },
+          "required": [
+            "filesDiscovered",
+            "filesIndexed",
+            "skippedFiles",
+            "parseStatus"
+          ],
+          "additionalProperties": false
         },
-        "filesIndexed": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+        {
+          "type": "object",
+          "properties": {
+            "filesDiscovered": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "filesIndexed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "skippedFiles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "parseStatus": {
+              "type": "string",
+              "const": "partial"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "filesDiscovered",
+            "filesIndexed",
+            "skippedFiles",
+            "parseStatus",
+            "reason"
+          ],
+          "additionalProperties": false
         },
-        "parseStatus": {
-          "type": "string",
-          "enum": [
-            "complete",
-            "partial",
-            "unavailable"
-          ]
-        },
-        "skippedFiles": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+        {
+          "type": "object",
+          "properties": {
+            "filesDiscovered": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "filesIndexed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "skippedFiles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "parseStatus": {
+              "type": "string",
+              "const": "unavailable"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "filesDiscovered",
+            "filesIndexed",
+            "skippedFiles",
+            "parseStatus",
+            "reason"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "filesDiscovered",
-        "filesIndexed",
-        "parseStatus",
-        "skippedFiles"
-      ],
-      "additionalProperties": false
+      ]
     },
     "revision": {
       "anyOf": [

@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {existsSync} from "node:fs";
-import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
+import {mkdtemp, readFile, rm, symlink, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {expect, it} from "vitest";
@@ -31,7 +31,7 @@ it("records repeated timing and validates explicit behavior checks", async () =>
   expect(result.behaviorChecks?.every((check) => check.passed)).toBe(true);
 });
 
-it("refuses workload cwd escape and unsupported isolation without downgrade", async () => {
+it("rejects workload cwd escapes and runner-free container profiles at the parsing boundary", async () => {
   const escaped = await measureWorkload(
     {
       schemaVersion: "footgun.workload.v2",
@@ -64,8 +64,8 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
     },
     {root: process.cwd()},
   );
-  expect("code" in escaped && escaped.code).toBe("workload-boundary-violation");
-  expect("code" in isolated && isolated.code).toBe("container-runner-missing");
+  expect("code" in escaped && escaped.code).toBe("invalid-workload");
+  expect("code" in isolated && isolated.code).toBe("invalid-workload");
   const readOnly = await measureWorkload(
     {
       schemaVersion: "footgun.workload.v2",
@@ -85,7 +85,7 @@ it("refuses workload cwd escape and unsupported isolation without downgrade", as
   expect("code" in readOnly && readOnly.code).toBe("execution-profile-unavailable");
 });
 
-it("refuses unsupported host memory and process limits before execution", async () => {
+it("rejects unsupported resource controls at the workload boundary", async () => {
   const result = await measureWorkload(
     {
       schemaVersion: "footgun.workload.v2",
@@ -103,10 +103,10 @@ it("refuses unsupported host memory and process limits before execution", async 
     },
     {root: process.cwd()},
   );
-  expect("code" in result && result.code).toBe("resource-limit-unavailable");
+  expect("code" in result && result.code).toBe("invalid-workload");
 });
 
-it("records a redacted reproduction contract and rejects artifact escapes", async () => {
+it("records a redacted reproduction contract and rejects artifact escapes at the parsing boundary", async () => {
   const result = await measureWorkload(
     {
       schemaVersion: "footgun.workload.v2",
@@ -147,7 +147,7 @@ it("records a redacted reproduction contract and rejects artifact escapes", asyn
     },
     {root: process.cwd()},
   );
-  expect("code" in escaped && escaped.code).toBe("workload-artifact-boundary-violation");
+  expect("code" in escaped && escaped.code).toBe("invalid-workload");
 });
 
 it.skipIf(!existsSync("/usr/bin/bwrap"))("runs an explicitly selected workload through bubblewrap", async () => {
@@ -205,5 +205,33 @@ it("runs candidate-write in a copied workspace and leaves the source tree untouc
   } finally {
     await rm(source, {recursive: true, force: true});
     await rm(artifacts, {recursive: true, force: true});
+  }
+});
+
+it("rejects a workload cwd symlink that escapes the repository root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "footgun-workload-root-"));
+  const outside = await mkdtemp(join(tmpdir(), "footgun-workload-outside-"));
+  try {
+    await symlink(outside, join(root, "linked"));
+    const result = await measureWorkload(
+      {
+        schemaVersion: "footgun.workload.v2",
+        command: [process.execPath, "-e", "process.exit(0)"],
+        cwd: "linked",
+        environment: {},
+        inheritEnvironment: false,
+        warmups: 0,
+        repetitions: 1,
+        timeoutMs: 2_000,
+        requestedProfile: "local-exec",
+        expectedArtifacts: [],
+        behaviorChecks: [],
+      },
+      {root},
+    );
+    expect(result).toMatchObject({code: "workload-boundary-violation"});
+  } finally {
+    await rm(root, {recursive: true, force: true});
+    await rm(outside, {recursive: true, force: true});
   }
 });

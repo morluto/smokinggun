@@ -1,10 +1,16 @@
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {renderScanReport} from "../reports/render.js";
 import {scanRepository} from "../scan/repository.js";
 import {shouldPrint, writeResult} from "../cli/output.js";
 import {resolveConfiguredPath} from "../config.js";
+import {parseScannerSelection, parseScanScope} from "../scan/selection.js";
+import {
+  adapterExecutionAuthorized,
+  adapterExecutionNotAuthorized,
+  parseExternalAdapters,
+} from "../scanners/external.js";
 
 export default class Scan extends BaseCommand {
   static override description = "Scan a local repository for complexity candidates.";
@@ -28,26 +34,44 @@ export default class Scan extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Scan);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     try {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
-      const scanner = parsed.flags.scanner as ReadonlyArray<string> | undefined;
-      const only = parsed.flags.only as ReadonlyArray<string> | undefined;
-      const adapter = parsed.flags.adapter as ReadonlyArray<string> | undefined;
-      const report = await scanRepository(target, {
+      const scanner = parseOptionalStringArrayFlag(parsed.flags.scanner, "scanner");
+      const only = parseOptionalStringArrayFlag(parsed.flags.only, "only");
+      const adapter = parseOptionalStringArrayFlag(parsed.flags.adapter, "adapter");
+      const adapterManifests = [
+        ...context.config.adapters,
+        ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
+      ];
+      const adapters = await parseExternalAdapters(adapterManifests, context.config.cwd, context.signal);
+      const selection = parseScannerSelection(
+        scanner,
+        adapters.adapters.map((adapter) => adapter.manifest.id),
+      );
+      if ("schemaVersion" in selection) this.emitProblem(selection, 2, context);
+      const scope = parseScanScope(only);
+      if ("schemaVersion" in scope) this.emitProblem(scope, 2, context);
+      const {report, policyFindings} = await scanRepository(target, {
         configDigest: context.config.digest,
+        selection,
+        scope,
         excludes: context.config.exclude,
         maxFindings: context.config.maxFindings,
         signal: context.signal,
-        ...(scanner === undefined ? {} : {scanners: scanner}),
-        ...(only === undefined ? {} : {only}),
-        adapterManifests: [...context.config.adapters, ...(adapter ?? [])],
-        allowAdapterExecution: parsed.flags["allow-adapter-execution"],
+        adapters,
+        adapterAuthorization: parsed.flags["allow-adapter-execution"]
+          ? adapterExecutionAuthorized
+          : adapterExecutionNotAuthorized,
       });
       const rendered = renderScanReport(report, context.config.format);
       await writeResult(rendered, context);
       if (shouldPrint(context.config.format, context.config.quiet)) this.emit(rendered, context);
-      if (context.config.strict && report.coverage.some((record) => record.parseStatus !== "complete")) {
+      if (
+        context.config.strict &&
+        (report.coverage.some((record) => record.parseStatus !== "complete") ||
+          report.diagnostics.some((diagnostic) => diagnostic.code === "scan-scope-unmatched"))
+      ) {
         if (context.config.format === "human")
           this.emitProblem(
             {
@@ -62,8 +86,7 @@ export default class Scan extends BaseCommand {
         this.exit(3);
       }
       const failOn = context.config.failOn;
-      if (failOn !== undefined && report.policyFindings.some((finding) => matchesFailPolicy(finding, failOn)))
-        this.exit(4);
+      if (failOn !== undefined && policyFindings.some((finding) => matchesFailPolicy(finding, failOn))) this.exit(4);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)
@@ -90,6 +113,12 @@ export default class Scan extends BaseCommand {
       );
     }
   }
+}
+
+function parseOptionalStringArrayFlag(input: unknown, name: string): ReadonlyArray<string> | undefined {
+  if (input === undefined) return undefined;
+  if (Array.isArray(input) && input.every((value): value is string => typeof value === "string")) return input;
+  throw new Error(`The ${name} flag was not parsed as a string array.`);
 }
 
 function matchesFailPolicy(finding: {readonly ruleId: string; readonly severity: string}, policy: string): boolean {

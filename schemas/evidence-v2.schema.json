@@ -1,68 +1,139 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "schemaVersion": {
-      "type": "string",
-      "const": "footgun.evidence.v2"
-    },
-    "id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "kind": {
-      "type": "string",
-      "enum": [
-        "static",
-        "estimate",
-        "measurement",
-        "benchmark",
-        "profile",
-        "trace",
-        "behavior",
-        "context",
-        "unknown"
-      ]
-    },
-    "claimClass": {
-      "type": "string",
-      "enum": [
-        "static-fact",
-        "theoretical-estimate",
-        "empirical-scaling",
-        "constant-factor",
-        "system-bottleneck",
-        "behavioral",
-        "unknown"
-      ]
-    },
-    "summary": {
-      "type": "string",
-      "minLength": 1
-    },
-    "artifact": {
-      "type": "string"
-    },
-    "digest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "provenance": {
+  "anyOf": [
+    {
       "type": "object",
-      "propertyNames": {
-        "type": "string"
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.evidence.v2"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "static",
+            "estimate",
+            "measurement",
+            "benchmark",
+            "profile",
+            "trace",
+            "behavior",
+            "context",
+            "unknown"
+          ]
+        },
+        "claimClass": {
+          "type": "string",
+          "enum": [
+            "static-fact",
+            "theoretical-estimate",
+            "empirical-scaling",
+            "constant-factor",
+            "system-bottleneck",
+            "behavioral",
+            "unknown"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
       },
-      "additionalProperties": {
-        "type": "string"
-      }
+      "required": [
+        "schemaVersion",
+        "id",
+        "kind",
+        "summary",
+        "artifact"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.evidence.v2"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "static",
+            "estimate",
+            "measurement",
+            "benchmark",
+            "profile",
+            "trace",
+            "behavior",
+            "context",
+            "unknown"
+          ]
+        },
+        "claimClass": {
+          "type": "string",
+          "enum": [
+            "static-fact",
+            "theoretical-estimate",
+            "empirical-scaling",
+            "constant-factor",
+            "system-bottleneck",
+            "behavioral",
+            "unknown"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "artifact": {
+          "not": {}
+        },
+        "digest": {
+          "not": {}
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "kind",
+        "summary"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "schemaVersion",
-    "id",
-    "kind",
-    "summary"
   ],
-  "additionalProperties": false,
   "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

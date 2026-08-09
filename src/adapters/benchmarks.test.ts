@@ -26,8 +26,31 @@ describe("standard benchmark importers", () => {
     expect("code" in result).toBe(false);
     if ("code" in result) return;
     expect(result.records[0]?.medianMs).toBe(0.002);
+    const unsupportedUnit = importBenchmark(
+      {benchmarks: [{name: "BM_lookup", real_time: 2_000, time_unit: "cycles"}]},
+      {tool: "google-benchmark"},
+    );
+    expect("code" in unsupportedUnit && unsupportedUnit.code).toBe("unsupported-google-benchmark-time-unit");
     const invalid = importBenchmark({benchmarks: []}, {tool: "jmh"});
     expect("code" in invalid && invalid.code).toBe("invalid-jmh");
+  });
+
+  it("preserves distinct Criterion summary estimates", () => {
+    const result = importBenchmark(
+      {
+        mean: {point_estimate: 2_000_000},
+        median: {point_estimate: 1_000_000},
+      },
+      {tool: "criterion"},
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.records[0]).toMatchObject({
+      samplesMs: [2],
+      medianMs: 1,
+      meanMs: 2,
+      metadata: {summaryOnly: true},
+    });
   });
 
   it("converts JMH throughput to milliseconds per operation", () => {
@@ -44,5 +67,10 @@ describe("standard benchmark importers", () => {
     expect("code" in result).toBe(false);
     if ("code" in result) return;
     expect(result.records[0]).toMatchObject({samplesMs: [1], medianMs: 1, sourceUnit: "ops/s"});
+    const unsupportedUnit = importBenchmark(
+      [{benchmark: "Example.run", mode: "avgt", primaryMetric: {score: 1, scoreUnit: "cycles"}}],
+      {tool: "jmh"},
+    );
+    expect("code" in unsupportedUnit && unsupportedUnit.code).toBe("unsupported-jmh-time-unit");
   });
 });

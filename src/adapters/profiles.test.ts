@@ -41,6 +41,14 @@ it("normalizes bounded Perfetto trace-processor rows", () => {
   expect(result.rows[0]?.duration).toBe(12.5);
 });
 
+it("rejects a Perfetto summary whose declared columns omit a row field", () => {
+  const result = importPerfettoSummary(
+    {columns: ["name"], rows: [{name: "main", duration: 12.5}]},
+    {sourceArtifact: "trace.pftrace"},
+  );
+  expect("code" in result && result.code).toBe("invalid-perfetto-summary");
+});
+
 it("imports raw Perfetto traces through an explicitly supplied trace processor", async () => {
   const result = await importPerfettoTrace({
     sourceArtifact: "trace.pftrace",

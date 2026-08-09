@@ -55,28 +55,74 @@
               "additionalProperties": false
             },
             "comparability": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "comparable",
-                    "cross-machine",
-                    "inconclusive"
-                  ]
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "comparable"
+                    },
+                    "reasons": {
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 },
-                "reasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "cross-machine"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "inconclusive"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "status",
-                "reasons"
-              ],
-              "additionalProperties": false
+              ]
             },
             "promotion": {
               "type": "string",
@@ -176,28 +222,74 @@
               "additionalProperties": false
             },
             "comparability": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "comparable",
-                    "cross-machine",
-                    "inconclusive"
-                  ]
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "comparable"
+                    },
+                    "reasons": {
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 },
-                "reasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "cross-machine"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "inconclusive"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "status",
-                "reasons"
-              ],
-              "additionalProperties": false
+              ]
             },
             "promotion": {
               "type": "string",
@@ -374,28 +466,74 @@
               "additionalProperties": false
             },
             "comparability": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "comparable",
-                    "cross-machine",
-                    "inconclusive"
-                  ]
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "comparable"
+                    },
+                    "reasons": {
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 },
-                "reasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "cross-machine"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "inconclusive"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "status",
-                "reasons"
-              ],
-              "additionalProperties": false
+              ]
             },
             "promotion": {
               "type": "string",
@@ -505,28 +643,74 @@
               "additionalProperties": false
             },
             "comparability": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "comparable",
-                    "cross-machine",
-                    "inconclusive"
-                  ]
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "comparable"
+                    },
+                    "reasons": {
+                      "minItems": 0,
+                      "maxItems": 0,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 },
-                "reasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "cross-machine"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "inconclusive"
+                    },
+                    "reasons": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "status",
-                "reasons"
-              ],
-              "additionalProperties": false
+              ]
             },
             "promotion": {
               "type": "string",

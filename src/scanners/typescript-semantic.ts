@@ -1,8 +1,17 @@
 import {createHash} from "node:crypto";
+import {existsSync} from "node:fs";
 import {relative, resolve} from "node:path";
+import {fileURLToPath} from "node:url";
+import {Worker} from "node:worker_threads";
 import * as ts from "typescript";
-import type {FindingV2, LocationV1, ProblemV1} from "../protocol/index.js";
-import {buildTypeScriptIndex, type TypeScriptIndexResult} from "../context/index.js";
+import {z} from "zod";
+import {Protocol, type FindingV2, type LocationV1, type ProblemV1} from "../protocol/index.js";
+import {
+  buildPreparedTypeScriptIndex,
+  isSelectedTypeScriptSource,
+  prepareTypeScriptAnalysis,
+  type TypeScriptIndexResult,
+} from "../context/index.js";
 import {isWithinRoot, portablePath} from "../paths.js";
 
 export const semanticScannerId = "footgun.typescript-semantic";
@@ -12,33 +21,60 @@ export type TypeScriptSemanticResult = TypeScriptIndexResult & {
   readonly findings: ReadonlyArray<FindingV2>;
 };
 
-/** Use the TypeScript compiler API for symbol-aware collection and call facts. */
-export function scanTypeScript(
+const workerResultSchema = z.strictObject({
+  result: z.union([
+    z.strictObject({
+      state: z.enum(["complete", "partial"]),
+      index: Protocol.contextIndex,
+      diagnostics: z.array(Protocol.problem),
+      findings: z.array(Protocol.finding),
+    }),
+    z.strictObject({
+      state: z.literal("unavailable"),
+      diagnostics: z.array(Protocol.problem),
+      findings: z.array(Protocol.finding),
+    }),
+  ]),
+});
+
+/** Run TypeScript analysis in an isolated worker so process signals can stop CPU-bound compiler work. */
+export async function scanTypeScript(
+  root: string,
+  files: ReadonlyArray<string>,
+  signal?: AbortSignal,
+): Promise<TypeScriptSemanticResult> {
+  signal?.throwIfAborted();
+  const workerUrl = new URL("./typescript-semantic-worker.js", import.meta.url);
+  if (!existsSync(fileURLToPath(workerUrl))) return scanTypeScriptSynchronously(root, files, signal);
+  return runTypeScriptWorker(workerUrl, root, files, signal);
+}
+
+/** Analyze one selected TypeScript source set with one shared compiler Program and TypeChecker. */
+export function scanTypeScriptSynchronously(
   root: string,
   files: ReadonlyArray<string>,
   signal?: AbortSignal,
 ): TypeScriptSemanticResult {
-  const indexResult = buildTypeScriptIndex(root, files, signal);
-  const sourcePaths = files.filter((path) => isTypeScriptPath(path)).map((path) => resolve(path));
-  if (sourcePaths.length === 0 || indexResult.state === "unavailable") return {...indexResult, findings: []};
-  const selectedPaths = new Set(sourcePaths);
+  const analysis = prepareTypeScriptAnalysis(files);
+  if (analysis._tag === "NoSupportedTypeScriptSources")
+    return {...buildPreparedTypeScriptIndex(root, analysis, signal), findings: []};
+  const {program} = analysis;
   const findings: FindingV2[] = [];
+  let context: Exclude<TypeScriptIndexResult, {readonly state: "unavailable"}> | undefined;
   try {
-    const program = ts.createProgram(sourcePaths, {
-      allowJs: true,
-      checkJs: false,
-      module: ts.ModuleKind.NodeNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeNext,
-      noEmit: true,
-      skipLibCheck: true,
-      target: ts.ScriptTarget.ES2022,
-    });
+    const index = buildPreparedTypeScriptIndex(root, analysis, signal);
+    if (index.state === "unavailable") return {...index, findings: []};
+    context = index;
     const checker = program.getTypeChecker();
     const absoluteRoot = resolve(root);
     for (const sourceFile of program.getSourceFiles()) {
       signal?.throwIfAborted();
       const sourcePath = resolve(sourceFile.fileName);
-      if (sourceFile.isDeclarationFile || !isWithinRoot(absoluteRoot, sourcePath) || !selectedPaths.has(sourcePath))
+      if (
+        sourceFile.isDeclarationFile ||
+        !isWithinRoot(absoluteRoot, sourcePath) ||
+        !isSelectedTypeScriptSource(analysis, sourcePath)
+      )
         continue;
       const relativePath = portablePath(relative(absoluteRoot, sourceFile.fileName));
       const visit = (node: ts.Node, loopDepth: number): void => {
@@ -90,7 +126,7 @@ export function scanTypeScript(
       };
       visit(sourceFile, 0);
     }
-    return {...indexResult, findings: dedupe(findings)};
+    return {...context, findings: dedupe(findings)};
   } catch (cause: unknown) {
     const diagnostic: ProblemV1 = {
       schemaVersion: "footgun.problem.v1",
@@ -99,13 +135,49 @@ export function scanTypeScript(
       detail: cause instanceof Error ? cause.message : "Unknown TypeScript compiler failure.",
       recovery: "Inspect the TypeScript project configuration and rerun the scan.",
     };
+    if (context === undefined) return {state: "unavailable", diagnostics: [diagnostic], findings: dedupe(findings)};
     return {
       state: "partial",
-      diagnostics: [...indexResult.diagnostics, diagnostic],
+      diagnostics: [...context.diagnostics, diagnostic],
       findings: dedupe(findings),
-      index: indexResult.index,
+      index: context.index,
     };
   }
+}
+
+function runTypeScriptWorker(
+  workerUrl: URL,
+  root: string,
+  files: ReadonlyArray<string>,
+  signal?: AbortSignal,
+): Promise<TypeScriptSemanticResult> {
+  return new Promise((resolveResult, rejectResult) => {
+    const worker = new Worker(workerUrl, {workerData: {root, files}});
+    let settled = false;
+    const settle = (action: () => void): void => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      action();
+    };
+    const onAbort = (): void => {
+      void worker.terminate();
+      settle(() => rejectResult(new Error("TypeScript semantic analysis was cancelled.")));
+    };
+    signal?.addEventListener("abort", onAbort, {once: true});
+    worker.once("message", (message: unknown) => {
+      const parsed = workerResultSchema.safeParse(message);
+      if (!parsed.success) {
+        settle(() => rejectResult(new Error("TypeScript semantic analysis returned an invalid worker result.")));
+        return;
+      }
+      settle(() => resolveResult(parsed.data.result));
+    });
+    worker.once("error", (cause) => settle(() => rejectResult(cause)));
+    worker.once("exit", (code) => {
+      if (code !== 0) settle(() => rejectResult(new Error(`TypeScript semantic worker exited with code ${code}.`)));
+    });
+  });
 }
 
 const collectionOperationNames = new Set([
@@ -180,11 +252,6 @@ function isLoop(node: ts.Node): boolean {
     ts.isWhileStatement(node) ||
     ts.isDoStatement(node)
   );
-}
-
-function isTypeScriptPath(path: string): boolean {
-  const extension = path.slice(path.lastIndexOf(".")).toLowerCase();
-  return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(extension);
 }
 
 function dedupe(findings: ReadonlyArray<FindingV2>): ReadonlyArray<FindingV2> {

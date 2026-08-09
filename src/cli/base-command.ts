@@ -20,25 +20,11 @@ export const globalFlags = {
   "max-findings": Flags.integer({description: "Maximum findings to emit.", min: 1}),
 } as const;
 
-export type ParsedGlobalFlags = {
-  readonly cwd?: string;
-  readonly config?: string;
-  readonly format?: OutputFormat;
-  readonly output?: string;
-  readonly noColor?: boolean;
-  readonly quiet?: boolean;
-  readonly debug?: boolean;
-  readonly nonInteractive?: boolean;
-  readonly strict?: boolean;
-  readonly failOn?: string;
-  readonly exclude?: ReadonlyArray<string>;
-  readonly maxFindings?: number;
-};
-
 export abstract class BaseCommand extends Command {
   static override flags = globalFlags;
 
-  protected async context(flags: ParsedGlobalFlags): Promise<RuntimeContext> {
+  /** Parse framework flags once before creating the runtime context. */
+  protected async context(flags: unknown): Promise<RuntimeContext> {
     const controller = new AbortController();
     const onSignal = (): void => controller.abort();
     process.on("SIGINT", onSignal);
@@ -48,7 +34,7 @@ export abstract class BaseCommand extends Command {
       process.off("SIGTERM", onSignal);
     });
     let result: Awaited<ReturnType<typeof createRuntimeContext>>;
-    const normalizedFlags = normalizeFlags(flags);
+    const normalizedFlags = parseGlobalFlags(flags);
     try {
       result = await createRuntimeContext(normalizedFlags, controller.signal);
     } catch (cause: unknown) {
@@ -146,9 +132,10 @@ export abstract class BaseCommand extends Command {
   }
 }
 
-function normalizeFlags(flags: ParsedGlobalFlags): GlobalFlags {
-  // SAFETY: oclif has already validated this object against globalFlags; this view only remaps names.
-  const input: Record<string, unknown> = Object.fromEntries(Object.entries(flags));
+function parseGlobalFlags(flags: unknown): GlobalFlags {
+  const input: Record<string, unknown> = {};
+  if (flags !== null && typeof flags === "object")
+    for (const [name, value] of Object.entries(flags)) input[name] = value;
   const normalized: {-readonly [Key in keyof GlobalFlags]?: GlobalFlags[Key]} = {};
   const stringValue = (name: string): string | undefined => (typeof input[name] === "string" ? input[name] : undefined);
   const booleanValue = (name: string): boolean | undefined =>

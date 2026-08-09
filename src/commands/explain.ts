@@ -1,5 +1,5 @@
 import {Args} from "@oclif/core";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 
 const explanations: Record<string, {readonly title: string; readonly detail: string; readonly next: string}> = {
@@ -46,7 +46,7 @@ export default class Explain extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Explain);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     const id = parsed.args["finding-id"];
     if (!/^fg_[a-f0-9]{16}$/.test(id) && !Object.hasOwn(explanations, id)) {
       this.emitProblem(

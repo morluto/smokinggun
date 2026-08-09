@@ -113,12 +113,7 @@ export function importPerfettoSummary(input: unknown, options: ProfileImportOpti
     );
   const rows = parsed.data.rows.slice(0, options.maxFunctions ?? 1000);
   const columns =
-    parsed.data.columns.length > 0
-      ? parsed.data.columns
-      : rows
-          .flatMap((row) => Object.keys(row))
-          .filter((value, index, all) => all.indexOf(value) === index)
-          .sort();
+    parsed.data.columns.length > 0 ? parsed.data.columns : [...new Set(rows.flatMap((row) => Object.keys(row)))].sort();
   const sourceDigest = options.sourceDigest ?? createHash("sha256").update(stableJson(input)).digest("hex");
   const result: TraceSummaryV1 = {
     schemaVersion: "footgun.trace-summary.v1",

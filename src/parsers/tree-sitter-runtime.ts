@@ -60,7 +60,7 @@ const languages = new Map<GrammarName, Promise<Language>>();
 
 /** Parse source with the pinned grammar when one is available. */
 export async function parseWithTreeSitter(path: string, source: string, signal?: AbortSignal): Promise<ParseCoverage> {
-  const language = languageForPath(path);
+  const language = grammarLanguageForPath(path);
   if (language === undefined) return unavailableCoverage("unknown", "No pinned grammar matches this file extension.");
   try {
     await initialize(signal);
@@ -94,7 +94,7 @@ export async function inspectWithTreeSitter<T>(
   inspect: (root: Node, language: string) => T,
   signal?: AbortSignal,
 ): Promise<TreeSitterInspection<T>> {
-  const language = languageForPath(path);
+  const language = grammarLanguageForPath(path);
   if (language === undefined)
     return {
       _tag: "unavailable",
@@ -189,7 +189,8 @@ function loadLanguage(language: GrammarName): Promise<Language> {
   return loaded;
 }
 
-function languageForPath(path: string): GrammarName | undefined {
+/** Return the pinned grammar name selected for a supported source path. */
+export function grammarLanguageForPath(path: string): GrammarName | undefined {
   const extension = path.slice(path.lastIndexOf(".")).toLowerCase();
   switch (extension) {
     case ".c":

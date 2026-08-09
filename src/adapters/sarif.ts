@@ -61,6 +61,7 @@ export function importSarif(
       recovery: "Pass a SARIF 2.1.0 document or generate one with `smokinggun scan --format sarif`.",
     };
   const findings: FindingV2[] = [];
+  const findingIds = new Set<string>();
   const diagnostics: ScanReportV2["diagnostics"] = [];
   const scannerNames: string[] = [];
   for (const [runIndex, run] of parsed.data.runs.entries()) {
@@ -101,9 +102,21 @@ export function importSarif(
       const fingerprint =
         result.fingerprints === undefined ? `${path}\0${line}\0${resultIndex}` : stableJson(result.fingerprints);
       const id = `fg_${createHash("sha256")
-        .update(`${scanner}\0${result.ruleId ?? "unknown"}\0${fingerprint}`)
+        .update(
+          `${scanner}\0${result.ruleId ?? "unknown"}\0${portablePath}\0${line}\0${Math.max(0, (region?.startColumn ?? 1) - 1)}\0${Math.max(line, region?.endLine ?? line)}\0${Math.max(0, (region?.endColumn ?? region?.startColumn ?? 1) - 1)}\0${fingerprint}`,
+        )
         .digest("hex")
         .slice(0, 16)}`;
+      if (findingIds.has(id)) {
+        diagnostics.push({
+          schemaVersion: "footgun.problem.v1",
+          code: "sarif-finding-duplicate",
+          message: `SARIF result ${runIndex}:${resultIndex} duplicates an imported finding identity.`,
+          recovery: "Inspect duplicate SARIF results; SmokingGun retained the first occurrence.",
+        });
+        continue;
+      }
+      findingIds.add(id);
       const thirdParty = capProperties({
         properties: result.properties,
         relatedLocations: result.relatedLocations,
@@ -147,6 +160,7 @@ export function importSarif(
       comparePortable(left.id, right.id),
   );
   const analyzedPaths = new Set(findings.map((finding) => finding.location.path));
+  const coverageComplete = diagnostics.length === 0;
   return {
     schemaVersion: "footgun.scan-report.v2",
     tool: toolIdentity,
@@ -160,12 +174,18 @@ export function importSarif(
         language: "mixed",
         filesDiscovered: analyzedPaths.size,
         filesAnalyzed: analyzedPaths.size,
-        parseStatus: "complete",
+        parseStatus: coverageComplete ? "complete" : "partial",
         skippedFiles: [],
-        reason:
-          scannerNames.length === 0
-            ? "SARIF contained no runs."
-            : `Imported ${scannerNames.join(", ")}; file coverage reflects unique result locations.`,
+        ...(coverageComplete
+          ? {
+              reason:
+                scannerNames.length === 0
+                  ? "SARIF contained no runs."
+                  : `Imported ${scannerNames.join(", ")}; file coverage reflects unique result locations.`,
+            }
+          : {
+              reason: `SARIF import retained ${analyzedPaths.size} located file${analyzedPaths.size === 1 ? "" : "s"} with ${diagnostics.length} diagnostic${diagnostics.length === 1 ? "" : "s"}.`,
+            }),
       },
     ],
     diagnostics,

@@ -1,24 +1,29 @@
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
-import {readFile, mkdir, writeFile} from "node:fs/promises";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
+import {readFile} from "node:fs/promises";
 import {join} from "node:path";
 import {measureParsedWorkload} from "../execution/measure.js";
 import {measureParsedMultiScaling, measureParsedScaling} from "../execution/scaling.js";
 import {writeResult} from "../cli/output.js";
 import {renderCommandResult} from "../cli/command-output.js";
-import {recordInvestigationSnapshot, requireLatestInvestigation} from "../investigations/store.js";
+import {
+  appendInvestigationEvidence,
+  appendInvestigationReport,
+  canRecordBaselineMeasurement,
+  recordParsedInvestigationSnapshot,
+  requireLatestInvestigation,
+} from "../investigations/store.js";
 import {createHash} from "node:crypto";
-import {comparePortable} from "../paths.js";
 import {
   Protocol,
-  isMultiScalingWorkload,
-  isSingleScalingWorkload,
+  classifyWorkload,
   type MeasurementV1,
   type ScalingAnalysisV2,
   type ScalingAnalysisV3,
 } from "../protocol/index.js";
 import {stableJson} from "../serialization.js";
+import {writeFileAtomically} from "../files.js";
 
 export default class Measure extends BaseCommand {
   static override description = "Measure an investigation only with an explicit workload and execution authorization.";
@@ -32,7 +37,7 @@ export default class Measure extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Measure);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     if (!parsed.flags.workload || !parsed.flags.execute) {
       this.emitActionRequired(
         {
@@ -46,7 +51,13 @@ export default class Measure extends BaseCommand {
       );
     }
     try {
-      await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
+      const initialInvestigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
+      if (!canRecordBaselineMeasurement(initialInvestigation.bundle))
+        this.emitProblem(
+          measurementStateProblem(parsed.args.investigation, initialInvestigation.bundle.state),
+          1,
+          context,
+        );
       const raw = await readFile(parsed.flags.workload, "utf8");
       const parsedWorkload = Protocol.workload.safeParse(JSON.parse(raw) as unknown);
       if (!parsedWorkload.success)
@@ -60,58 +71,57 @@ export default class Measure extends BaseCommand {
           1,
           context,
         );
-      const workload = parsedWorkload.data;
-      const measurement = isMultiScalingWorkload(workload)
-        ? await measureParsedMultiScaling(workload, {
-            root: context.config.cwd,
-            workspaceRoot: context.artifacts,
-            signal: context.signal,
-          })
-        : isSingleScalingWorkload(workload)
-          ? await measureParsedScaling(workload, {
+      const workload = classifyWorkload(parsedWorkload.data);
+      const measurement =
+        workload.kind === "multi-scaling"
+          ? await measureParsedMultiScaling(workload.workload, {
               root: context.config.cwd,
               workspaceRoot: context.artifacts,
               signal: context.signal,
             })
-          : await measureParsedWorkload(workload, {
-              root: context.config.cwd,
-              workspaceRoot: context.artifacts,
-              signal: context.signal,
-            });
+          : workload.kind === "single-scaling"
+            ? await measureParsedScaling(workload.workload, {
+                root: context.config.cwd,
+                workspaceRoot: context.artifacts,
+                signal: context.signal,
+              })
+            : await measureParsedWorkload(workload.workload, {
+                root: context.config.cwd,
+                workspaceRoot: context.artifacts,
+                signal: context.signal,
+              });
       if ("code" in measurement)
         this.emitProblem(measurement, unavailableExecutionCode(measurement.code) ? 3 : 1, context);
       const storedMeasurement = attachInvestigation(measurement, parsed.args.investigation);
       const id = storedMeasurement.id;
-      const directory = join(context.artifacts, "measurements");
-      await mkdir(directory, {recursive: true});
-      const path = join(directory, `${id}.json`);
-      await writeFile(path, `${JSON.stringify(storedMeasurement, null, 2)}\n`, "utf8");
       const measurementDigest = createHash("sha256").update(stableJson(storedMeasurement)).digest("hex");
       const investigation = await requireLatestInvestigation(context.artifacts, parsed.args.investigation);
+      if (!canRecordBaselineMeasurement(investigation.bundle))
+        this.emitProblem(measurementStateProblem(parsed.args.investigation, investigation.bundle.state), 1, context);
+      const directory = join(context.artifacts, "measurements");
+      const path = join(directory, `${id}.json`);
+      await writeFileAtomically(path, `${JSON.stringify(storedMeasurement, null, 2)}\n`);
       const nextBundle = {
         ...investigation.bundle,
         state: "baseline-measured" as const,
-        reports: [...new Set([...investigation.bundle.reports, `../measurements/${id}.json`])].sort(comparePortable),
-        evidence: [
-          ...investigation.bundle.evidence,
-          {
-            schemaVersion: "footgun.evidence.v2" as const,
-            id: `${parsed.args.investigation}:measurement:${id}`,
-            kind: "measurement" as const,
-            claimClass:
-              measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
-                ? ("empirical-scaling" as const)
-                : ("constant-factor" as const),
-            summary:
-              measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
-                ? "Parameterized scaling measurement"
-                : "Repeated local workload measurement",
-            artifact: `../measurements/${id}.json`,
-            digest: measurementDigest,
-          },
-        ],
+        reports: appendInvestigationReport(investigation.bundle.reports, `../measurements/${id}.json`),
+        evidence: appendInvestigationEvidence(investigation.bundle.evidence, {
+          schemaVersion: "footgun.evidence.v2" as const,
+          id: `${parsed.args.investigation}:measurement:${id}`,
+          kind: "measurement" as const,
+          claimClass:
+            measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
+              ? ("empirical-scaling" as const)
+              : ("constant-factor" as const),
+          summary:
+            measurement.schemaVersion === "footgun.scaling.v2" || measurement.schemaVersion === "footgun.scaling.v3"
+              ? "Parameterized scaling measurement"
+              : "Repeated local workload measurement",
+          artifact: `../measurements/${id}.json`,
+          digest: measurementDigest,
+        }),
       };
-      await recordInvestigationSnapshot(context.artifacts, nextBundle);
+      await recordParsedInvestigationSnapshot(context.artifacts, nextBundle);
       const human =
         measurement.schemaVersion === "footgun.scaling.v2"
           ? `Scaling measurement ${id}\nParameter: ${measurement.parameter}\nPoints: ${measurement.points.length}\nSelected model: ${measurement.selectedModel ?? "inconclusive"}\nArtifact: ${path}`
@@ -163,11 +173,18 @@ function attachInvestigation<T extends MeasurementV1 | ScalingAnalysisV2 | Scali
 function unavailableExecutionCode(code: string): boolean {
   return [
     "execution-profile-unavailable",
-    "container-runner-missing",
-    "container-image-missing",
     "container-image-unpinned",
     "container-runtime-unavailable",
     "sandbox-execution-failed",
     "resource-limit-unavailable",
   ].includes(code);
+}
+
+function measurementStateProblem(investigation: string, state: string) {
+  return {
+    schemaVersion: "footgun.problem.v1" as const,
+    code: "investigation-not-measurable",
+    message: `Investigation ${investigation} is in ${state} state and cannot record a baseline measurement.`,
+    recovery: "Investigate the target until it reaches scanned, context-resolved, or measurement-planned state.",
+  };
 }

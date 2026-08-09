@@ -2,10 +2,13 @@ import {readFile} from "node:fs/promises";
 import {Flags} from "@oclif/core";
 import {execa} from "execa";
 import {z} from "zod";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {probeTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {probeIsolation} from "../execution/capabilities.js";
+import {toolIdentity} from "../tool-identity.js";
+import {adapterExecutionNotAuthorized, loadExternalAdapters} from "../scanners/external.js";
+import {listScanners} from "../scanners/registry.js";
 
 export default class Doctor extends BaseCommand {
   static override description = "Report local SmokingGun capabilities and configuration health.";
@@ -17,14 +20,18 @@ export default class Doctor extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Doctor);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     const lock = await readFile(new URL("../../grammar.lock.json", import.meta.url), "utf8").catch(() => "{}");
     const treeSitter = await probeTreeSitter();
     const registry = parsed.flags["check-updates"]
       ? await checkRegistry(context.config.cwd, context.signal)
       : {state: "not-requested" as const};
     const isolation = parsed.flags["probe-isolation"] ? await probeIsolation(context.signal) : [];
-    const scanners = context.scannerRegistry();
+    const external = await loadExternalAdapters(context.config.adapters, context.config.cwd, {
+      signal: context.signal,
+      authorization: adapterExecutionNotAuthorized,
+    });
+    const scanners = listScanners(external.descriptors);
     const hostControls = {
       processTree: {
         status: "best-effort",
@@ -40,7 +47,7 @@ export default class Doctor extends BaseCommand {
     };
     const result = {
       schemaVersion: "footgun.doctor.v1",
-      version: "1.0.0",
+      version: toolIdentity.version,
       node: process.versions.node,
       platform: process.platform,
       cwd: context.config.cwd,
@@ -58,7 +65,7 @@ export default class Doctor extends BaseCommand {
         : isolation.map((entry) => `${entry.backend}: ${entry.available ? "available" : entry.reason}`).join(", ");
     const scannerSummary = scanners.map((scanner) => `${scanner.id}: ${scanner.availability}`).join(", ");
     const human = [
-      `SmokingGun 1.0.0`,
+      `SmokingGun ${toolIdentity.version}`,
       `Node ${result.node} on ${result.platform}`,
       `Configuration: ${result.configSource}`,
       `Network checks: ${registry.state}`,
