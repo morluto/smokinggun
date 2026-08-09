@@ -71,12 +71,34 @@ const coverageFields = {
   skippedFiles: z.array(portableRepositoryChildPathSchema),
 };
 
+const completeCoverageSchema = z.strictObject({
+  ...coverageFields,
+  parseStatus: z.literal("complete"),
+  reason: z.string().min(1).optional(),
+});
+
+const partialCoverageSchema = z.strictObject({
+  ...coverageFields,
+  parseStatus: z.literal("partial"),
+  reason: z.string().min(1),
+});
+const failedCoverageSchema = z.strictObject({
+  ...coverageFields,
+  parseStatus: z.literal("failed"),
+  reason: z.string().min(1),
+});
+const unavailableCoverageSchema = z.strictObject({
+  ...coverageFields,
+  parseStatus: z.literal("unavailable"),
+  reason: z.string().min(1),
+});
+
 const coverageSchema = z
   .discriminatedUnion("parseStatus", [
-    z.strictObject({...coverageFields, parseStatus: z.literal("complete"), reason: z.string().min(1).optional()}),
-    z.strictObject({...coverageFields, parseStatus: z.literal("partial"), reason: z.string().min(1)}),
-    z.strictObject({...coverageFields, parseStatus: z.literal("failed"), reason: z.string().min(1)}),
-    z.strictObject({...coverageFields, parseStatus: z.literal("unavailable"), reason: z.string().min(1)}),
+    completeCoverageSchema,
+    partialCoverageSchema,
+    failedCoverageSchema,
+    unavailableCoverageSchema,
   ])
   .superRefine((coverage, context) => {
     if (coverage.filesAnalyzed > coverage.filesDiscovered)
@@ -534,7 +556,12 @@ const adapterResultFields = {
 
 const adapterResultSchema = z
   .discriminatedUnion("state", [
-    z.strictObject({...adapterResultFields, state: z.literal("complete"), diagnostics: z.array(problemSchema)}),
+    z.strictObject({
+      ...adapterResultFields,
+      state: z.literal("complete"),
+      coverage: z.array(completeCoverageSchema),
+      diagnostics: z.array(problemSchema),
+    }),
     z.strictObject({...adapterResultFields, state: z.literal("partial"), diagnostics: z.array(problemSchema)}),
     z.strictObject({
       ...adapterResultFields,
@@ -557,12 +584,6 @@ const adapterResultSchema = z
           message: "An artifact digest requires a matching rawArtifacts entry.",
           path: ["rawArtifactDigests", artifact],
         });
-    if (result.state === "complete" && result.coverage.some((coverage) => coverage.parseStatus !== "complete"))
-      context.addIssue({
-        code: "custom",
-        path: ["coverage"],
-        message: "A complete adapter result cannot contain incomplete coverage.",
-      });
     if (
       result.state === "partial" &&
       result.diagnostics.length === 0 &&

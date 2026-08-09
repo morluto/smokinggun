@@ -716,6 +716,23 @@ describe("protocol contracts", () => {
         ],
       }).success,
     ).toBe(false);
+    expect(
+      Protocol.adapterResult.safeParse({
+        ...validResult,
+        state: "complete",
+        coverage: [
+          {
+            scanner: "fixture",
+            version: "1.0.0",
+            language: "typescript",
+            filesDiscovered: 1,
+            filesAnalyzed: 1,
+            parseStatus: "complete",
+            skippedFiles: [],
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects evidence digests detached from artifacts within scan findings", () => {
