@@ -2,114 +2,32 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "anyOf": [
     {
-      "type": "object",
-      "properties": {
-        "schemaVersion": {
-          "type": "string",
-          "const": "footgun.measurement.v1"
-        },
-        "id": {
-          "type": "string",
-          "pattern": "^meas_[a-f0-9]{16}$"
-        },
-        "investigation": {
-          "type": "string"
-        },
-        "workloadDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "samplesMs": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "warmups": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repetitions": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "medianMs": {
-          "type": "number",
-          "minimum": 0
-        },
-        "meanMs": {
-          "type": "number",
-          "minimum": 0
-        },
-        "quartiles": {
+      "anyOf": [
+        {
           "type": "object",
           "properties": {
-            "q1Ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "q3Ms": {
-              "type": "number",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "q1Ms",
-            "q3Ms"
-          ],
-          "additionalProperties": false
-        },
-        "statisticalPolicy": {
-          "type": "object",
-          "properties": {
-            "kind": {
+            "schemaVersion": {
               "type": "string",
-              "enum": [
-                "median-improvement",
-                "non-overlapping-iqr"
-              ]
+              "const": "footgun.measurement.v1"
             },
-            "minimumRelativeImprovement": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": [
-            "kind",
-            "minimumRelativeImprovement"
-          ],
-          "additionalProperties": false
-        },
-        "reproduction": {
-          "type": "object",
-          "properties": {
-            "command": {
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
+              "type": "string"
+            },
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "samplesMs": {
               "minItems": 1,
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "number",
+                "minimum": 0
               }
-            },
-            "cwd": {
-              "type": "string",
-              "minLength": 1
-            },
-            "environmentKeys": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
             },
             "warmups": {
               "type": "integer",
@@ -121,74 +39,422 @@
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
             },
-            "expectedArtifacts": {
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
+              "type": "object",
+              "properties": {
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "local-exec"
+            },
+            "isolation": {
+              "type": "object",
+              "properties": {
+                "controlsRequested": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "controlsApplied": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "downgradeReasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "backend": {
+                  "type": "string",
+                  "const": "host-process"
+                },
+                "candidateWorkspace": {
+                  "not": {}
+                },
+                "runner": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "controlsRequested",
+                "controlsApplied",
+                "downgradeReasons",
+                "backend"
+              ],
+              "additionalProperties": false
+            },
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": true
+            },
+            "behaviorChecks": {
+              "minItems": 1,
               "type": "array",
               "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "datasetDigests": {
-              "default": {},
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
               }
             }
           },
           "required": [
-            "command",
-            "cwd",
-            "environmentKeys",
-            "timeoutMs",
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
             "warmups",
             "repetitions",
-            "expectedArtifacts",
-            "datasetDigests"
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated",
+            "behaviorChecks"
           ],
           "additionalProperties": false
         },
-        "behaviorValidated": {
-          "type": "boolean",
-          "const": true
-        },
-        "executionProfile": {
-          "type": "string",
-          "enum": [
-            "read-only",
-            "local-exec",
-            "service-exec",
-            "container-exec",
-            "candidate-write"
-          ]
-        },
-        "environment": {
+        {
           "type": "object",
           "properties": {
-            "node": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.measurement.v1"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
               "type": "string"
             },
-            "platform": {
-              "type": "string"
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
             },
-            "arch": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "node",
-            "platform",
-            "arch"
-          ],
-          "additionalProperties": false
-        },
-        "isolation": {
-          "anyOf": [
-            {
+            "samplesMs": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
+              "type": "object",
+              "properties": {
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "candidate-write"
+            },
+            "isolation": {
               "type": "object",
               "properties": {
                 "controlsRequested": {
@@ -228,396 +494,549 @@
                 "controlsRequested",
                 "controlsApplied",
                 "downgradeReasons",
-                "backend"
+                "backend",
+                "candidateWorkspace"
               ],
               "additionalProperties": false
             },
-            {
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": true
+            },
+            "behaviorChecks": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
+            "warmups",
+            "repetitions",
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated",
+            "behaviorChecks"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.measurement.v1"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
+              "type": "string"
+            },
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "samplesMs": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
               "type": "object",
               "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
                   "type": "string",
-                  "const": "docker"
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
                 },
-                "candidateWorkspace": {
-                  "not": {}
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                "runner": {
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "isolation": {
+              "anyOf": [
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "docker"
                     },
-                    "image": {
-                      "type": "string",
-                      "minLength": 1
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "docker"
+                        },
+                        "image": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "image"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime",
-                    "image"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "podman"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "podman"
                     },
-                    "image": {
-                      "type": "string",
-                      "minLength": 1
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "podman"
+                        },
+                        "image": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "image"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime",
-                    "image"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "bwrap"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "bwrap"
+                    },
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "bwrap"
+                        }
+                      },
+                      "required": [
+                        "runtime"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "nsjail"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "nsjail"
+                    },
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "nsjail"
+                        }
+                      },
+                      "required": [
+                        "runtime"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
                 }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            }
-          ]
-        },
-        "artifact": {
-          "type": "string",
-          "minLength": 1
-        },
-        "behaviorChecks": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "check": {
-                "type": "string",
-                "minLength": 1
-              },
-              "passed": {
-                "type": "boolean"
-              },
-              "observed": {
-                "type": "string"
-              }
+              ]
             },
-            "required": [
-              "check",
-              "passed"
-            ],
-            "additionalProperties": false
-          }
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": true
+            },
+            "behaviorChecks": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
+            "warmups",
+            "repetitions",
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated",
+            "behaviorChecks"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "schemaVersion",
-        "id",
-        "workloadDigest",
-        "samplesMs",
-        "warmups",
-        "repetitions",
-        "medianMs",
-        "meanMs",
-        "quartiles",
-        "statisticalPolicy",
-        "reproduction",
-        "behaviorValidated",
-        "executionProfile",
-        "environment",
-        "isolation",
-        "behaviorChecks"
-      ],
-      "additionalProperties": false
+      ]
     },
     {
-      "type": "object",
-      "properties": {
-        "schemaVersion": {
-          "type": "string",
-          "const": "footgun.measurement.v1"
-        },
-        "id": {
-          "type": "string",
-          "pattern": "^meas_[a-f0-9]{16}$"
-        },
-        "investigation": {
-          "type": "string"
-        },
-        "workloadDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
-        },
-        "samplesMs": {
-          "minItems": 1,
-          "type": "array",
-          "items": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "warmups": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repetitions": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "medianMs": {
-          "type": "number",
-          "minimum": 0
-        },
-        "meanMs": {
-          "type": "number",
-          "minimum": 0
-        },
-        "quartiles": {
+      "anyOf": [
+        {
           "type": "object",
           "properties": {
-            "q1Ms": {
-              "type": "number",
-              "minimum": 0
-            },
-            "q3Ms": {
-              "type": "number",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "q1Ms",
-            "q3Ms"
-          ],
-          "additionalProperties": false
-        },
-        "statisticalPolicy": {
-          "type": "object",
-          "properties": {
-            "kind": {
+            "schemaVersion": {
               "type": "string",
-              "enum": [
-                "median-improvement",
-                "non-overlapping-iqr"
-              ]
+              "const": "footgun.measurement.v1"
             },
-            "minimumRelativeImprovement": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "required": [
-            "kind",
-            "minimumRelativeImprovement"
-          ],
-          "additionalProperties": false
-        },
-        "reproduction": {
-          "type": "object",
-          "properties": {
-            "command": {
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
+              "type": "string"
+            },
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "samplesMs": {
               "minItems": 1,
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "number",
+                "minimum": 0
               }
-            },
-            "cwd": {
-              "type": "string",
-              "minLength": 1
-            },
-            "environmentKeys": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
             },
             "warmups": {
               "type": "integer",
@@ -629,74 +1048,419 @@
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
             },
-            "expectedArtifacts": {
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
+              "type": "object",
+              "properties": {
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "local-exec"
+            },
+            "isolation": {
+              "type": "object",
+              "properties": {
+                "controlsRequested": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "controlsApplied": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "downgradeReasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "backend": {
+                  "type": "string",
+                  "const": "host-process"
+                },
+                "candidateWorkspace": {
+                  "not": {}
+                },
+                "runner": {
+                  "not": {}
+                }
+              },
+              "required": [
+                "controlsRequested",
+                "controlsApplied",
+                "downgradeReasons",
+                "backend"
+              ],
+              "additionalProperties": false
+            },
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": false
+            },
+            "behaviorChecks": {
               "type": "array",
               "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "datasetDigests": {
-              "default": {},
-              "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
-              "additionalProperties": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean"
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
               }
             }
           },
           "required": [
-            "command",
-            "cwd",
-            "environmentKeys",
-            "timeoutMs",
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
             "warmups",
             "repetitions",
-            "expectedArtifacts",
-            "datasetDigests"
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated"
           ],
           "additionalProperties": false
         },
-        "behaviorValidated": {
-          "type": "boolean",
-          "const": false
-        },
-        "executionProfile": {
-          "type": "string",
-          "enum": [
-            "read-only",
-            "local-exec",
-            "service-exec",
-            "container-exec",
-            "candidate-write"
-          ]
-        },
-        "environment": {
+        {
           "type": "object",
           "properties": {
-            "node": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.measurement.v1"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
               "type": "string"
             },
-            "platform": {
-              "type": "string"
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
             },
-            "arch": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "node",
-            "platform",
-            "arch"
-          ],
-          "additionalProperties": false
-        },
-        "isolation": {
-          "anyOf": [
-            {
+            "samplesMs": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
+              "type": "object",
+              "properties": {
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
+                },
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "candidate-write"
+            },
+            "isolation": {
               "type": "object",
               "properties": {
                 "controlsRequested": {
@@ -736,284 +1500,515 @@
                 "controlsRequested",
                 "controlsApplied",
                 "downgradeReasons",
-                "backend"
+                "backend",
+                "candidateWorkspace"
               ],
               "additionalProperties": false
             },
-            {
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": false
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean"
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
+            "warmups",
+            "repetitions",
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "type": "string",
+              "const": "footgun.measurement.v1"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^meas_[a-f0-9]{16}$"
+            },
+            "investigation": {
+              "type": "string"
+            },
+            "workloadDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "samplesMs": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "warmups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "repetitions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "medianMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "meanMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "quartiles": {
               "type": "object",
               "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
+                "q1Ms": {
+                  "type": "number",
+                  "minimum": 0
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
+                "q3Ms": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "q1Ms",
+                "q3Ms"
+              ],
+              "additionalProperties": false
+            },
+            "statisticalPolicy": {
+              "type": "object",
+              "properties": {
+                "kind": {
                   "type": "string",
-                  "const": "docker"
+                  "enum": [
+                    "median-improvement",
+                    "non-overlapping-iqr"
+                  ]
                 },
-                "candidateWorkspace": {
-                  "not": {}
+                "minimumRelativeImprovement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "minimumRelativeImprovement"
+              ],
+              "additionalProperties": false
+            },
+            "reproduction": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                "runner": {
+                "cwd": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environmentKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "warmups": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "repetitions": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expectedArtifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "datasetDigests": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "cwd",
+                "environmentKeys",
+                "timeoutMs",
+                "warmups",
+                "repetitions",
+                "expectedArtifacts",
+                "datasetDigests"
+              ],
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object",
+              "properties": {
+                "node": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "arch": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node",
+                "platform",
+                "arch"
+              ],
+              "additionalProperties": false
+            },
+            "artifact": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionProfile": {
+              "type": "string",
+              "const": "container-exec"
+            },
+            "isolation": {
+              "anyOf": [
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "docker"
                     },
-                    "image": {
-                      "type": "string",
-                      "minLength": 1
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "docker"
+                        },
+                        "image": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "image"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime",
-                    "image"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "podman"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "podman"
                     },
-                    "image": {
-                      "type": "string",
-                      "minLength": 1
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "podman"
+                        },
+                        "image": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "image"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime",
-                    "image"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "bwrap"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "bwrap"
+                    },
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "bwrap"
+                        }
+                      },
+                      "required": [
+                        "runtime"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "controlsRequested": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
                 },
-                "controlsApplied": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "downgradeReasons": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "backend": {
-                  "type": "string",
-                  "const": "nsjail"
-                },
-                "candidateWorkspace": {
-                  "not": {}
-                },
-                "runner": {
+                {
                   "type": "object",
                   "properties": {
-                    "runtime": {
+                    "controlsRequested": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "controlsApplied": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "downgradeReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "backend": {
                       "type": "string",
                       "const": "nsjail"
+                    },
+                    "candidateWorkspace": {
+                      "not": {}
+                    },
+                    "runner": {
+                      "type": "object",
+                      "properties": {
+                        "runtime": {
+                          "type": "string",
+                          "const": "nsjail"
+                        }
+                      },
+                      "required": [
+                        "runtime"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "runtime"
+                    "controlsRequested",
+                    "controlsApplied",
+                    "downgradeReasons",
+                    "backend",
+                    "runner"
                   ],
                   "additionalProperties": false
                 }
-              },
-              "required": [
-                "controlsRequested",
-                "controlsApplied",
-                "downgradeReasons",
-                "backend",
-                "runner"
-              ],
-              "additionalProperties": false
-            }
-          ]
-        },
-        "artifact": {
-          "type": "string",
-          "minLength": 1
-        },
-        "behaviorChecks": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "check": {
-                "type": "string",
-                "minLength": 1
-              },
-              "passed": {
-                "type": "boolean"
-              },
-              "observed": {
-                "type": "string"
-              }
+              ]
             },
-            "required": [
-              "check",
-              "passed"
-            ],
-            "additionalProperties": false
-          }
+            "behaviorValidated": {
+              "type": "boolean",
+              "const": false
+            },
+            "behaviorChecks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passed": {
+                    "type": "boolean"
+                  },
+                  "observed": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "check",
+                  "passed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "workloadDigest",
+            "samplesMs",
+            "warmups",
+            "repetitions",
+            "medianMs",
+            "meanMs",
+            "quartiles",
+            "statisticalPolicy",
+            "reproduction",
+            "environment",
+            "executionProfile",
+            "isolation",
+            "behaviorValidated"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "schemaVersion",
-        "id",
-        "workloadDigest",
-        "samplesMs",
-        "warmups",
-        "repetitions",
-        "medianMs",
-        "meanMs",
-        "quartiles",
-        "statisticalPolicy",
-        "reproduction",
-        "behaviorValidated",
-        "executionProfile",
-        "environment",
-        "isolation"
-      ],
-      "additionalProperties": false
+      ]
     }
   ]
 }

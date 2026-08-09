@@ -88,6 +88,49 @@
                         "const": "host-process"
                       },
                       "candidateWorkspace": {
+                        "not": {}
+                      },
+                      "runner": {
+                        "not": {}
+                      }
+                    },
+                    "required": [
+                      "controlsRequested",
+                      "controlsApplied",
+                      "downgradeReasons",
+                      "backend"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "controlsRequested": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "controlsApplied": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "downgradeReasons": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "backend": {
+                        "type": "string",
+                        "const": "host-process"
+                      },
+                      "candidateWorkspace": {
                         "type": "string",
                         "minLength": 1
                       },
@@ -99,7 +142,8 @@
                       "controlsRequested",
                       "controlsApplied",
                       "downgradeReasons",
-                      "backend"
+                      "backend",
+                      "candidateWorkspace"
                     ],
                     "additionalProperties": false
                   },
@@ -452,6 +496,49 @@
                         "const": "host-process"
                       },
                       "candidateWorkspace": {
+                        "not": {}
+                      },
+                      "runner": {
+                        "not": {}
+                      }
+                    },
+                    "required": [
+                      "controlsRequested",
+                      "controlsApplied",
+                      "downgradeReasons",
+                      "backend"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "controlsRequested": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "controlsApplied": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "downgradeReasons": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "backend": {
+                        "type": "string",
+                        "const": "host-process"
+                      },
+                      "candidateWorkspace": {
                         "type": "string",
                         "minLength": 1
                       },
@@ -463,7 +550,8 @@
                       "controlsRequested",
                       "controlsApplied",
                       "downgradeReasons",
-                      "backend"
+                      "backend",
+                      "candidateWorkspace"
                     ],
                     "additionalProperties": false
                   },
@@ -817,6 +905,49 @@
                         "const": "host-process"
                       },
                       "candidateWorkspace": {
+                        "not": {}
+                      },
+                      "runner": {
+                        "not": {}
+                      }
+                    },
+                    "required": [
+                      "controlsRequested",
+                      "controlsApplied",
+                      "downgradeReasons",
+                      "backend"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "controlsRequested": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "controlsApplied": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "downgradeReasons": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "backend": {
+                        "type": "string",
+                        "const": "host-process"
+                      },
+                      "candidateWorkspace": {
                         "type": "string",
                         "minLength": 1
                       },
@@ -828,7 +959,8 @@
                       "controlsRequested",
                       "controlsApplied",
                       "downgradeReasons",
-                      "backend"
+                      "backend",
+                      "candidateWorkspace"
                     ],
                     "additionalProperties": false
                   },

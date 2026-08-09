@@ -800,46 +800,75 @@ const isolationCommonFields = {
   downgradeReasons: uniqueNonemptyStrings("Isolation downgrade reasons must be unique."),
 };
 
-const isolationSchema = z.union([
-  z.strictObject({
-    ...isolationCommonFields,
-    backend: z.literal("host-process"),
-    candidateWorkspace: portableRepositoryChildPathSchema.optional(),
-    runner: z.never().optional(),
-  }),
-  z.strictObject({
-    ...isolationCommonFields,
-    backend: z.literal("docker"),
-    candidateWorkspace: z.never().optional(),
-    runner: z.strictObject({runtime: z.literal("docker"), image: z.string().min(1)}),
-  }),
-  z.strictObject({
-    ...isolationCommonFields,
-    backend: z.literal("podman"),
-    candidateWorkspace: z.never().optional(),
-    runner: z.strictObject({runtime: z.literal("podman"), image: z.string().min(1)}),
-  }),
-  z.strictObject({
-    ...isolationCommonFields,
-    backend: z.literal("bwrap"),
-    candidateWorkspace: z.never().optional(),
-    runner: z.strictObject({runtime: z.literal("bwrap")}),
-  }),
-  z.strictObject({
-    ...isolationCommonFields,
-    backend: z.literal("nsjail"),
-    candidateWorkspace: z.never().optional(),
-    runner: z.strictObject({runtime: z.literal("nsjail")}),
-  }),
-]);
+const hostProcessIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  backend: z.literal("host-process"),
+  candidateWorkspace: z.never().optional(),
+  runner: z.never().optional(),
+});
 
-const behaviorCheckSchema = z.strictObject({
+const candidateWorkspaceIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  controlsRequested: uniqueNonemptyStrings("Requested isolation controls must be unique.").refine(
+    (controls) => controls.includes("candidate-workspace"),
+    "Candidate measurements must request the candidate-workspace control.",
+  ),
+  backend: z.literal("host-process"),
+  candidateWorkspace: portableRepositoryChildPathSchema,
+  runner: z.never().optional(),
+});
+
+const dockerIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  backend: z.literal("docker"),
+  candidateWorkspace: z.never().optional(),
+  runner: z.strictObject({runtime: z.literal("docker"), image: z.string().min(1)}),
+});
+
+const podmanIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  backend: z.literal("podman"),
+  candidateWorkspace: z.never().optional(),
+  runner: z.strictObject({runtime: z.literal("podman"), image: z.string().min(1)}),
+});
+
+const bubblewrapIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  backend: z.literal("bwrap"),
+  candidateWorkspace: z.never().optional(),
+  runner: z.strictObject({runtime: z.literal("bwrap")}),
+});
+
+const nsjailIsolationSchema = z.strictObject({
+  ...isolationCommonFields,
+  backend: z.literal("nsjail"),
+  candidateWorkspace: z.never().optional(),
+  runner: z.strictObject({runtime: z.literal("nsjail")}),
+});
+
+const containerIsolationSchema = z.union([
+  dockerIsolationSchema,
+  podmanIsolationSchema,
+  bubblewrapIsolationSchema,
+  nsjailIsolationSchema,
+] as const);
+
+const isolationSchema = z.union([
+  hostProcessIsolationSchema,
+  candidateWorkspaceIsolationSchema,
+  ...containerIsolationSchema.options,
+] as const);
+
+const behaviorCheckFields = {
   check: z.string().min(1),
   passed: z.boolean(),
   observed: z.string().optional(),
-});
+};
 
-const measurementFields = {
+const behaviorCheckSchema = z.strictObject(behaviorCheckFields);
+const passedBehaviorCheckSchema = z.strictObject({...behaviorCheckFields, passed: z.literal(true)});
+
+const measurementBaseFields = {
   schemaVersion: version("footgun.measurement.v1"),
   id: z.string().regex(/^meas_[a-f0-9]{16}$/),
   investigation: z.string().optional(),
@@ -855,66 +884,61 @@ const measurementFields = {
     minimumRelativeImprovement: z.number().nonnegative().max(1),
   }),
   reproduction: reproductionSchema,
-  behaviorValidated: z.boolean(),
-  executionProfile: z.enum(["read-only", "local-exec", "service-exec", "container-exec", "candidate-write"]),
   environment: z.strictObject({node: z.string(), platform: z.string(), arch: z.string()}),
-  isolation: isolationSchema,
   artifact: z.string().min(1).optional(),
 };
 
+const localMeasurementSchema = z.strictObject({
+  ...measurementBaseFields,
+  executionProfile: z.literal("local-exec"),
+  isolation: hostProcessIsolationSchema,
+});
+
+const candidateMeasurementSchema = z.strictObject({
+  ...measurementBaseFields,
+  executionProfile: z.literal("candidate-write"),
+  isolation: candidateWorkspaceIsolationSchema,
+});
+
+const containerMeasurementSchema = z.strictObject({
+  ...measurementBaseFields,
+  executionProfile: z.literal("container-exec"),
+  isolation: containerIsolationSchema,
+});
+
+const behaviorValidatedMeasurementSchema = z.union([
+  localMeasurementSchema.extend({
+    behaviorValidated: z.literal(true),
+    behaviorChecks: z.array(passedBehaviorCheckSchema).min(1),
+  }),
+  candidateMeasurementSchema.extend({
+    behaviorValidated: z.literal(true),
+    behaviorChecks: z.array(passedBehaviorCheckSchema).min(1),
+  }),
+  containerMeasurementSchema.extend({
+    behaviorValidated: z.literal(true),
+    behaviorChecks: z.array(passedBehaviorCheckSchema).min(1),
+  }),
+] as const);
+
+const behaviorUnvalidatedMeasurementSchema = z.union([
+  localMeasurementSchema.extend({
+    behaviorValidated: z.literal(false),
+    behaviorChecks: z.array(behaviorCheckSchema).optional(),
+  }),
+  candidateMeasurementSchema.extend({
+    behaviorValidated: z.literal(false),
+    behaviorChecks: z.array(behaviorCheckSchema).optional(),
+  }),
+  containerMeasurementSchema.extend({
+    behaviorValidated: z.literal(false),
+    behaviorChecks: z.array(behaviorCheckSchema).optional(),
+  }),
+] as const);
+
 const measurementSchema = z
-  .union([
-    z.strictObject({
-      ...measurementFields,
-      behaviorValidated: z.literal(true),
-      behaviorChecks: z
-        .array(behaviorCheckSchema)
-        .min(1)
-        .refine((checks) => checks.every((check) => check.passed), {
-          message: "A behavior-validated measurement requires only passing behavior checks.",
-        }),
-    }),
-    z.strictObject({
-      ...measurementFields,
-      behaviorValidated: z.literal(false),
-      behaviorChecks: z.array(behaviorCheckSchema).optional(),
-    }),
-  ])
+  .union([behaviorValidatedMeasurementSchema, behaviorUnvalidatedMeasurementSchema] as const)
   .superRefine((measurement, context) => {
-    const profileIssue = (message: string, path: string[]): void => context.addIssue({code: "custom", path, message});
-    const {isolation} = measurement;
-    if (measurement.executionProfile === "local-exec") {
-      if (isolation.backend !== "host-process")
-        profileIssue("local-exec measurements must use the host-process backend.", ["isolation", "backend"]);
-      if (isolation.candidateWorkspace !== undefined)
-        profileIssue("local-exec measurements cannot claim a candidate workspace.", [
-          "isolation",
-          "candidateWorkspace",
-        ]);
-      if (isolation.runner !== undefined)
-        profileIssue("local-exec measurements cannot claim an isolation runner.", ["isolation", "runner"]);
-    } else if (measurement.executionProfile === "candidate-write") {
-      if (isolation.backend !== "host-process")
-        profileIssue("candidate-write measurements must use the host-process backend.", ["isolation", "backend"]);
-      if (isolation.candidateWorkspace === undefined)
-        profileIssue("candidate-write measurements require a candidate workspace reference.", [
-          "isolation",
-          "candidateWorkspace",
-        ]);
-      if (!isolation.controlsRequested.includes("candidate-workspace"))
-        profileIssue("candidate-write measurements must record the candidate-workspace control.", [
-          "isolation",
-          "controlsRequested",
-        ]);
-      if (isolation.runner !== undefined)
-        profileIssue("candidate-write measurements cannot claim an isolation runner.", ["isolation", "runner"]);
-    } else if (measurement.executionProfile === "container-exec") {
-      if (isolation.backend === "host-process")
-        profileIssue("container-exec measurements require an isolated backend.", ["isolation", "backend"]);
-    } else
-      profileIssue(`${measurement.executionProfile} is not an executable measurement profile in this build.`, [
-        "executionProfile",
-      ]);
     if (measurement.samplesMs.length !== measurement.repetitions)
       context.addIssue({
         code: "custom",

@@ -592,6 +592,25 @@ describe("protocol contracts", () => {
         executionProfile: "candidate-write",
       }).success,
     ).toBe(false);
+    const candidateMeasurement = {
+      ...measurement,
+      behaviorChecks: [{check: "exit-code:0", passed: true}],
+      executionProfile: "candidate-write" as const,
+      isolation: {
+        backend: "host-process" as const,
+        candidateWorkspace: "candidates/fixture",
+        controlsRequested: ["candidate-workspace"],
+        controlsApplied: ["candidate-workspace"],
+        downgradeReasons: [],
+      },
+    };
+    expect(Protocol.measurement.safeParse(candidateMeasurement).success).toBe(true);
+    expect(
+      Protocol.measurement.safeParse({
+        ...candidateMeasurement,
+        isolation: {...candidateMeasurement.isolation, controlsRequested: []},
+      }).success,
+    ).toBe(false);
     expect(
       Protocol.measurement.safeParse({
         ...measurement,

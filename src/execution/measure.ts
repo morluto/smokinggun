@@ -9,7 +9,7 @@ import {
   type ProblemV1,
   type UnparameterizedWorkloadV2,
 } from "../protocol/index.js";
-import {classifyExecutableWorkload, executeWorkload} from "./runner.js";
+import {classifyExecutableWorkload, executeWorkload, type ExecutableWorkloadV2} from "./runner.js";
 import {stableJson} from "../serialization.js";
 import {executionEnvironment, redactCommand} from "./environment.js";
 import {isWithinRoot, portablePath} from "../paths.js";
@@ -131,7 +131,7 @@ export async function measureParsedWorkload(
       : behaviorChecks.length === 0
         ? {behaviorValidated: false as const}
         : {behaviorValidated: false as const, behaviorChecks};
-  return {
+  return Protocol.measurement.parse({
     schemaVersion: "footgun.measurement.v1",
     id: `meas_${createHash("sha256").update(`${workloadDigest}\0${Date.now()}`).digest("hex").slice(0, 16)}`,
     workloadDigest,
@@ -153,10 +153,10 @@ export async function measureParsedWorkload(
       datasetDigests: workload.datasetDigests,
     },
     ...behavior,
-    executionProfile: workload.requestedProfile,
+    executionProfile: executableWorkload.requestedProfile,
     environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
     isolation: measurementIsolation(
-      workload,
+      executableWorkload,
       backend,
       [
         "no-shell",
@@ -172,11 +172,11 @@ export async function measureParsedWorkload(
         ? undefined
         : portablePath(relative(options.workspaceRoot ?? root, candidateWorkspace)),
     ),
-  };
+  });
 }
 
 function measurementIsolation(
-  workload: UnparameterizedWorkloadV2,
+  workload: ExecutableWorkloadV2,
   backend: MeasurementV1["isolation"]["backend"],
   controlsRequested: string[],
   controlsApplied: string[],
@@ -184,8 +184,12 @@ function measurementIsolation(
   candidateWorkspace: string | undefined,
 ): MeasurementV1["isolation"] {
   const details = {controlsRequested, controlsApplied, downgradeReasons};
-  if (backend === "host-process")
-    return candidateWorkspace === undefined ? {backend, ...details} : {backend, ...details, candidateWorkspace};
+  if (backend === "host-process") {
+    if (workload.requestedProfile === "local-exec") return {backend, ...details};
+    if (workload.requestedProfile !== "candidate-write" || candidateWorkspace === undefined)
+      throw new Error("Host-process measurement isolation requires a parsed local or candidate workload.");
+    return {backend, ...details, candidateWorkspace};
+  }
   if (workload.requestedProfile !== "container-exec")
     throw new Error(`Execution backend ${backend} requires a parsed container workload.`);
   switch (backend) {
