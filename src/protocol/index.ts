@@ -77,29 +77,14 @@ const completeCoverageSchema = z.strictObject({
   reason: z.string().min(1).optional(),
 });
 
-const partialCoverageSchema = z.strictObject({
+const incompleteCoverageSchema = z.strictObject({
   ...coverageFields,
-  parseStatus: z.literal("partial"),
-  reason: z.string().min(1),
-});
-const failedCoverageSchema = z.strictObject({
-  ...coverageFields,
-  parseStatus: z.literal("failed"),
-  reason: z.string().min(1),
-});
-const unavailableCoverageSchema = z.strictObject({
-  ...coverageFields,
-  parseStatus: z.literal("unavailable"),
+  parseStatus: z.enum(["partial", "failed", "unavailable"]),
   reason: z.string().min(1),
 });
 
 const coverageSchema = z
-  .discriminatedUnion("parseStatus", [
-    completeCoverageSchema,
-    partialCoverageSchema,
-    failedCoverageSchema,
-    unavailableCoverageSchema,
-  ])
+  .discriminatedUnion("parseStatus", [completeCoverageSchema, incompleteCoverageSchema])
   .superRefine((coverage, context) => {
     if (coverage.filesAnalyzed > coverage.filesDiscovered)
       context.addIssue({
@@ -565,12 +550,9 @@ const adapterResultSchema = z
     z.strictObject({...adapterResultFields, state: z.literal("partial"), diagnostics: z.array(problemSchema)}),
     z.strictObject({
       ...adapterResultFields,
-      state: z.literal("unavailable"),
+      state: z.enum(["unavailable", "blocked", "failed", "cancelled"]),
       diagnostics: z.array(problemSchema).min(1),
     }),
-    z.strictObject({...adapterResultFields, state: z.literal("blocked"), diagnostics: z.array(problemSchema).min(1)}),
-    z.strictObject({...adapterResultFields, state: z.literal("failed"), diagnostics: z.array(problemSchema).min(1)}),
-    z.strictObject({...adapterResultFields, state: z.literal("cancelled"), diagnostics: z.array(problemSchema).min(1)}),
   ])
   .superRefine((result, context) => {
     requireUniqueFindingIds(result.findings, context);
@@ -1487,6 +1469,26 @@ const comparisonSchema = z
       });
   });
 
+type InvestigationArtifactRequirement = "empty" | "retained" | "any";
+
+const emptyArtifactInvestigationStates = ["created", "inventoried"] as const;
+const retainedArtifactInvestigationStates = [
+  "scanned",
+  "context-resolved",
+  "baseline-measured",
+  "candidate-compared",
+  "behavior-validated",
+  "reported",
+] as const;
+const anyArtifactInvestigationStates = [
+  "measurement-planned",
+  "blocked",
+  "inconclusive",
+  "unavailable",
+  "cancelled",
+  "failed",
+] as const;
+
 const investigationStates = [
   "created",
   "inventoried",
@@ -1505,7 +1507,6 @@ const investigationStates = [
 ] as const;
 
 type InvestigationState = (typeof investigationStates)[number];
-type InvestigationArtifactRequirement = "empty" | "retained" | "any";
 
 const investigationCommonFields = {
   schemaVersion: version("footgun.investigation-bundle.v2"),
@@ -1527,8 +1528,8 @@ const investigationCommonFields = {
   diagnostics: z.array(problemSchema),
 };
 
-function investigationStateSchema<const State extends InvestigationState>(
-  state: State,
+function investigationStateSchema(
+  states: readonly [InvestigationState, ...InvestigationState[]],
   artifactRequirement: InvestigationArtifactRequirement,
 ) {
   const reports = z.array(z.string().min(1));
@@ -1539,25 +1540,14 @@ function investigationStateSchema<const State extends InvestigationState>(
       : artifactRequirement === "retained"
         ? {reports: reports.min(1), evidence: evidence.min(1)}
         : {reports, evidence};
-  return z.strictObject({...investigationCommonFields, state: z.literal(state), ...artifacts});
+  return z.strictObject({...investigationCommonFields, state: z.enum(states), ...artifacts});
 }
 
 const investigationSchema = z
   .union([
-    investigationStateSchema("created", "empty"),
-    investigationStateSchema("inventoried", "empty"),
-    investigationStateSchema("scanned", "retained"),
-    investigationStateSchema("context-resolved", "retained"),
-    investigationStateSchema("measurement-planned", "any"),
-    investigationStateSchema("baseline-measured", "retained"),
-    investigationStateSchema("candidate-compared", "retained"),
-    investigationStateSchema("behavior-validated", "retained"),
-    investigationStateSchema("reported", "retained"),
-    investigationStateSchema("blocked", "any"),
-    investigationStateSchema("inconclusive", "any"),
-    investigationStateSchema("unavailable", "any"),
-    investigationStateSchema("cancelled", "any"),
-    investigationStateSchema("failed", "any"),
+    investigationStateSchema(emptyArtifactInvestigationStates, "empty"),
+    investigationStateSchema(retainedArtifactInvestigationStates, "retained"),
+    investigationStateSchema(anyArtifactInvestigationStates, "any"),
   ])
   .superRefine((bundle, context) => {
     const unique = (values: ReadonlyArray<string>, path: string, message: string): void => {
