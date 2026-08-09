@@ -126,8 +126,22 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
     )
       continue;
     const unit = entry.time_unit;
+    const convertedRealTime = convertToMilliseconds(realTime, unit);
+    if (convertedRealTime === undefined)
+      return problem(
+        "unsupported-google-benchmark-time-unit",
+        `Google Benchmark time unit ${unit} cannot be normalized as milliseconds.`,
+        "Use ns, us, ms, or s time units in the JSON export.",
+      );
     const samples = (finiteArray(entry.repetitions_data) ?? []).map((sample) => convertToMilliseconds(sample, unit));
-    const normalized = samples.length > 0 ? samples : [convertToMilliseconds(realTime, unit)];
+    if (samples.some((sample) => sample === undefined))
+      return problem(
+        "unsupported-google-benchmark-time-unit",
+        `Google Benchmark time unit ${unit} cannot be normalized as milliseconds.`,
+        "Use ns, us, ms, or s time units in the JSON export.",
+      );
+    const normalized =
+      samples.length > 0 ? samples.filter((sample): sample is number => sample !== undefined) : [convertedRealTime];
     records.push(
       makeRecord(options, entry.name, normalized, unit, {
         index,
@@ -198,9 +212,9 @@ function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRe
         : values.map((value) => convertToMilliseconds(value, unit));
     if (normalized.some((value) => value === undefined))
       return problem(
-        "unsupported-jmh-throughput-unit",
-        `JMH throughput unit ${unit} cannot be normalized as milliseconds per operation.`,
-        "Use a positive ops/s, ops/ms, ops/us, ops/ns, or ops/min score, or export a time-per-operation JMH mode.",
+        "unsupported-jmh-time-unit",
+        `JMH unit ${unit} cannot be normalized as milliseconds per operation.`,
+        "Use a supported time-per-operation unit or positive ops/s, ops/ms, ops/us, ops/ns, or ops/min throughput.",
       );
     const samplesMs = normalized.filter((value): value is number => value !== undefined);
     if (samplesMs.length > 0)
@@ -261,14 +275,14 @@ function makeRecord(
   };
 }
 
-function convertToMilliseconds(value: number, unit: string): number {
+function convertToMilliseconds(value: number, unit: string): number | undefined {
   const normalized = unit.toLowerCase();
   if (normalized === "ms" || normalized === "milliseconds" || normalized === "ms/op") return value;
   if (normalized === "ns" || normalized === "nanoseconds" || normalized === "ns/op") return value / 1_000_000;
   if (normalized === "us" || normalized === "µs" || normalized === "microseconds" || normalized === "us/op")
     return value / 1_000;
   if (normalized === "s" || normalized === "seconds" || normalized === "s/op") return value * 1000;
-  return value;
+  return undefined;
 }
 
 function convertThroughputToMilliseconds(value: number, unit: string): number | undefined {

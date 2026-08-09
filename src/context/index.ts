@@ -19,21 +19,27 @@ export type TypeScriptIndexResult =
     }
   | {readonly state: "unavailable"; readonly diagnostics: ReadonlyArray<ProblemV1>};
 
-const supportedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+export type TypeScriptAnalysis =
+  | {readonly _tag: "NoSupportedTypeScriptSources"}
+  | {
+      readonly _tag: "PreparedTypeScriptAnalysis";
+      readonly program: ts.Program;
+      readonly sourcePaths: ReadonlyArray<string>;
+      readonly selectedPaths: ReadonlySet<string>;
+    };
 
-/** Build a local, read-only TypeScript symbol/reference/call index without executing repository code. */
-export function buildTypeScriptIndex(
-  root: string,
-  files: ReadonlyArray<string>,
-  signal?: AbortSignal,
-): TypeScriptIndexResult {
-  const absoluteRoot = resolve(root);
-  const canonical = (path: string): string => (ts.sys.useCaseSensitiveFileNames ? path : path.toLowerCase());
+const supportedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+const maxContextEntriesPerKind = 10_000;
+
+/** Prepare one compiler program and its exact selected source set for TypeScript analysis. */
+export function prepareTypeScriptAnalysis(files: ReadonlyArray<string>): TypeScriptAnalysis {
   const sourcePaths = files.filter((path) => supportedExtensions.has(extensionOf(path))).map((path) => resolve(path));
-  const selectedPaths = new Set(sourcePaths.map(canonical));
-  if (sourcePaths.length === 0) return {state: "unavailable", diagnostics: []};
-  try {
-    const program = ts.createProgram(sourcePaths, {
+  if (sourcePaths.length === 0) return {_tag: "NoSupportedTypeScriptSources"};
+  return {
+    _tag: "PreparedTypeScriptAnalysis",
+    sourcePaths,
+    selectedPaths: new Set(sourcePaths.map(canonicalPath)),
+    program: ts.createProgram(sourcePaths, {
       allowJs: true,
       allowSyntheticDefaultImports: true,
       checkJs: false,
@@ -42,20 +48,43 @@ export function buildTypeScriptIndex(
       noEmit: true,
       skipLibCheck: true,
       target: ts.ScriptTarget.ES2022,
-    });
-    const checker = program.getTypeChecker();
+    }),
+  };
+}
+
+/** Build a local, read-only TypeScript symbol/reference/call index without executing repository code. */
+export function buildTypeScriptIndex(
+  root: string,
+  files: ReadonlyArray<string>,
+  signal?: AbortSignal,
+): TypeScriptIndexResult {
+  return buildPreparedTypeScriptIndex(root, prepareTypeScriptAnalysis(files), signal);
+}
+
+/** Index the exact source set and compiler program produced by prepareTypeScriptAnalysis. */
+export function buildPreparedTypeScriptIndex(
+  root: string,
+  analysis: TypeScriptAnalysis,
+  signal?: AbortSignal,
+): TypeScriptIndexResult {
+  if (analysis._tag === "NoSupportedTypeScriptSources") return {state: "unavailable", diagnostics: []};
+  const {program: compilerProgram, selectedPaths, sourcePaths} = analysis;
+  const absoluteRoot = resolve(root);
+  try {
+    const checker = compilerProgram.getTypeChecker();
     const definitions: ContextDefinitionV1[] = [];
     const references: ContextReferenceV1[] = [];
     const calls: ContextCallV1[] = [];
     const declarationNames = new Set<ts.Node>();
     const diagnostics: ProblemV1[] = [];
+    let contextTruncated = false;
 
-    for (const sourceFile of program.getSourceFiles()) {
+    for (const sourceFile of compilerProgram.getSourceFiles()) {
       signal?.throwIfAborted();
       if (
         sourceFile.isDeclarationFile ||
         !isWithinRoot(absoluteRoot, resolve(sourceFile.fileName)) ||
-        !selectedPaths.has(canonical(resolve(sourceFile.fileName)))
+        !selectedPaths.has(canonicalPath(resolve(sourceFile.fileName)))
       )
         continue;
       const relativePath = portablePath(relative(absoluteRoot, sourceFile.fileName));
@@ -68,59 +97,83 @@ export function buildTypeScriptIndex(
             if (declaration) declarationNames.add(node);
             const location = locationOf(sourceFile, node);
             if (declaration) {
-              definitions.push({
-                name: symbol.getName(),
-                kind: ts.SyntaxKind[node.parent.kind] ?? "unknown",
-                path: relativePath,
-                line: location.line,
-                column: location.column,
-                type: typeText(checker, node),
-                alias: aliasName(checker, symbol),
-              });
+              if (definitions.length < maxContextEntriesPerKind)
+                definitions.push({
+                  name: symbol.getName(),
+                  kind: ts.SyntaxKind[node.parent.kind] ?? "unknown",
+                  path: relativePath,
+                  line: location.line,
+                  column: location.column,
+                  type: typeText(checker, node),
+                  alias: aliasName(checker, symbol),
+                });
+              else contextTruncated = true;
             } else {
-              references.push({
-                name: symbol.getName(),
-                path: relativePath,
-                line: location.line,
-                column: location.column,
-                resolved: symbol.getDeclarations()?.length !== 0,
-                alias: aliasName(checker, symbol),
-              });
+              if (references.length < maxContextEntriesPerKind) {
+                const declarations = symbol.getDeclarations();
+                references.push({
+                  name: symbol.getName(),
+                  path: relativePath,
+                  line: location.line,
+                  column: location.column,
+                  resolved: declarations !== undefined && declarations.length > 0,
+                  alias: aliasName(checker, symbol),
+                });
+              } else contextTruncated = true;
             }
           }
         }
         if (ts.isCallExpression(node)) {
           const location = locationOf(sourceFile, node);
-          calls.push({
-            callee: node.expression.getText(sourceFile),
-            path: relativePath,
-            line: location.line,
-            column: location.column,
-          });
+          if (calls.length < maxContextEntriesPerKind)
+            calls.push({
+              callee: node.expression.getText(sourceFile),
+              path: relativePath,
+              line: location.line,
+              column: location.column,
+            });
+          else contextTruncated = true;
         }
         ts.forEachChild(node, visit);
       };
       visit(sourceFile);
-      const syntactic = program.getSyntacticDiagnostics(sourceFile);
+      const syntactic = compilerProgram.getSyntacticDiagnostics(sourceFile);
       diagnostics.push(...syntactic.map((diagnostic) => diagnosticToProblem(absoluteRoot, sourceFile, diagnostic)));
     }
 
+    if (contextTruncated)
+      diagnostics.push({
+        schemaVersion: "footgun.problem.v1",
+        code: "typescript-context-truncated",
+        message: "The TypeScript context index reached its per-kind evidence limit.",
+        recovery: "Use a narrower --only scope before relying on complete symbol, reference, or call context.",
+      });
+    const indexedFiles = sourcePaths
+      .filter((path) => isWithinRoot(absoluteRoot, path))
+      .map((path) => portablePath(relative(absoluteRoot, path)))
+      .sort(comparePortable);
     const index: ContextIndexV1 = {
       schemaVersion: "footgun.context-index.v1",
       tool: {name: "typescript", version: ts.version},
-      files: sourcePaths
-        .filter((path) => isWithinRoot(absoluteRoot, path))
-        .map((path) => portablePath(relative(absoluteRoot, path)))
-        .sort(comparePortable),
+      files: indexedFiles,
       definitions: definitions.sort(compareDefinitions),
       references: references.sort(compareReferences),
       calls: calls.sort(compareCalls),
-      coverage: {
-        filesDiscovered: sourcePaths.length,
-        filesIndexed: sourcePaths.filter((path) => isWithinRoot(absoluteRoot, path)).length,
-        parseStatus: diagnostics.length === 0 ? "complete" : "partial",
-        skippedFiles: [],
-      },
+      coverage:
+        diagnostics.length === 0
+          ? {
+              filesDiscovered: sourcePaths.length,
+              filesIndexed: indexedFiles.length,
+              parseStatus: "complete",
+              skippedFiles: [],
+            }
+          : {
+              filesDiscovered: sourcePaths.length,
+              filesIndexed: indexedFiles.length,
+              parseStatus: "partial",
+              skippedFiles: [],
+              reason: diagnostics.map((diagnostic) => diagnostic.message).join(" "),
+            },
       revision: null,
       stale: false,
       digest: createHash("sha256").update(stableJson({definitions, references, calls})).digest("hex"),
@@ -140,6 +193,15 @@ export function buildTypeScriptIndex(
       ],
     };
   }
+}
+
+/** Check whether a compiler source path belongs to the prepared analysis selection. */
+export function isSelectedTypeScriptSource(analysis: TypeScriptAnalysis, path: string): boolean {
+  return analysis._tag === "PreparedTypeScriptAnalysis" && analysis.selectedPaths.has(canonicalPath(resolve(path)));
+}
+
+function canonicalPath(path: string): string {
+  return ts.sys.useCaseSensitiveFileNames ? path : path.toLowerCase();
 }
 
 function isDeclarationName(node: ts.Identifier): boolean {

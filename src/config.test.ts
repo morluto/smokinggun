@@ -43,4 +43,28 @@ describe("configuration", () => {
     expect(isConfigFailure(result)).toBe(false);
     if (!isConfigFailure(result)) expect(result.output).toBe(join(nested, "artifacts/report.json"));
   });
+
+  it("canonicalizes duplicate set-like configuration and rejects empty path entries", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const duplicate = join(directory, "duplicate.json");
+    const canonical = join(directory, "canonical.json");
+    await writeFile(
+      duplicate,
+      JSON.stringify({exclude: ["dist", "dist", "node_modules"], adapters: ["adapter.json", "adapter.json"]}),
+      "utf8",
+    );
+    await writeFile(canonical, JSON.stringify({exclude: ["dist", "node_modules"], adapters: ["adapter.json"]}), "utf8");
+    const duplicateResult = await loadConfig({config: duplicate, cwd: directory});
+    const canonicalResult = await loadConfig({config: canonical, cwd: directory});
+    expect(isConfigFailure(duplicateResult)).toBe(false);
+    expect(isConfigFailure(canonicalResult)).toBe(false);
+    if (!isConfigFailure(duplicateResult) && !isConfigFailure(canonicalResult)) {
+      expect(duplicateResult.exclude).toEqual(["dist", "node_modules"]);
+      expect(duplicateResult.adapters).toEqual([join(directory, "adapter.json")]);
+      expect(duplicateResult.digest).toBe(canonicalResult.digest);
+    }
+    const invalid = join(directory, "invalid.json");
+    await writeFile(invalid, JSON.stringify({adapters: [""]}), "utf8");
+    expect(isConfigFailure(await loadConfig({config: invalid, cwd: directory}))).toBe(true);
+  });
 });

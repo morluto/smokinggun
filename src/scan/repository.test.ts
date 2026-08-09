@@ -1,10 +1,25 @@
-import {mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
+import {mkdir, mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
 import {execFileSync} from "node:child_process";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
+import {Protocol} from "../protocol/index.js";
 import {scanRepository} from "./repository.js";
+import {automaticScannerSelection, entireScanRoot, parseScanScope, parseScannerSelection} from "./selection.js";
+import {
+  adapterExecutionAuthorized,
+  adapterExecutionNotAuthorized,
+  noExternalAdapters,
+  parseExternalAdapters,
+} from "../scanners/external.js";
+
+const defaultScanOptions = {
+  selection: automaticScannerSelection(),
+  scope: entireScanRoot(),
+  adapters: noExternalAdapters(),
+  adapterAuthorization: adapterExecutionNotAuthorized,
+};
 
 describe("repository scan seam", () => {
   it("scans a real temporary repository and preserves deterministic findings", async () => {
@@ -15,12 +30,17 @@ describe("repository scan seam", () => {
         "for (const item of items) {\n  for (const other of items) work(other);\n}\n",
         "utf8",
       );
-      const options = {configDigest: "b".repeat(64), maxFindings: 20};
+      const options = {...defaultScanOptions, configDigest: "b".repeat(64), maxFindings: 20};
       const first = await scanRepository(root, options);
       const second = await scanRepository(root, options);
-      expect(first.findings.map((finding) => finding.id)).toEqual(second.findings.map((finding) => finding.id));
-      expect(first.coverage[0]?.filesAnalyzed).toBe(1);
-      expect(first.findings[0]?.location.path).toBe("fixture.ts");
+      expect(first.report.findings.map((finding) => finding.id)).toEqual(
+        second.report.findings.map((finding) => finding.id),
+      );
+      expect(first.report.coverage[0]?.filesAnalyzed).toBe(1);
+      expect(first.report.findings[0]?.location.path).toBe("fixture.ts");
+      expect(Protocol.scanReport.safeParse(first.report).success).toBe(true);
+      for (const finding of first.report.findings)
+        expect(finding.relatedFindings).toEqual([...finding.relatedFindings].sort());
     } finally {
       await rm(root, {recursive: true, force: true});
     }
@@ -34,11 +54,11 @@ describe("repository scan seam", () => {
         "for (const item of items) { for (const other of items) values.includes(other); }\n",
         "utf8",
       );
-      const report = await scanRepository(root, {configDigest: "e".repeat(64), maxFindings: 1});
-      expect(report.diagnostics).toContainEqual(expect.objectContaining({code: "findings-truncated"}));
-      expect(report.findings).toHaveLength(1);
-      expect(report.policyFindings).toHaveLength(3);
-      expect(JSON.parse(JSON.stringify(report))).not.toHaveProperty("policyFindings");
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64), maxFindings: 1});
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "findings-truncated"}));
+      expect(result.report.findings).toHaveLength(1);
+      expect(result.policyFindings).toHaveLength(3);
+      expect(JSON.parse(JSON.stringify(result.report))).not.toHaveProperty("policyFindings");
     } finally {
       await rm(root, {recursive: true, force: true});
     }
@@ -64,16 +84,21 @@ describe("repository scan seam", () => {
         }),
         "utf8",
       );
-      const report = await scanRepository(root, {
+      const adapters = await parseExternalAdapters([manifest], root);
+      const result = await scanRepository(root, {
         configDigest: "c".repeat(64),
-        adapterManifests: [manifest],
-        scanners: ["auto"],
-        allowAdapterExecution: true,
+        ...defaultScanOptions,
+        adapters,
+        adapterAuthorization: adapterExecutionAuthorized,
       });
-      expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 1, extensions: [".ts"]});
-      expect(report.findings.some((finding) => finding.scanner === "fixture-adapter")).toBe(true);
+      expect(result.report.inventory?.languages).toContainEqual({
+        language: "typescript",
+        files: 1,
+        extensions: [".ts"],
+      });
+      expect(result.report.findings.some((finding) => finding.scanner === "fixture-adapter")).toBe(true);
       expect(
-        report.coverage.some(
+        result.report.coverage.some(
           (record) => record.scanner === "footgun.adapter:fixture-adapter" && record.parseStatus === "complete",
         ),
       ).toBe(true);
@@ -94,9 +119,13 @@ describe("repository scan seam", () => {
         {cwd: root},
       );
       await writeFile(join(root, "untracked.ts"), "export const untracked = 2;\n", "utf8");
-      const report = await scanRepository(root, {configDigest: "d".repeat(64)});
-      expect(report.repository.dirty).toBe(true);
-      expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 2, extensions: [".ts"]});
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "d".repeat(64)});
+      expect(result.report.repository.dirty).toBe(true);
+      expect(result.report.inventory?.languages).toContainEqual({
+        language: "typescript",
+        files: 2,
+        extensions: [".ts"],
+      });
     } finally {
       await rm(root, {recursive: true, force: true});
     }
@@ -111,10 +140,21 @@ describe("repository scan seam", () => {
         "export function run(values: string[]) { for (const value of values) fetch(value); }\n",
         "utf8",
       );
-      const report = await scanRepository(root, {configDigest: "d".repeat(64), only: ["a.ts"]});
-      expect(report.inventory?.languages).toContainEqual({language: "typescript", files: 1, extensions: [".ts"]});
-      expect(report.findings.every((finding) => finding.location.path === "a.ts")).toBe(true);
-      expect(report.context?.files).toEqual(["a.ts"]);
+      const scope = parseScanScope(["a.ts"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+      const result = await scanRepository(root, {
+        ...defaultScanOptions,
+        configDigest: "d".repeat(64),
+        selection: automaticScannerSelection(),
+        scope,
+      });
+      expect(result.report.inventory?.languages).toContainEqual({
+        language: "typescript",
+        files: 1,
+        extensions: [".ts"],
+      });
+      expect(result.report.findings.every((finding) => finding.location.path === "a.ts")).toBe(true);
+      expect(result.report.context?.files).toEqual(["a.ts"]);
     } finally {
       await rm(root, {recursive: true, force: true});
     }
@@ -125,12 +165,117 @@ describe("repository scan seam", () => {
     try {
       await writeFile(join(root, "normal.ts"), "export const value = 1;\n", "utf8");
       await symlink("normal.ts", join(root, "linked.ts"));
-      const report = await scanRepository(root, {configDigest: "d".repeat(64)});
-      expect(report.coverage[0]).toMatchObject({filesDiscovered: 2, filesAnalyzed: 1, parseStatus: "partial"});
-      expect(report.coverage[0]?.skippedFiles).toContain("linked.ts");
-      expect(report.diagnostics).toContainEqual(expect.objectContaining({code: "symlink-skipped", path: "linked.ts"}));
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "d".repeat(64)});
+      expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 2, filesAnalyzed: 1, parseStatus: "partial"});
+      expect(result.report.coverage[0]?.skippedFiles).toContain("linked.ts");
+      expect(result.report.diagnostics).toContainEqual(
+        expect.objectContaining({code: "symlink-skipped", path: "linked.ts"}),
+      );
     } finally {
       await rm(root, {recursive: true, force: true});
     }
+  });
+
+  it("treats an unmatched explicit scope as incomplete coverage", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-scope-"));
+    try {
+      await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
+      const scope = parseScanScope(["missing"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+      const result = await scanRepository(root, {
+        ...defaultScanOptions,
+        configDigest: "d".repeat(64),
+        selection: automaticScannerSelection(),
+        scope,
+      });
+      expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 0, filesAnalyzed: 0, parseStatus: "partial"});
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "scan-scope-unmatched"}));
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("matches path filters only against paths inside the scan root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-root-relative-"));
+    try {
+      await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
+      const scope = parseScanScope(["tmp"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+      const result = await scanRepository(root, {
+        ...defaultScanOptions,
+        configDigest: "d".repeat(64),
+        selection: automaticScannerSelection(),
+        scope,
+      });
+      expect(result.report.inventory?.languages).toEqual([]);
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "scan-scope-unmatched"}));
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("reports skipped directory symlinks as incomplete coverage without following them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-directory-symlink-"));
+    try {
+      const sourceDirectory = join(root, "source");
+      await mkdir(sourceDirectory);
+      await writeFile(join(sourceDirectory, "fixture.py"), "for item in values:\n  item in values\n", "utf8");
+      await symlink("source", join(root, "linked-source"));
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "d".repeat(64)});
+      expect(result.report.coverage[0]).toMatchObject({parseStatus: "partial"});
+      expect(result.report.coverage[0]?.skippedFiles).toContain("linked-source");
+      expect(result.report.diagnostics).toContainEqual(
+        expect.objectContaining({code: "symlink-skipped", path: "linked-source"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("rejects a symlink passed as the scan root before traversing its target", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-root-symlink-"));
+    const outside = await mkdtemp(join(tmpdir(), "footgun-scan-outside-"));
+    try {
+      await writeFile(join(outside, "outside.ts"), "export const outside = true;\n", "utf8");
+      const link = join(root, "linked-root");
+      await symlink(outside, link);
+      await expect(scanRepository(link, {...defaultScanOptions, configDigest: "d".repeat(64)})).rejects.toThrow(
+        "scan root cannot be a symlink",
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+      await rm(outside, {recursive: true, force: true});
+    }
+  });
+
+  it("accepts canonical scanner IDs and emits coverage only for selected backends", async () => {
+    const pythonSelection = parseScannerSelection(["footgun.python-semantic"], []);
+    if ("schemaVersion" in pythonSelection) throw new Error(pythonSelection.message);
+    const pythonResult = await scanRepository("fixtures/corpus/python", {
+      ...defaultScanOptions,
+      configDigest: "d".repeat(64),
+      selection: pythonSelection,
+      scope: entireScanRoot(),
+    });
+    expect(pythonResult.report.findings.some((finding) => finding.scanner === "footgun.python-semantic")).toBe(true);
+    expect(pythonResult.report.coverage.some((record) => record.scanner === "footgun.python-semantic")).toBe(true);
+    expect(
+      pythonResult.report.coverage.some(
+        (record) => record.scanner === "footgun.structural" || record.scanner === "footgun.tree-sitter",
+      ),
+    ).toBe(false);
+
+    const structuralSelection = parseScannerSelection(["footgun.structural"], []);
+    if ("schemaVersion" in structuralSelection) throw new Error(structuralSelection.message);
+    const structuralResult = await scanRepository("fixtures/corpus/typescript", {
+      ...defaultScanOptions,
+      configDigest: "d".repeat(64),
+      selection: structuralSelection,
+      scope: entireScanRoot(),
+    });
+    expect(structuralResult.report.coverage.some((record) => record.scanner === "footgun.typescript-semantic")).toBe(
+      false,
+    );
+    expect(structuralResult.report.diagnostics.some((diagnostic) => diagnostic.code === "scanner-skipped")).toBe(false);
   });
 });

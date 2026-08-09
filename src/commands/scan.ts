@@ -5,6 +5,12 @@ import {renderScanReport} from "../reports/render.js";
 import {scanRepository} from "../scan/repository.js";
 import {shouldPrint, writeResult} from "../cli/output.js";
 import {resolveConfiguredPath} from "../config.js";
+import {parseScannerSelection, parseScanScope} from "../scan/selection.js";
+import {
+  adapterExecutionAuthorized,
+  adapterExecutionNotAuthorized,
+  parseExternalAdapters,
+} from "../scanners/external.js";
 
 export default class Scan extends BaseCommand {
   static override description = "Scan a local repository for complexity candidates.";
@@ -34,20 +40,38 @@ export default class Scan extends BaseCommand {
       const scanner = parsed.flags.scanner as ReadonlyArray<string> | undefined;
       const only = parsed.flags.only as ReadonlyArray<string> | undefined;
       const adapter = parsed.flags.adapter as ReadonlyArray<string> | undefined;
-      const report = await scanRepository(target, {
+      const adapterManifests = [
+        ...context.config.adapters,
+        ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
+      ];
+      const adapters = await parseExternalAdapters(adapterManifests, context.config.cwd, context.signal);
+      const selection = parseScannerSelection(
+        scanner,
+        adapters.adapters.map((adapter) => adapter.manifest.id),
+      );
+      if ("schemaVersion" in selection) this.emitProblem(selection, 2, context);
+      const scope = parseScanScope(only);
+      if ("schemaVersion" in scope) this.emitProblem(scope, 2, context);
+      const {report, policyFindings} = await scanRepository(target, {
         configDigest: context.config.digest,
+        selection,
+        scope,
         excludes: context.config.exclude,
         maxFindings: context.config.maxFindings,
         signal: context.signal,
-        ...(scanner === undefined ? {} : {scanners: scanner}),
-        ...(only === undefined ? {} : {only}),
-        adapterManifests: [...context.config.adapters, ...(adapter ?? [])],
-        allowAdapterExecution: parsed.flags["allow-adapter-execution"],
+        adapters,
+        adapterAuthorization: parsed.flags["allow-adapter-execution"]
+          ? adapterExecutionAuthorized
+          : adapterExecutionNotAuthorized,
       });
       const rendered = renderScanReport(report, context.config.format);
       await writeResult(rendered, context);
       if (shouldPrint(context.config.format, context.config.quiet)) this.emit(rendered, context);
-      if (context.config.strict && report.coverage.some((record) => record.parseStatus !== "complete")) {
+      if (
+        context.config.strict &&
+        (report.coverage.some((record) => record.parseStatus !== "complete") ||
+          report.diagnostics.some((diagnostic) => diagnostic.code === "scan-scope-unmatched"))
+      ) {
         if (context.config.format === "human")
           this.emitProblem(
             {
@@ -62,8 +86,7 @@ export default class Scan extends BaseCommand {
         this.exit(3);
       }
       const failOn = context.config.failOn;
-      if (failOn !== undefined && report.policyFindings.some((finding) => matchesFailPolicy(finding, failOn)))
-        this.exit(4);
+      if (failOn !== undefined && policyFindings.some((finding) => matchesFailPolicy(finding, failOn))) this.exit(4);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)

@@ -5,13 +5,16 @@ import type {RuntimeContext} from "../cli/context.js";
 import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
-import {mkdir, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {writeResult} from "../cli/output.js";
 import {renderCommandResult} from "../cli/command-output.js";
 import {parseMeasurementArtifact} from "../execution/measure.js";
-import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
-import {comparePortable} from "../paths.js";
+import {
+  appendInvestigationEvidence,
+  appendInvestigationReport,
+  loadLatestInvestigation,
+  recordParsedInvestigationSnapshot,
+} from "../investigations/store.js";
 import {
   Protocol,
   type ComparisonV2,
@@ -23,8 +26,10 @@ import {
   buildMeasurementComparison,
   buildMultiScalingComparison,
   buildScalingComparison,
+  classifyComparableMeasurementArtifacts,
   type ComparisonArtifactDigests,
 } from "../execution/compare.js";
+import {writeFileAtomically} from "../files.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -42,34 +47,13 @@ export default class Compare extends BaseCommand {
       const candidate = parseMeasurementArtifact(JSON.parse(candidateBytes.toString("utf8")));
       if ("code" in baseline) this.emitProblem(baseline, 2, context);
       if ("code" in candidate) this.emitProblem(candidate, 2, context);
-      if (baseline.schemaVersion !== candidate.schemaVersion)
-        this.emitProblem(
-          {
-            schemaVersion: "footgun.problem.v1",
-            code: "measurement-kind-mismatch",
-            message: "Baseline and candidate artifacts use different measurement kinds.",
-            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV2 artifacts.",
-          },
-          2,
-          context,
-        );
-      if (baseline.workloadDigest !== candidate.workloadDigest)
-        this.emitProblem(
-          {
-            schemaVersion: "footgun.problem.v1",
-            code: "workload-mismatch",
-            message: "Baseline and candidate measurements use different workload digests.",
-            recovery: "Measure both artifacts from the same immutable WorkloadV2 descriptor.",
-          },
-          2,
-          context,
-        );
+      const artifacts = classifyComparableMeasurementArtifacts(baseline, candidate);
+      if ("code" in artifacts) this.emitProblem(artifacts, 2, context);
       if (
-        baseline.schemaVersion === "footgun.measurement.v1" &&
-        candidate.schemaVersion === "footgun.measurement.v1" &&
-        (baseline.statisticalPolicy.kind !== candidate.statisticalPolicy.kind ||
-          baseline.statisticalPolicy.minimumRelativeImprovement !==
-            candidate.statisticalPolicy.minimumRelativeImprovement)
+        artifacts.kind === "measurement" &&
+        (artifacts.baseline.statisticalPolicy.kind !== artifacts.candidate.statisticalPolicy.kind ||
+          artifacts.baseline.statisticalPolicy.minimumRelativeImprovement !==
+            artifacts.candidate.statisticalPolicy.minimumRelativeImprovement)
       )
         this.emitProblem(
           {
@@ -81,10 +65,10 @@ export default class Compare extends BaseCommand {
           2,
           context,
         );
-      if (baseline.schemaVersion === "footgun.scaling.v2" && candidate.schemaVersion === "footgun.scaling.v2") {
+      if (artifacts.kind === "single-scaling") {
         await this.compareScaling(
-          baseline,
-          candidate,
+          artifacts.baseline,
+          artifacts.candidate,
           parsed.args.baseline,
           parsed.args.candidate,
           [digest(baselineBytes), digest(candidateBytes)],
@@ -92,10 +76,10 @@ export default class Compare extends BaseCommand {
         );
         return;
       }
-      if (baseline.schemaVersion === "footgun.scaling.v3" && candidate.schemaVersion === "footgun.scaling.v3") {
+      if (artifacts.kind === "multi-scaling") {
         await this.compareMultiScaling(
-          baseline,
-          candidate,
+          artifacts.baseline,
+          artifacts.candidate,
           parsed.args.baseline,
           parsed.args.candidate,
           [digest(baselineBytes), digest(candidateBytes)],
@@ -103,18 +87,8 @@ export default class Compare extends BaseCommand {
         );
         return;
       }
-      if (baseline.schemaVersion !== "footgun.measurement.v1" || candidate.schemaVersion !== "footgun.measurement.v1")
-        this.emitProblem(
-          {
-            schemaVersion: "footgun.problem.v1",
-            code: "measurement-kind-mismatch",
-            message: "Baseline and candidate artifacts use different measurement kinds.",
-            recovery: "Compare two MeasurementV1 artifacts or two ScalingAnalysisV2 artifacts.",
-          },
-          2,
-          context,
-        );
-      if (!baseline.behaviorValidated || !candidate.behaviorValidated) {
+      const {baseline: measurementBaseline, candidate: measurementCandidate} = artifacts;
+      if (!measurementBaseline.behaviorValidated || !measurementCandidate.behaviorValidated) {
         this.emitActionRequired(
           {
             schemaVersion: "footgun.action-required.v1",
@@ -128,14 +102,17 @@ export default class Compare extends BaseCommand {
           context,
         );
       }
-      const result = buildMeasurementComparison(baseline, candidate, parsed.args.baseline, parsed.args.candidate, [
-        digest(baselineBytes),
-        digest(candidateBytes),
-      ]);
-      await this.storeComparison(result, context, baseline, candidate);
+      const result = buildMeasurementComparison(
+        measurementBaseline,
+        measurementCandidate,
+        parsed.args.baseline,
+        parsed.args.candidate,
+        [digest(baselineBytes), digest(candidateBytes)],
+      );
+      await this.storeComparison(result, context, measurementBaseline, measurementCandidate);
       await this.writeComparison(
         result,
-        `Comparison\nBaseline median: ${baseline.medianMs.toFixed(3)} ms\nCandidate median: ${candidate.medianMs.toFixed(3)} ms\nChange: ${result.deltaPercent?.toFixed(2) ?? "n/a"}%`,
+        `Comparison\nBaseline median: ${measurementBaseline.medianMs.toFixed(3)} ms\nCandidate median: ${measurementCandidate.medianMs.toFixed(3)} ms\nChange: ${result.deltaPercent?.toFixed(2) ?? "n/a"}%`,
         context,
       );
     } catch (cause: unknown) {
@@ -323,50 +300,64 @@ export default class Compare extends BaseCommand {
     baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
     candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
   ): Promise<void> {
-    const validated = Protocol.comparison.parse(result);
+    const comparison = Protocol.comparison.parse(result);
     const directory = join(context.artifacts, "comparisons");
-    await mkdir(directory, {recursive: true});
-    const artifact = `${result.id}.json`;
-    await writeFile(join(directory, artifact), `${JSON.stringify(validated, null, 2)}\n`, "utf8");
+    const artifact = `${comparison.id}.json`;
+    const report = `../comparisons/${artifact}`;
     const investigationIds = [
       ...new Set(
         [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
       ),
     ];
+    const pending = [];
     for (const investigationId of investigationIds) {
       const investigation = await loadLatestInvestigation(context.artifacts, investigationId);
       if (investigation === undefined) continue;
+      if (investigation.bundle.state === "behavior-validated") {
+        const comparisonEvidenceId = `${investigationId}:comparison:${comparison.id}`;
+        const validationEvidenceId = `${comparisonEvidenceId}:validated`;
+        const reportPaths = new Set(investigation.bundle.reports);
+        const evidenceIds = new Set(investigation.bundle.evidence.map((evidence) => evidence.id));
+        const isSameComparison =
+          reportPaths.has(report) && evidenceIds.has(comparisonEvidenceId) && evidenceIds.has(validationEvidenceId);
+        if (isSameComparison) continue;
+        throw new Error(
+          `Investigation ${investigationId} is already behavior-validated and cannot record comparison ${comparison.id}.`,
+        );
+      }
+      if (investigation.bundle.state !== "baseline-measured" && investigation.bundle.state !== "candidate-compared")
+        throw new Error(
+          `Investigation ${investigationId} must be baseline-measured before recording comparison ${comparison.id}.`,
+        );
+      pending.push({investigationId, bundle: investigation.bundle});
+    }
+    await writeFileAtomically(join(directory, artifact), `${JSON.stringify(comparison, null, 2)}\n`);
+    for (const {investigationId, bundle} of pending) {
       const candidateCompared = {
-        ...investigation.bundle,
+        ...bundle,
         state: "candidate-compared" as const,
-        reports: [...new Set([...investigation.bundle.reports, `../comparisons/${artifact}`])].sort(comparePortable),
-        evidence: [
-          ...investigation.bundle.evidence,
-          {
-            schemaVersion: "footgun.evidence.v2" as const,
-            id: `${investigationId}:comparison:${result.id}`,
-            kind: "behavior" as const,
-            claimClass: "behavioral" as const,
-            summary: "Baseline and candidate comparison completed after declared behavior checks",
-            artifact: `../comparisons/${artifact}`,
-          },
-        ],
+        reports: appendInvestigationReport(bundle.reports, report),
+        evidence: appendInvestigationEvidence(bundle.evidence, {
+          schemaVersion: "footgun.evidence.v2" as const,
+          id: `${investigationId}:comparison:${comparison.id}`,
+          kind: "behavior" as const,
+          claimClass: "behavioral" as const,
+          summary: "Baseline and candidate comparison completed after declared behavior checks",
+          artifact: report,
+        }),
       };
-      await recordInvestigationSnapshot(context.artifacts, candidateCompared);
-      await recordInvestigationSnapshot(context.artifacts, {
+      await recordParsedInvestigationSnapshot(context.artifacts, candidateCompared);
+      await recordParsedInvestigationSnapshot(context.artifacts, {
         ...candidateCompared,
         state: "behavior-validated",
-        evidence: [
-          ...candidateCompared.evidence,
-          {
-            schemaVersion: "footgun.evidence.v2" as const,
-            id: `${investigationId}:comparison:${result.id}:validated`,
-            kind: "behavior" as const,
-            claimClass: "behavioral" as const,
-            summary: "Baseline and candidate comparison passed declared behavior checks",
-            artifact: `../comparisons/${artifact}`,
-          },
-        ],
+        evidence: appendInvestigationEvidence(candidateCompared.evidence, {
+          schemaVersion: "footgun.evidence.v2" as const,
+          id: `${investigationId}:comparison:${comparison.id}:validated`,
+          kind: "behavior" as const,
+          claimClass: "behavioral" as const,
+          summary: "Baseline and candidate comparison passed declared behavior checks",
+          artifact: report,
+        }),
       });
     }
   }

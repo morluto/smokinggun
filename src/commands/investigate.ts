@@ -1,15 +1,17 @@
 import {createHash} from "node:crypto";
-import {mkdir, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
 import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {scanRepository} from "../scan/repository.js";
-import {Protocol, type InvestigationBundleV2} from "../protocol/index.js";
+import type {InvestigationBundleV2, ScanReportV2} from "../protocol/index.js";
 import {resolveConfiguredPath} from "../config.js";
-import {loadLatestInvestigation, recordInvestigationSnapshot} from "../investigations/store.js";
+import {loadLatestInvestigation, recordParsedInvestigationSnapshot} from "../investigations/store.js";
 import {stableJson} from "../serialization.js";
+import {automaticScannerSelection, entireScanRoot} from "../scan/selection.js";
+import {adapterExecutionNotAuthorized, parseExternalAdapters} from "../scanners/external.js";
+import {writeFileAtomically} from "../files.js";
 
 export default class Investigate extends BaseCommand {
   static override description = "Create a durable local investigation bundle from a scan.";
@@ -40,15 +42,22 @@ export default class Investigate extends BaseCommand {
           2,
           context,
         );
-      const report = parsed.flags["plan-only"]
-        ? undefined
-        : await scanRepository(target, {
+      let report: ScanReportV2 | undefined;
+      if (!parsed.flags["plan-only"]) {
+        const adapters = await parseExternalAdapters(context.config.adapters, context.config.cwd, context.signal);
+        report = (
+          await scanRepository(target, {
             configDigest: context.config.digest,
+            selection: automaticScannerSelection(),
+            scope: entireScanRoot(),
             excludes: context.config.exclude,
             maxFindings: Number.MAX_SAFE_INTEGER,
-            adapterManifests: context.config.adapters,
+            adapters,
+            adapterAuthorization: adapterExecutionNotAuthorized,
             signal: context.signal,
-          });
+          })
+        ).report;
+      }
       if (finding !== undefined) {
         if (report === undefined)
           this.emitProblem(
@@ -73,56 +82,75 @@ export default class Investigate extends BaseCommand {
             context,
           );
       }
-      const investigationDigest = createHash("sha256").update(stableJson({target, finding, report})).digest("hex");
+      const investigationDigest = createHash("sha256")
+        .update(
+          stableJson(
+            report === undefined
+              ? {target, finding, mode: "plan-only"}
+              : {
+                  target,
+                  finding,
+                  mode: "scan",
+                  sourceDigest: report.sourceDigest ?? null,
+                  configDigest: report.configDigest,
+                },
+          ),
+        )
+        .digest("hex");
       const id = `inv_${investigationDigest.slice(0, 16)}`;
       const directory = join(context.artifacts, "investigations", id);
-      if (parsed.flags["plan-only"]) {
-        const existing = await loadLatestInvestigation(context.artifacts, id);
-        if (existing !== undefined && !["created", "inventoried"].includes(existing.bundle.state)) {
-          await printResult(
-            existing.bundle,
-            `Investigation ${id}\nState: ${existing.bundle.state}\nBundle: ${join(directory, "snapshots", `${existing.digest}.json`)}`,
-            context,
-          );
-          return;
-        }
+      const existing = await loadLatestInvestigation(context.artifacts, id);
+      if (existing !== undefined && !["created", "inventoried"].includes(existing.bundle.state)) {
+        await printResult(
+          existing.bundle,
+          `Investigation ${id}\nState: ${existing.bundle.state}\nBundle: ${join(directory, "snapshots", `${existing.digest}.json`)}`,
+          context,
+        );
+        return;
       }
-      await mkdir(directory, {recursive: true});
       const reportPath = join(directory, "scan-report.json");
       const reportBytes =
         report === undefined ? undefined : Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8");
       const reportDigest =
         reportBytes === undefined ? undefined : createHash("sha256").update(reportBytes).digest("hex");
-      if (reportBytes !== undefined) await writeFile(reportPath, reportBytes);
-      const createdBundle: InvestigationBundleV2 = {
-        schemaVersion: "footgun.investigation-bundle.v2",
-        id,
-        state: "created",
-        root: report?.repository.root ?? ".",
-        ...(report === undefined
-          ? {callers: [], inputs: [], tests: [], workloads: [], assumptions: [], versions: {}}
+      if (reportBytes !== undefined) await writeFileAtomically(reportPath, reportBytes);
+      const createdBundle: InvestigationBundleV2 =
+        existing?.bundle.state === "created"
+          ? existing.bundle
           : {
-              repository: report.repository,
-              ...(report.sourceDigest === undefined ? {} : {sourceDigest: report.sourceDigest}),
-              callers: report.context?.calls.map((call) => `${call.callee} @ ${call.path}:${call.line}`) ?? [],
-              inputs: report.inventory?.manifests ?? [],
-              tests: report.inventory?.tests ?? [],
-              workloads: report.inventory?.benchmarks ?? [],
-              assumptions: report.assumptions,
-              versions: {
-                footgun: report.tool.version,
-                ...(report.context === undefined ? {} : {[report.context.tool.name]: report.context.tool.version}),
-              },
-            }),
-        createdAt: new Date().toISOString(),
-        reports: [],
-        evidence: [],
-        diagnostics: [],
-        ...(finding === undefined ? {} : {findingIds: [finding]}),
-      };
-      await recordInvestigationSnapshot(context.artifacts, createdBundle);
-      const inventoriedBundle: InvestigationBundleV2 = {...createdBundle, state: "inventoried"};
-      await recordInvestigationSnapshot(context.artifacts, inventoriedBundle);
+              schemaVersion: "footgun.investigation-bundle.v2",
+              id,
+              state: "created",
+              root: report?.repository.root ?? ".",
+              ...(report === undefined
+                ? {callers: [], inputs: [], tests: [], workloads: [], assumptions: [], versions: {}}
+                : {
+                    repository: report.repository,
+                    ...(report.sourceDigest === undefined ? {} : {sourceDigest: report.sourceDigest}),
+                    callers: report.context?.calls.map((call) => `${call.callee} @ ${call.path}:${call.line}`) ?? [],
+                    inputs: report.inventory?.manifests ?? [],
+                    tests: report.inventory?.tests ?? [],
+                    workloads: report.inventory?.benchmarks ?? [],
+                    assumptions: report.assumptions,
+                    versions: {
+                      footgun: report.tool.version,
+                      ...(report.context === undefined
+                        ? {}
+                        : {[report.context.tool.name]: report.context.tool.version}),
+                    },
+                  }),
+              createdAt: new Date().toISOString(),
+              reports: [],
+              evidence: [],
+              diagnostics: [],
+              ...(finding === undefined ? {} : {findingIds: [finding]}),
+            };
+      if (existing?.bundle.state !== "created")
+        await recordParsedInvestigationSnapshot(context.artifacts, createdBundle);
+      const inventoriedBundle: InvestigationBundleV2 =
+        existing?.bundle.state === "inventoried" ? existing.bundle : {...createdBundle, state: "inventoried"};
+      if (existing?.bundle.state !== "inventoried")
+        await recordParsedInvestigationSnapshot(context.artifacts, inventoriedBundle);
       const scannedBundle: InvestigationBundleV2 =
         report === undefined
           ? {...inventoriedBundle, state: "measurement-planned"}
@@ -146,19 +174,27 @@ export default class Investigate extends BaseCommand {
       const bundle: InvestigationBundleV2 =
         report?.context === undefined || scannedBundle.state !== "scanned"
           ? scannedBundle
-          : {...scannedBundle, state: "context-resolved"};
-      const parsedBundle = Protocol.investigation.safeParse(bundle);
-      if (!parsedBundle.success) throw new Error("Internal investigation bundle validation failed.");
-      const finalBundle = parsedBundle.data;
+          : {
+              ...scannedBundle,
+              state: "context-resolved",
+              evidence: [
+                ...scannedBundle.evidence,
+                {
+                  schemaVersion: "footgun.evidence.v2",
+                  id: `${id}:context:scan`,
+                  kind: "context",
+                  claimClass: "static-fact",
+                  summary: "Compiler-backed repository context from the scan report",
+                  artifact: "scan-report.json",
+                  digest: reportDigest,
+                },
+              ],
+            };
       const bundlePath = join(directory, "bundle.json");
-      await writeFile(bundlePath, `${JSON.stringify(finalBundle, null, 2)}\n`, "utf8");
-      await recordInvestigationSnapshot(context.artifacts, scannedBundle);
-      if (finalBundle.state !== scannedBundle.state) await recordInvestigationSnapshot(context.artifacts, finalBundle);
-      await printResult(
-        finalBundle,
-        `Investigation ${id}\nState: ${finalBundle.state}\nBundle: ${bundlePath}`,
-        context,
-      );
+      await writeFileAtomically(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+      await recordParsedInvestigationSnapshot(context.artifacts, scannedBundle);
+      if (bundle.state !== scannedBundle.state) await recordParsedInvestigationSnapshot(context.artifacts, bundle);
+      await printResult(bundle, `Investigation ${id}\nState: ${bundle.state}\nBundle: ${bundlePath}`, context);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)

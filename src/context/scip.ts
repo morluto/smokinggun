@@ -1,5 +1,4 @@
 import {createHash} from "node:crypto";
-import {readFile} from "node:fs/promises";
 import {isAbsolute, normalize, resolve, sep} from "node:path";
 import {fromBinary} from "@bufbuild/protobuf";
 import {IndexSchema, SymbolRole, type Occurrence} from "@scip-code/scip";
@@ -11,6 +10,7 @@ import type {
   ProblemV1,
 } from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
+import {readArtifactBytes} from "../artifacts/store.js";
 
 export type ScipImportResult =
   | {
@@ -24,7 +24,7 @@ export type ScipImportResult =
 export async function importScip(path: string, root: string): Promise<ScipImportResult> {
   try {
     const repositoryRoot = resolve(root);
-    const bytes = await readFile(path);
+    const bytes = await readArtifactBytes(path);
     const parsed = fromBinary(IndexSchema, bytes);
     const diagnostics: ProblemV1[] = [];
     if (parsed.metadata === undefined)
@@ -35,14 +35,13 @@ export async function importScip(path: string, root: string): Promise<ScipImport
     const references: ContextReferenceV1[] = [];
     const calls: ContextCallV1[] = [];
     const files: string[] = [];
-    let indexed = 0;
     for (const document of parsed.documents) {
       const documentPath = portableRelative(document.relativePath);
       if (documentPath === undefined) {
         diagnostics.push(
           problem(
             "scip-path-invalid",
-            `SCIP document path is outside the repository boundary: ${document.relativePath}`,
+            "A SCIP document path is not a canonical repository-relative path.",
             "Return canonical repository-relative paths from the indexer.",
           ),
         );
@@ -53,14 +52,13 @@ export async function importScip(path: string, root: string): Promise<ScipImport
         diagnostics.push(
           problem(
             "scip-path-outside-root",
-            `SCIP document path escapes the repository boundary: ${document.relativePath}`,
+            "A SCIP document path escapes the repository boundary.",
             "Return a repository-relative index or import it from the matching repository root.",
           ),
         );
         continue;
       }
       files.push(documentPath);
-      indexed += 1;
       const symbols = new Map(document.symbols.map((symbol) => [symbol.symbol, symbol]));
       for (const occurrence of document.occurrences) {
         if (occurrence.symbol.length === 0) continue;
@@ -92,23 +90,30 @@ export async function importScip(path: string, root: string): Promise<ScipImport
         }
       }
     }
+    const indexedFiles = [...new Set(files)].sort(comparePortable);
     const tool = parsed.metadata?.toolInfo;
     const index: ContextIndexV1 = {
       schemaVersion: "footgun.context-index.v1",
       tool: {name: tool?.name || "scip", version: tool?.version || "unknown"},
-      files: [...new Set(files)].sort(comparePortable),
+      files: indexedFiles,
       definitions: definitions.sort(compareDefinitions),
       references: references.sort(compareReferences),
-      calls,
-      coverage: {
-        filesDiscovered: parsed.documents.length,
-        filesIndexed: indexed,
-        parseStatus: diagnostics.length === 0 ? "complete" : "partial",
-        skippedFiles: diagnostics
-          .filter((entry) => entry.code === "scip-path-invalid")
-          .map((entry) => entry.message)
-          .sort(comparePortable),
-      },
+      calls: calls.sort(compareCalls),
+      coverage:
+        diagnostics.length === 0
+          ? {
+              filesDiscovered: parsed.documents.length,
+              filesIndexed: indexedFiles.length,
+              parseStatus: "complete",
+              skippedFiles: [],
+            }
+          : {
+              filesDiscovered: parsed.documents.length,
+              filesIndexed: indexedFiles.length,
+              parseStatus: "partial",
+              skippedFiles: [],
+              reason: diagnostics.map((diagnostic) => diagnostic.message).join(" "),
+            },
       revision: null,
       stale: true,
       digest: createHash("sha256").update(bytes).digest("hex"),
@@ -170,5 +175,14 @@ function compareReferences(left: ContextReferenceV1, right: ContextReferenceV1):
     left.line - right.line ||
     left.column - right.column ||
     comparePortable(left.name, right.name)
+  );
+}
+
+function compareCalls(left: ContextCallV1, right: ContextCallV1): number {
+  return (
+    comparePortable(left.path, right.path) ||
+    left.line - right.line ||
+    left.column - right.column ||
+    comparePortable(left.callee, right.callee)
   );
 }

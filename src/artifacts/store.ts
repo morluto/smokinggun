@@ -17,13 +17,24 @@ export async function storeArtifact(
   root: string,
   maxBytes = 100 * 1024 * 1024,
 ): Promise<StoredArtifact> {
-  const bytes = await readRegularFile(sourcePath, maxBytes);
+  const bytes = await readArtifactBytes(sourcePath, maxBytes);
+  return storeArtifactBytes(sourcePath, bytes, root, maxBytes);
+}
+
+/** Persist bytes already accepted at an input boundary under their immutable content digest. */
+export async function storeArtifactBytes(
+  sourcePath: string,
+  bytes: Uint8Array,
+  root: string,
+  maxBytes = 100 * 1024 * 1024,
+): Promise<StoredArtifact> {
+  if (bytes.byteLength > maxBytes) throw new Error(`Artifact exceeds the ${maxBytes} byte limit.`);
   const digest = createHash("sha256").update(bytes).digest("hex");
   const directory = join(root, "sha256");
   const destination = join(directory, digest);
   await mkdir(directory, {recursive: true});
   try {
-    const existing = await readRegularFile(destination, bytes.byteLength);
+    const existing = await readArtifactBytes(destination, bytes.byteLength);
     if (existing.byteLength !== bytes.byteLength)
       throw new Error("The content-addressed artifact destination does not match its digest.");
     const existingDigest = createHash("sha256").update(existing).digest("hex");
@@ -43,7 +54,8 @@ export async function storeArtifact(
   return {reference: `artifact://sha256/${digest}`, digest, size: bytes.byteLength, name: basename(sourcePath)};
 }
 
-async function readRegularFile(path: string, maxBytes: number): Promise<Buffer> {
+/** Read a bounded regular, non-symlink artifact without persisting it. */
+export async function readArtifactBytes(path: string, maxBytes = 100 * 1024 * 1024): Promise<Buffer> {
   let handle;
   try {
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);

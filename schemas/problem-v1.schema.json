@@ -18,7 +18,8 @@
       "type": "string"
     },
     "path": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "recovery": {
       "type": "string"

@@ -11,17 +11,17 @@ const outputFormats = ["human", "json", "markdown", "sarif"] as const;
 export type OutputFormat = (typeof outputFormats)[number];
 
 const fileConfigSchema = z.strictObject({
-  cwd: z.string().optional(),
+  cwd: z.string().min(1).optional(),
   format: z.enum(outputFormats).optional(),
-  output: z.string().optional(),
+  output: z.string().min(1).optional(),
   noColor: z.boolean().optional(),
   quiet: z.boolean().optional(),
   debug: z.boolean().optional(),
   nonInteractive: z.boolean().optional(),
   strict: z.boolean().optional(),
   failOn: z.string().min(1).optional(),
-  exclude: z.array(z.string()).optional(),
-  adapters: z.array(z.string()).optional(),
+  exclude: z.array(z.string().min(1)).optional(),
+  adapters: z.array(z.string().min(1)).optional(),
   maxFindings: z.number().int().positive().optional(),
 });
 
@@ -134,10 +134,8 @@ export async function loadConfig(
     nonInteractive: merged.nonInteractive ?? false,
     strict: merged.strict ?? false,
     failOn: merged.failOn,
-    exclude: [...(merged.exclude ?? [])].sort(comparePortable),
-    adapters: [...(merged.adapters ?? [])]
-      .map((value) => resolve(configPath === undefined ? initialCwd : dirname(configPath), value))
-      .sort(comparePortable),
+    exclude: uniqueSorted(merged.exclude ?? []),
+    adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
     maxFindings: merged.maxFindings ?? 80,
     source,
     digest: digestConfig({
@@ -149,10 +147,8 @@ export async function loadConfig(
       nonInteractive: merged.nonInteractive ?? false,
       strict: merged.strict ?? false,
       failOn: merged.failOn,
-      exclude: [...(merged.exclude ?? [])].sort(comparePortable),
-      adapters: [...(merged.adapters ?? [])]
-        .map((value) => resolve(configPath === undefined ? initialCwd : dirname(configPath), value))
-        .sort(comparePortable),
+      exclude: uniqueSorted(merged.exclude ?? []),
+      adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
       maxFindings: merged.maxFindings ?? 80,
     }),
   };
@@ -259,6 +255,14 @@ function stripConfigMeta(overrides: CliOverrides): FileConfig {
   if (overrides.adapters !== undefined) values.adapters = [...overrides.adapters];
   if (overrides.maxFindings !== undefined) values.maxFindings = overrides.maxFindings;
   return values;
+}
+
+function uniqueSorted(values: ReadonlyArray<string>): string[] {
+  return [...new Set(values)].sort(comparePortable);
+}
+
+function resolveAdapterPaths(values: ReadonlyArray<string>, base: string): string[] {
+  return uniqueSorted(values.map((value) => resolve(base, value)));
 }
 
 function digestConfig(value: unknown): string {

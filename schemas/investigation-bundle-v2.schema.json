@@ -1,254 +1,4362 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "schemaVersion": {
-      "type": "string",
-      "const": "footgun.investigation-bundle.v2"
-    },
-    "id": {
-      "type": "string",
-      "pattern": "^inv_[a-f0-9]{16}$"
-    },
-    "state": {
-      "type": "string",
-      "enum": [
-        "created",
-        "inventoried",
-        "scanned",
-        "context-resolved",
-        "measurement-planned",
-        "baseline-measured",
-        "candidate-compared",
-        "behavior-validated",
-        "reported",
-        "blocked",
-        "inconclusive",
-        "unavailable",
-        "cancelled",
-        "failed"
-      ]
-    },
-    "root": {
-      "type": "string",
-      "minLength": 1
-    },
-    "repository": {
+  "anyOf": [
+    {
       "type": "object",
       "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
         "root": {
           "type": "string",
           "minLength": 1
         },
-        "revision": {
-          "anyOf": [
-            {
-              "type": "string"
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
             },
-            {
-              "type": "null"
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
             }
-          ]
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
         },
-        "dirty": {
-          "type": "boolean"
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "created"
+        },
+        "reports": {
+          "maxItems": 0,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "maxItems": 0,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
         }
       },
       "required": [
+        "schemaVersion",
+        "id",
         "root",
-        "revision",
-        "dirty"
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
       ],
       "additionalProperties": false
     },
-    "sourceDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "createdAt": {
-      "type": "string",
-      "format": "date-time",
-      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-    },
-    "findingIds": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^fg_[a-f0-9]{16}$"
-      }
-    },
-    "callers": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "inputs": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "tests": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "workloads": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "assumptions": {
-      "default": [],
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "versions": {
-      "default": {},
+    {
       "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "reports": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "evidence": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "footgun.evidence.v2"
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "static",
-              "estimate",
-              "measurement",
-              "benchmark",
-              "profile",
-              "trace",
-              "behavior",
-              "context",
-              "unknown"
-            ]
-          },
-          "claimClass": {
-            "type": "string",
-            "enum": [
-              "static-fact",
-              "theoretical-estimate",
-              "empirical-scaling",
-              "constant-factor",
-              "system-bottleneck",
-              "behavioral",
-              "unknown"
-            ]
-          },
-          "summary": {
-            "type": "string",
-            "minLength": 1
-          },
-          "artifact": {
-            "type": "string"
-          },
-          "digest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "provenance": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
             },
-            "additionalProperties": {
-              "type": "string"
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
             }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
           }
         },
-        "required": [
-          "schemaVersion",
-          "id",
-          "kind",
-          "summary"
-        ],
-        "additionalProperties": false
-      }
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "inventoried"
+        },
+        "reports": {
+          "maxItems": 0,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "maxItems": 0,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
     },
-    "diagnostics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "schemaVersion": {
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
             "type": "string",
-            "const": "footgun.problem.v1"
-          },
-          "code": {
-            "type": "string",
-            "minLength": 1
-          },
-          "message": {
-            "type": "string",
-            "minLength": 1
-          },
-          "detail": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "recovery": {
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
             "type": "string"
           }
         },
-        "required": [
-          "schemaVersion",
-          "code",
-          "message"
-        ],
-        "additionalProperties": false
-      }
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "scanned"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "context-resolved"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "measurement-planned"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "baseline-measured"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "candidate-compared"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "behavior-validated"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "reported"
+        },
+        "reports": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "blocked"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "inconclusive"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "unavailable"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "cancelled"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.investigation-bundle.v2"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^inv_[a-f0-9]{16}$"
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dirty": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "revision",
+            "dirty"
+          ],
+          "additionalProperties": false
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^fg_[a-f0-9]{16}$"
+          }
+        },
+        "callers": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workloads": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "versions": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "state": {
+          "type": "string",
+          "const": "failed"
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary",
+                  "artifact"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "footgun.evidence.v2"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "static",
+                      "estimate",
+                      "measurement",
+                      "benchmark",
+                      "profile",
+                      "trace",
+                      "behavior",
+                      "context",
+                      "unknown"
+                    ]
+                  },
+                  "claimClass": {
+                    "type": "string",
+                    "enum": [
+                      "static-fact",
+                      "theoretical-estimate",
+                      "empirical-scaling",
+                      "constant-factor",
+                      "system-bottleneck",
+                      "behavioral",
+                      "unknown"
+                    ]
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "artifact": {
+                    "not": {}
+                  },
+                  "digest": {
+                    "not": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "id",
+                  "kind",
+                  "summary"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "root",
+        "createdAt",
+        "callers",
+        "inputs",
+        "tests",
+        "workloads",
+        "assumptions",
+        "versions",
+        "diagnostics",
+        "state",
+        "reports",
+        "evidence"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "schemaVersion",
-    "id",
-    "state",
-    "root",
-    "createdAt",
-    "callers",
-    "inputs",
-    "tests",
-    "workloads",
-    "assumptions",
-    "versions",
-    "reports",
-    "evidence",
-    "diagnostics"
   ],
-  "additionalProperties": false,
   "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

@@ -3,7 +3,13 @@ import {constants} from "node:fs";
 import {lstat, open, realpath} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
-import {Protocol, type AdapterResultV2, type ProblemV1} from "../protocol/index.js";
+import {
+  Protocol,
+  type AdapterManifestV1,
+  type AdapterRequestV1,
+  type AdapterResultV2,
+  type ProblemV1,
+} from "../protocol/index.js";
 import {executionEnvironment, redactCommand, redactSensitive} from "../execution/environment.js";
 import {isWithinRoot, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
@@ -33,7 +39,16 @@ export async function runSubprocessAdapter(
       "The adapter request is invalid.",
       "Regenerate the request from the supported protocol version.",
     );
-  const command = manifest.data.command;
+  return runParsedSubprocessAdapter(manifest.data, request.data, options);
+}
+
+/** Run an adapter whose manifest and request have already crossed their schema boundaries. */
+export async function runParsedSubprocessAdapter(
+  manifest: AdapterManifestV1,
+  request: AdapterRequestV1,
+  options: AdapterRunOptions,
+): Promise<AdapterResultV2 | ProblemV1> {
+  const command = manifest.command;
   const executable = command[0];
   if (executable === undefined)
     return problem(
@@ -42,26 +57,26 @@ export async function runSubprocessAdapter(
       "Declare an executable and arguments in the manifest.",
     );
   const identity = {
-    id: manifest.data.id,
-    version: manifest.data.version,
-    command: redactCommand(manifest.data.command, options.root),
+    id: manifest.id,
+    version: manifest.version,
+    command: redactCommand(manifest.command, options.root),
   };
-  const requestDigest = createHash("sha256").update(stableJson(request.data)).digest("hex");
+  const requestDigest = createHash("sha256").update(stableJson(request)).digest("hex");
   const failure = (state: AdapterResultV2["state"], message: string): AdapterResultV2 => ({
-    ...failedAdapter(request.data.requestId, state, message, requestDigest),
+    ...failedAdapter(request.requestId, state, message, requestDigest),
     adapter: identity,
-    ...(request.data.configDigest === undefined ? {} : {configDigest: request.data.configDigest}),
-    ...(request.data.sourceDigest === undefined ? {} : {sourceDigest: request.data.sourceDigest}),
+    ...(request.configDigest === undefined ? {} : {configDigest: request.configDigest}),
+    ...(request.sourceDigest === undefined ? {} : {sourceDigest: request.sourceDigest}),
   });
   try {
     const result = await execa(executable, command.slice(1), {
       cwd: options.root,
-      input: JSON.stringify(request.data),
-      timeout: manifest.data.limits.timeoutMs,
+      input: JSON.stringify(request),
+      timeout: manifest.limits.timeoutMs,
       forceKillAfterDelay: 250,
       cleanup: true,
       windowsHide: false,
-      maxBuffer: manifest.data.limits.maxOutputBytes,
+      maxBuffer: manifest.limits.maxOutputBytes,
       env: executionEnvironment({}, false),
       extendEnv: false,
       reject: false,
@@ -83,13 +98,13 @@ export async function runSubprocessAdapter(
         "The adapter result does not satisfy AdapterResultV2.",
         "Update the adapter to the supported protocol version.",
       );
-    if (parsed.data.requestId !== request.data.requestId)
+    if (parsed.data.requestId !== request.requestId)
       return problem(
         "adapter-request-mismatch",
         "The adapter result requestId does not match the request.",
         "Run the adapter once per request and preserve requestId.",
       );
-    const boundaryProblem = await checkArtifacts(parsed.data, options.root, manifest.data.limits.maxArtifactBytes);
+    const boundaryProblem = await checkArtifacts(parsed.data, options.root, manifest.limits.maxArtifactBytes);
     if (boundaryProblem !== undefined) return boundaryProblem;
     const findingBoundaryProblem = checkFindingLocations(parsed.data, options.root);
     if (findingBoundaryProblem !== undefined) return findingBoundaryProblem;
@@ -99,8 +114,8 @@ export async function runSubprocessAdapter(
     return {
       ...parsed.data,
       requestDigest,
-      ...(request.data.configDigest === undefined ? {} : {configDigest: request.data.configDigest}),
-      ...(request.data.sourceDigest === undefined ? {} : {sourceDigest: request.data.sourceDigest}),
+      ...(request.configDigest === undefined ? {} : {configDigest: request.configDigest}),
+      ...(request.sourceDigest === undefined ? {} : {sourceDigest: request.sourceDigest}),
       ...(stderr.length === 0
         ? {}
         : {

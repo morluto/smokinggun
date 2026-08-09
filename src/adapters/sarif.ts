@@ -61,6 +61,7 @@ export function importSarif(
       recovery: "Pass a SARIF 2.1.0 document or generate one with `smokinggun scan --format sarif`.",
     };
   const findings: FindingV2[] = [];
+  const findingIds = new Set<string>();
   const diagnostics: ScanReportV2["diagnostics"] = [];
   const scannerNames: string[] = [];
   for (const [runIndex, run] of parsed.data.runs.entries()) {
@@ -101,9 +102,21 @@ export function importSarif(
       const fingerprint =
         result.fingerprints === undefined ? `${path}\0${line}\0${resultIndex}` : stableJson(result.fingerprints);
       const id = `fg_${createHash("sha256")
-        .update(`${scanner}\0${result.ruleId ?? "unknown"}\0${fingerprint}`)
+        .update(
+          `${scanner}\0${result.ruleId ?? "unknown"}\0${portablePath}\0${line}\0${Math.max(0, (region?.startColumn ?? 1) - 1)}\0${Math.max(line, region?.endLine ?? line)}\0${Math.max(0, (region?.endColumn ?? region?.startColumn ?? 1) - 1)}\0${fingerprint}`,
+        )
         .digest("hex")
         .slice(0, 16)}`;
+      if (findingIds.has(id)) {
+        diagnostics.push({
+          schemaVersion: "footgun.problem.v1",
+          code: "sarif-finding-duplicate",
+          message: `SARIF result ${runIndex}:${resultIndex} duplicates an imported finding identity.`,
+          recovery: "Inspect duplicate SARIF results; SmokingGun retained the first occurrence.",
+        });
+        continue;
+      }
+      findingIds.add(id);
       const thirdParty = capProperties({
         properties: result.properties,
         relatedLocations: result.relatedLocations,

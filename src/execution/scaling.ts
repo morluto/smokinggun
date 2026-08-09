@@ -2,8 +2,7 @@ import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import {
   Protocol,
-  isMultiScalingWorkload,
-  isSingleScalingWorkload,
+  classifyWorkload,
   type MultiScalingWorkloadV2,
   type ProblemV1,
   type SingleScalingWorkloadV2,
@@ -29,20 +28,20 @@ export async function measureScaling(
       "The workload is not a valid WorkloadV2 descriptor.",
       "Provide a strict workload with an input-size parameterization.",
     );
-  const workload = parsed.data;
-  if (isMultiScalingWorkload(workload))
+  const workload = classifyWorkload(parsed.data);
+  if (workload.kind === "multi-scaling")
     return problem(
       "scaling-profile-unavailable",
       "A multi-parameter workload must use the multi-scaling runner.",
       "Call measureMultiScaling for a multiParameterization descriptor.",
     );
-  if (!isSingleScalingWorkload(workload))
+  if (workload.kind !== "single-scaling")
     return problem(
       "scaling-parameter-missing",
       "The workload does not declare an input-size parameterization.",
       "Add name, values, and an explicit commandIndex to WorkloadV2.",
     );
-  return measureParsedScaling(workload, options);
+  return measureParsedScaling(workload.workload, options);
 }
 
 /** Measure a single-parameter workload already parsed at the caller's boundary. */
@@ -127,14 +126,14 @@ export async function measureMultiScaling(
       "The workload is not a valid WorkloadV2 descriptor.",
       "Provide a strict workload.",
     );
-  const workload = parsed.data;
-  if (!isMultiScalingWorkload(workload))
+  const workload = classifyWorkload(parsed.data);
+  if (workload.kind !== "multi-scaling")
     return problem(
       "scaling-parameters-missing",
       "The workload does not declare a multi-parameter scaling plan.",
       "Add multiParameterization.",
     );
-  return measureParsedMultiScaling(workload, options);
+  return measureParsedMultiScaling(workload.workload, options);
 }
 
 /** Measure a multi-parameter workload already parsed at the caller's boundary. */

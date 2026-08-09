@@ -1,16 +1,15 @@
 import {createHash} from "node:crypto";
-import {join, resolve, relative, isAbsolute} from "node:path";
+import {join, resolve, relative} from "node:path";
 import {cp, lstat, mkdir, mkdtemp, realpath, stat} from "node:fs/promises";
 import {
   Protocol,
-  isScalingWorkload,
+  classifyWorkload,
+  type MeasurementArtifactV1,
   type MeasurementV1,
   type ProblemV1,
-  type ScalingAnalysisV2,
-  type ScalingAnalysisV3,
-  type WorkloadV2,
+  type UnparameterizedWorkloadV2,
 } from "../protocol/index.js";
-import {executeWorkload} from "./runner.js";
+import {classifyExecutableWorkload, executeWorkload} from "./runner.js";
 import {stableJson} from "../serialization.js";
 import {executionEnvironment, redactCommand} from "./environment.js";
 import {isWithinRoot, portablePath} from "../paths.js";
@@ -30,52 +29,26 @@ export async function measureWorkload(input: unknown, options: MeasurementOption
       "The workload is not a valid WorkloadV2 descriptor.",
       "Provide strict JSON with command, cwd, repetitions, timeoutMs, and execution profile.",
     );
-  return measureParsedWorkload(parsed.data, options);
-}
-
-/** Execute a workload already parsed at the caller's boundary. */
-export async function measureParsedWorkload(
-  workload: WorkloadV2,
-  options: MeasurementOptions,
-): Promise<MeasurementV1 | ProblemV1> {
-  if (workload.requestedProfile === "read-only")
-    return problem(
-      "execution-profile-unavailable",
-      "The read-only profile does not execute workloads; measurement requires an explicit local or isolated execution profile.",
-      "Use local-exec for an explicitly authorized host process or container-exec with a pinned runner.",
-    );
-  if (
-    workload.requestedProfile !== "local-exec" &&
-    workload.requestedProfile !== "container-exec" &&
-    workload.requestedProfile !== "candidate-write"
-  )
-    return problem(
-      "execution-profile-unavailable",
-      `The ${workload.requestedProfile} execution profile is unavailable in this build.`,
-      "Use local-exec, candidate-write, or container-exec with an explicit runner.",
-    );
-  if (isScalingWorkload(workload))
+  const workload = classifyWorkload(parsed.data);
+  if (workload.kind !== "unparameterized")
     return problem(
       "scaling-profile-unavailable",
       "This runner does not silently collapse a scaling series into one measurement.",
       "Use the scaling runner that matches the declared parameterization.",
     );
-  if (
-    workload.resourceLimits?.cpuMs !== undefined ||
-    workload.resourceLimits?.memoryBytes !== undefined ||
-    workload.resourceLimits?.maxProcesses !== undefined
-  )
-    if (workload.requestedProfile === "container-exec" && workload.resourceLimits?.cpuMs === undefined) {
-      // Docker and Podman apply memory and process controls in the container runner.
-    } else
-      return problem(
-        "resource-limit-unavailable",
-        "The available runners cannot enforce every requested CPU, memory, or process limit.",
-        "Use a runner with resource-limit support and remove an unsupported limit only when that control is acceptable.",
-      );
+  return measureParsedWorkload(workload.workload, options);
+}
+
+/** Execute a workload already parsed at the caller's boundary. */
+export async function measureParsedWorkload(
+  workload: UnparameterizedWorkloadV2,
+  options: MeasurementOptions,
+): Promise<MeasurementV1 | ProblemV1> {
+  const executableWorkload = classifyExecutableWorkload(workload);
+  if ("code" in executableWorkload) return executableWorkload;
   const cwd = resolve(options.root, workload.cwd);
   const root = resolve(options.root);
-  if (!isWithinRoot(root, cwd))
+  if (!(await isWithinRealRoot(root, cwd)))
     return problem(
       "workload-boundary-violation",
       "The workload cwd escapes the repository boundary.",
@@ -97,7 +70,7 @@ export async function measureParsedWorkload(
     candidateWorkspace = await createCandidateWorkspace(root, workload, options.workspaceRoot, workloadDigest);
     executionRoot = candidateWorkspace;
     executionCwd = resolve(candidateWorkspace, workload.cwd);
-    if (!isWithinRoot(candidateWorkspace, executionCwd))
+    if (!(await isWithinRealRoot(candidateWorkspace, executionCwd)))
       return problem(
         "workload-boundary-violation",
         "The candidate workload cwd escapes the isolated candidate workspace.",
@@ -113,7 +86,7 @@ export async function measureParsedWorkload(
   for (let index = 0; index < totalRuns; index += 1) {
     options.signal?.throwIfAborted();
     const started = performance.now();
-    const result = await executeWorkload(workload, {
+    const result = await executeWorkload(executableWorkload, {
       root: executionRoot,
       cwd: executionCwd,
       ...(options.signal === undefined ? {} : {signal: options.signal}),
@@ -152,6 +125,12 @@ export async function measureParsedWorkload(
     sorted.length % 2 === 0 ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2 : (sorted[middle] ?? 0);
   const meanMs = samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
   const quartiles = {q1Ms: quantile(sorted, 0.25), q3Ms: quantile(sorted, 0.75)};
+  const behavior =
+    behaviorChecks.length > 0 && behaviorChecks.every((check) => check.passed)
+      ? {behaviorValidated: true as const, behaviorChecks}
+      : behaviorChecks.length === 0
+        ? {behaviorValidated: false as const}
+        : {behaviorValidated: false as const, behaviorChecks};
   return {
     schemaVersion: "footgun.measurement.v1",
     id: `meas_${createHash("sha256").update(`${workloadDigest}\0${Date.now()}`).digest("hex").slice(0, 16)}`,
@@ -173,12 +152,13 @@ export async function measureParsedWorkload(
       expectedArtifacts: workload.expectedArtifacts.map((artifact) => portablePath(artifact)).sort(),
       datasetDigests: workload.datasetDigests,
     },
-    behaviorValidated: behaviorChecks.length > 0 && behaviorChecks.every((check) => check.passed),
+    ...behavior,
     executionProfile: workload.requestedProfile,
     environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
-    isolation: {
+    isolation: measurementIsolation(
+      workload,
       backend,
-      controlsRequested: [
+      [
         "no-shell",
         "cwd-boundary",
         "bounded-output",
@@ -188,13 +168,44 @@ export async function measureParsedWorkload(
       ],
       controlsApplied,
       downgradeReasons,
-      ...(candidateWorkspace === undefined
-        ? {}
-        : {candidateWorkspace: portablePath(relative(options.workspaceRoot ?? root, candidateWorkspace))}),
-      ...(backend === "host-process" || workload.runner === undefined ? {} : {runner: workload.runner}),
-    },
-    ...(behaviorChecks.length === 0 ? {} : {behaviorChecks}),
+      candidateWorkspace === undefined
+        ? undefined
+        : portablePath(relative(options.workspaceRoot ?? root, candidateWorkspace)),
+    ),
   };
+}
+
+function measurementIsolation(
+  workload: UnparameterizedWorkloadV2,
+  backend: MeasurementV1["isolation"]["backend"],
+  controlsRequested: string[],
+  controlsApplied: string[],
+  downgradeReasons: string[],
+  candidateWorkspace: string | undefined,
+): MeasurementV1["isolation"] {
+  const details = {controlsRequested, controlsApplied, downgradeReasons};
+  if (backend === "host-process")
+    return candidateWorkspace === undefined ? {backend, ...details} : {backend, ...details, candidateWorkspace};
+  if (workload.requestedProfile !== "container-exec")
+    throw new Error(`Execution backend ${backend} requires a parsed container workload.`);
+  switch (backend) {
+    case "docker":
+      if (workload.runner.runtime !== backend)
+        throw new Error("Execution backend docker does not match the parsed runner.");
+      return {backend, ...details, runner: workload.runner};
+    case "podman":
+      if (workload.runner.runtime !== backend)
+        throw new Error("Execution backend podman does not match the parsed runner.");
+      return {backend, ...details, runner: workload.runner};
+    case "bwrap":
+      if (workload.runner.runtime !== backend)
+        throw new Error("Execution backend bwrap does not match the parsed runner.");
+      return {backend, ...details, runner: workload.runner};
+    case "nsjail":
+      if (workload.runner.runtime !== backend)
+        throw new Error("Execution backend nsjail does not match the parsed runner.");
+      return {backend, ...details, runner: workload.runner};
+  }
 }
 
 async function validateExpectedArtifacts(
@@ -203,12 +214,6 @@ async function validateExpectedArtifacts(
 ): Promise<ProblemV1 | undefined> {
   for (const artifact of artifacts) {
     const candidate = resolve(root, artifact);
-    if (isAbsolute(artifact) || !isWithinRoot(root, candidate))
-      return problem(
-        "workload-artifact-boundary-violation",
-        "An expected workload artifact escapes the repository boundary.",
-        "Use repository-relative expectedArtifacts paths.",
-      );
     const existing = await lstat(candidate).catch(() => undefined);
     if (existing?.isSymbolicLink() || (existing !== undefined && !existing.isFile()))
       return problem(
@@ -284,7 +289,7 @@ function evaluateBehaviorChecks(
 
 async function createCandidateWorkspace(
   sourceRoot: string,
-  workload: WorkloadV2,
+  workload: UnparameterizedWorkloadV2,
   workspaceRoot: string,
   digest: string,
 ): Promise<string> {
@@ -327,16 +332,10 @@ export function parseMeasurement(input: unknown): MeasurementV1 | ProblemV1 {
       );
 }
 
-export function parseMeasurementArtifact(
-  input: unknown,
-): MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3 | ProblemV1 {
-  const multiScaling = Protocol.multiScaling.safeParse(input);
-  if (multiScaling.success) return multiScaling.data;
-  const scaling = Protocol.scaling.safeParse(input);
-  if (scaling.success) return scaling.data;
-  const measurement = Protocol.measurement.safeParse(input);
-  return measurement.success
-    ? measurement.data
+export function parseMeasurementArtifact(input: unknown): MeasurementArtifactV1 | ProblemV1 {
+  const parsed = Protocol.measurementArtifact.safeParse(input);
+  return parsed.success
+    ? parsed.data
     : problem(
         "invalid-measurement-artifact",
         "The artifact is not a valid MeasurementV1 or ScalingAnalysisV2.",
@@ -346,4 +345,12 @@ export function parseMeasurementArtifact(
 
 function problem(code: string, message: string, recovery: string): ProblemV1 {
   return {schemaVersion: "footgun.problem.v1", code, message, recovery};
+}
+
+async function isWithinRealRoot(root: string, candidate: string): Promise<boolean> {
+  const [realRoot, realCandidate] = await Promise.all([
+    realpath(root).catch(() => root),
+    realpath(candidate).catch(() => candidate),
+  ]);
+  return isWithinRoot(realRoot, realCandidate);
 }

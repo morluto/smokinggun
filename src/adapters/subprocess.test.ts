@@ -28,7 +28,11 @@ describe("subprocess adapter seam", () => {
 
   it("accepts every declared adapter result state and preserves the state", async () => {
     for (const state of ["complete", "partial", "unavailable", "blocked", "failed", "cancelled"] as const) {
-      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v2',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]})));`;
+      const diagnostics =
+        state === "complete"
+          ? "[]"
+          : "[{schemaVersion:'footgun.problem.v1',code:'fixture',message:'Fixture adapter state.'}]";
+      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v2',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:${diagnostics},rawArtifacts:[]})));`;
       const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {root: process.cwd()});
       expect("_tag" in result).toBe(false);
       if (!("_tag" in result)) expect(result.state).toBe(state);

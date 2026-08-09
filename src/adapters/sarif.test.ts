@@ -100,4 +100,41 @@ describe("SARIF import boundary", () => {
     expect(result.findings).toHaveLength(2);
     expect(result.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
   });
+
+  it("keeps a reused SARIF fingerprint distinct across locations and removes exact duplicates", () => {
+    const result = importSarif(
+      {
+        version: "2.1.0",
+        runs: [
+          {
+            tool: {driver: {name: "tool"}},
+            results: [
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/first.ts"}, region: {startLine: 1}}}],
+              },
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/second.ts"}, region: {startLine: 1}}}],
+              },
+              {
+                ruleId: "same-rule",
+                fingerprints: {primary: "shared"},
+                locations: [{physicalLocation: {artifactLocation: {uri: "src/second.ts"}, region: {startLine: 1}}}],
+              },
+            ],
+          },
+        ],
+      },
+      "/repo",
+      "a".repeat(64),
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.findings).toHaveLength(2);
+    expect(new Set(result.findings.map((finding) => finding.id)).size).toBe(2);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain("sarif-finding-duplicate");
+  });
 });

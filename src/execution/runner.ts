@@ -1,6 +1,6 @@
 import {execa} from "execa";
 import {relative, resolve} from "node:path";
-import {type ProblemV1, type WorkloadV2} from "../protocol/index.js";
+import {type ProblemV1, type UnparameterizedWorkloadV2} from "../protocol/index.js";
 import {executionEnvironment, redactSensitive} from "./environment.js";
 
 export type RunnerOptions = {
@@ -8,6 +8,11 @@ export type RunnerOptions = {
   readonly cwd: string;
   readonly signal?: AbortSignal;
 };
+
+export type ExecutableWorkloadV2 = Extract<
+  UnparameterizedWorkloadV2,
+  {readonly requestedProfile: "local-exec" | "container-exec" | "candidate-write"}
+>;
 
 type WorkloadExecutionBase = {
   readonly backend: "host-process" | "docker" | "podman" | "bwrap" | "nsjail";
@@ -30,22 +35,36 @@ type ProcessResult = {
   readonly isCanceled: boolean;
 };
 
-/** Run a validated workload through the requested process boundary without a shell. */
+/** Narrow a parsed workload to one of the profiles that may execute a process in this build. */
+export function classifyExecutableWorkload(workload: UnparameterizedWorkloadV2): ExecutableWorkloadV2 | ProblemV1 {
+  switch (workload.requestedProfile) {
+    case "local-exec":
+      return workload;
+    case "container-exec":
+      return workload;
+    case "candidate-write":
+      return workload;
+    case "read-only":
+      return problem(
+        "execution-profile-unavailable",
+        "The read-only profile does not execute workloads; measurement requires an explicit local or isolated execution profile.",
+        "Use local-exec for an explicitly authorized host process or container-exec with a pinned runner.",
+      );
+    case "service-exec":
+      return problem(
+        "execution-profile-unavailable",
+        "The service-exec execution profile is unavailable in this build.",
+        "Use local-exec, candidate-write, or container-exec with an explicit runner.",
+      );
+  }
+}
+
+/** Run an explicitly executable workload through the requested process boundary without a shell. */
 export async function executeWorkload(
-  workload: WorkloadV2,
+  workload: ExecutableWorkloadV2,
   options: RunnerOptions,
 ): Promise<WorkloadExecution | ProblemV1> {
   if (workload.requestedProfile === "container-exec") return executeContainer(workload, options);
-  if (
-    workload.requestedProfile !== "read-only" &&
-    workload.requestedProfile !== "local-exec" &&
-    workload.requestedProfile !== "candidate-write"
-  )
-    return problem(
-      "execution-profile-unavailable",
-      `The ${workload.requestedProfile} execution profile is unavailable in this build.`,
-      "Use read-only, local-exec, candidate-write, or container-exec with an explicit runner.",
-    );
   const executable = workload.command[0];
   if (executable === undefined)
     return problem("workload-command-empty", "The workload command is empty.", "Declare an executable and arguments.");
@@ -92,22 +111,13 @@ export async function executeWorkload(
   }
 }
 
-async function executeContainer(workload: WorkloadV2, options: RunnerOptions): Promise<WorkloadExecution | ProblemV1> {
+async function executeContainer(
+  workload: Extract<ExecutableWorkloadV2, {readonly requestedProfile: "container-exec"}>,
+  options: RunnerOptions,
+): Promise<WorkloadExecution | ProblemV1> {
   const runner = workload.runner;
-  if (runner === undefined)
-    return problem(
-      "container-runner-missing",
-      "container-exec requires an explicit runner configuration.",
-      "Add runner.runtime and, for Docker or Podman, an image reference containing @sha256:<digest> to WorkloadV2.",
-    );
   if (runner.runtime === "bwrap" || runner.runtime === "nsjail")
     return executeLinuxSandbox(workload, options, runner.runtime);
-  if (runner.image === undefined)
-    return problem(
-      "container-image-missing",
-      "Docker and Podman execution requires an image reference.",
-      "Add runner.image with an immutable @sha256:<digest> reference to WorkloadV2.",
-    );
   if (!runner.image.includes("@sha256:"))
     return problem(
       "container-image-unpinned",
@@ -206,7 +216,7 @@ async function executeContainer(workload: WorkloadV2, options: RunnerOptions): P
 }
 
 async function executeLinuxSandbox(
-  workload: WorkloadV2,
+  workload: Extract<ExecutableWorkloadV2, {readonly requestedProfile: "container-exec"}>,
   options: RunnerOptions,
   runtime: "bwrap" | "nsjail",
 ): Promise<WorkloadExecution | ProblemV1> {

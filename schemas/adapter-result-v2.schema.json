@@ -1,463 +1,4138 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "schemaVersion": {
-      "type": "string",
-      "const": "footgun.adapter-result.v2"
-    },
-    "requestId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "state": {
-      "type": "string",
-      "enum": [
-        "complete",
-        "partial",
-        "unavailable",
-        "blocked",
-        "failed",
-        "cancelled"
-      ]
-    },
-    "findings": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "footgun.finding.v2"
-          },
-          "id": {
-            "type": "string",
-            "pattern": "^fg_[a-f0-9]{16}$"
-          },
-          "scanner": {
-            "type": "string",
-            "minLength": 1
-          },
-          "scannerVersion": {
-            "type": "string",
-            "minLength": 1
-          },
-          "ruleId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "language": {
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "type": "string",
-            "minLength": 1
-          },
-          "symbol": {
-            "type": "string",
-            "minLength": 1
-          },
-          "claimClass": {
-            "type": "string",
-            "enum": [
-              "static-fact",
-              "theoretical-estimate",
-              "empirical-scaling",
-              "constant-factor",
-              "system-bottleneck",
-              "behavioral",
-              "unknown"
-            ]
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "high",
-              "medium",
-              "low",
-              "info"
-            ]
-          },
-          "confidence": {
-            "type": "string",
-            "enum": [
-              "candidate",
-              "type-informed",
-              "verified",
-              "unknown"
-            ]
-          },
-          "status": {
-            "default": "unvalidated",
-            "type": "string",
-            "enum": [
-              "unvalidated",
-              "supported",
-              "measured",
-              "rejected",
-              "blocked",
-              "inconclusive"
-            ]
-          },
-          "relatedFindings": {
-            "default": [],
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^fg_[a-f0-9]{16}$"
-            }
-          },
-          "message": {
-            "type": "string",
-            "minLength": 1
-          },
-          "suggestion": {
-            "type": "string",
-            "minLength": 1
-          },
-          "location": {
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
             "type": "object",
             "properties": {
-              "path": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
                 "type": "string",
                 "minLength": 1
               },
-              "startLine": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
               },
-              "startColumn": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
               },
-              "endLine": {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
+              "language": {
+                "type": "string",
+                "minLength": 1
               },
-              "endColumn": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "required": [
-              "path",
-              "startLine",
-              "startColumn",
-              "endLine",
-              "endColumn"
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
             ],
             "additionalProperties": false
-          },
-          "assumptions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "evidence": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "evidenceRecords": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "schemaVersion": {
-                  "type": "string",
-                  "const": "footgun.evidence.v2"
-                },
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "static",
-                    "estimate",
-                    "measurement",
-                    "benchmark",
-                    "profile",
-                    "trace",
-                    "behavior",
-                    "context",
-                    "unknown"
-                  ]
-                },
-                "claimClass": {
-                  "type": "string",
-                  "enum": [
-                    "static-fact",
-                    "theoretical-estimate",
-                    "empirical-scaling",
-                    "constant-factor",
-                    "system-bottleneck",
-                    "behavioral",
-                    "unknown"
-                  ]
-                },
-                "summary": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "artifact": {
-                  "type": "string"
-                },
-                "digest": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "provenance": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
                   },
-                  "additionalProperties": {
-                    "type": "string"
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
                   }
-                }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
               },
-              "required": [
-                "schemaVersion",
-                "id",
-                "kind",
-                "summary"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "thirdParty": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "complexity": {
-            "type": "object",
-            "properties": {
-              "current": {
-                "type": "string"
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
               },
-              "expected": {
-                "type": "string"
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
               }
-            },
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "schemaVersion",
-          "id",
-          "scanner",
-          "scannerVersion",
-          "ruleId",
-          "severity",
-          "confidence",
-          "status",
-          "relatedFindings",
-          "message",
-          "suggestion",
-          "location",
-          "assumptions",
-          "evidence",
-          "complexity"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "coverage": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "scanner": {
-            "type": "string",
-            "minLength": 1
-          },
-          "version": {
-            "type": "string",
-            "minLength": 1
-          },
-          "language": {
-            "type": "string",
-            "minLength": 1
-          },
-          "filesDiscovered": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "filesAnalyzed": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "parseStatus": {
-            "type": "string",
-            "enum": [
-              "complete",
-              "partial",
-              "failed",
-              "unavailable"
             ]
-          },
-          "skippedFiles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "reason": {
-            "type": "string"
           }
         },
-        "required": [
-          "scanner",
-          "version",
-          "language",
-          "filesDiscovered",
-          "filesAnalyzed",
-          "parseStatus",
-          "skippedFiles"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "diagnostics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "schemaVersion": {
-            "type": "string",
-            "const": "footgun.problem.v1"
-          },
-          "code": {
-            "type": "string",
-            "minLength": 1
-          },
-          "message": {
-            "type": "string",
-            "minLength": 1
-          },
-          "detail": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "recovery": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "schemaVersion",
-          "code",
-          "message"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "rawArtifacts": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "rawArtifactDigests": {
-      "default": {},
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {
-        "type": "string",
-        "pattern": "^[a-f0-9]{64}$"
-      }
-    },
-    "adapter": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "command": {
+        "rawArtifacts": {
           "type": "array",
           "items": {
             "type": "string",
             "minLength": 1
           }
         },
-        "tool": {
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
           "type": "object",
           "properties": {
-            "name": {
+            "id": {
               "type": "string",
               "minLength": 1
             },
             "version": {
               "type": "string",
               "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
-            "name",
-            "version"
+            "id",
+            "version",
+            "command"
           ],
           "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "complete"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [
-        "id",
-        "version",
-        "command"
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
       ],
       "additionalProperties": false
     },
-    "requestDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "configDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "sourceDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "reproduction": {
+    {
       "type": "object",
-      "propertyNames": {
-        "type": "string"
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "partial"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
       },
-      "additionalProperties": {}
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "unavailable"
+        },
+        "diagnostics": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "blocked"
+        },
+        "diagnostics": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "failed"
+        },
+        "diagnostics": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "footgun.adapter-result.v2"
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.finding.v2"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^fg_[a-f0-9]{16}$"
+              },
+              "scanner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scannerVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ruleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claimClass": {
+                "type": "string",
+                "enum": [
+                  "static-fact",
+                  "theoretical-estimate",
+                  "empirical-scaling",
+                  "constant-factor",
+                  "system-bottleneck",
+                  "behavioral",
+                  "unknown"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "candidate",
+                  "type-informed",
+                  "verified",
+                  "unknown"
+                ]
+              },
+              "status": {
+                "default": "unvalidated",
+                "type": "string",
+                "enum": [
+                  "unvalidated",
+                  "supported",
+                  "measured",
+                  "rejected",
+                  "blocked",
+                  "inconclusive"
+                ]
+              },
+              "relatedFindings": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^fg_[a-f0-9]{16}$"
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "suggestion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "startLine",
+                  "startColumn",
+                  "endLine",
+                  "endColumn"
+                ],
+                "additionalProperties": false
+              },
+              "assumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidenceRecords": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary",
+                        "artifact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "string",
+                          "const": "footgun.evidence.v2"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "static",
+                            "estimate",
+                            "measurement",
+                            "benchmark",
+                            "profile",
+                            "trace",
+                            "behavior",
+                            "context",
+                            "unknown"
+                          ]
+                        },
+                        "claimClass": {
+                          "type": "string",
+                          "enum": [
+                            "static-fact",
+                            "theoretical-estimate",
+                            "empirical-scaling",
+                            "constant-factor",
+                            "system-bottleneck",
+                            "behavioral",
+                            "unknown"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provenance": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "artifact": {
+                          "not": {}
+                        },
+                        "digest": {
+                          "not": {}
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "id",
+                        "kind",
+                        "summary"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "thirdParty": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "complexity": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "id",
+              "scanner",
+              "scannerVersion",
+              "ruleId",
+              "severity",
+              "confidence",
+              "status",
+              "relatedFindings",
+              "message",
+              "suggestion",
+              "location",
+              "assumptions",
+              "evidence",
+              "complexity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "complete"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "partial"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "scanner": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "filesDiscovered": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "filesAnalyzed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "skippedFiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "parseStatus": {
+                    "type": "string",
+                    "const": "unavailable"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scanner",
+                  "version",
+                  "language",
+                  "filesDiscovered",
+                  "filesAnalyzed",
+                  "skippedFiles",
+                  "parseStatus",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rawArtifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "adapter": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "version",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "requestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reproduction": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "state": {
+          "type": "string",
+          "const": "cancelled"
+        },
+        "diagnostics": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "string",
+                "const": "footgun.problem.v1"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detail": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "findings",
+        "coverage",
+        "rawArtifacts",
+        "rawArtifactDigests",
+        "state",
+        "diagnostics"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "schemaVersion",
-    "requestId",
-    "state",
-    "findings",
-    "coverage",
-    "diagnostics",
-    "rawArtifacts",
-    "rawArtifactDigests"
   ],
-  "additionalProperties": false,
   "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

@@ -1,5 +1,5 @@
 import {expect, it} from "vitest";
-import {executeWorkload} from "./runner.js";
+import {classifyExecutableWorkload, executeWorkload} from "./runner.js";
 
 it("represents process completion and timeout as exclusive outcomes", async () => {
   const complete = await executeWorkload(workload("process.stdout.write('ok')", 2_000), {
@@ -36,6 +36,13 @@ it("represents an aborted workload as a cancelled outcome", async () => {
   if ("code" in cancelled) return;
   expect(cancelled.outcome).toBe("cancelled");
   expect("exitCode" in cancelled).toBe(false);
+});
+
+it("rejects non-executing workload profiles before process dispatch", () => {
+  const readOnly = classifyExecutableWorkload({...workload("process.exit(0)", 1_000), requestedProfile: "read-only"});
+  const service = classifyExecutableWorkload({...workload("process.exit(0)", 1_000), requestedProfile: "service-exec"});
+  expect(readOnly).toMatchObject({code: "execution-profile-unavailable"});
+  expect(service).toMatchObject({code: "execution-profile-unavailable"});
 });
 
 function workload(script: string, timeoutMs: number) {

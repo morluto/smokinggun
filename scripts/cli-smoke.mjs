@@ -1,8 +1,10 @@
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
-import {access, chmod, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
+import {access, chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
+import {create, toBinary} from "@bufbuild/protobuf";
+import {IndexSchema, ProtocolVersion, SymbolInformation_Kind, SymbolRole, TextEncoding} from "@scip-code/scip";
 
 const root = process.cwd();
 const entry = "dist/bin/footgun.js";
@@ -33,6 +35,12 @@ try {
     scanners.stderr.length !== 0
   )
     throw new Error("scanner registry stream contract failed");
+
+  const doctor = await run([entry, "doctor", "--format", "json"]);
+  const doctorValue = JSON.parse(doctor.stdout);
+  const packageVersion = JSON.parse(await readFile(join(root, "package.json"), "utf8")).version;
+  if (doctor.code !== 0 || doctorValue.version !== packageVersion || doctor.stderr.length !== 0)
+    throw new Error("doctor must report the package-derived tool identity");
 
   const explanation = await run([entry, "explain", "membership-in-loop", "--format", "json"]);
   const explanationValue = JSON.parse(explanation.stdout);
@@ -65,6 +73,87 @@ try {
   const scanEvidence = investigationValue.evidence.find((evidence) => evidence.artifact === "scan-report.json");
   if (scanEvidence?.digest !== storedScanDigest)
     throw new Error("investigation scan evidence digest must match its stored artifact");
+  const repeatedInvestigation = await run([
+    entry,
+    "investigate",
+    "fixtures/corpus/typescript",
+    "--format",
+    "json",
+    "--non-interactive",
+  ]);
+  const repeatedInvestigationValue = JSON.parse(repeatedInvestigation.stdout);
+  if (
+    repeatedInvestigation.code !== 0 ||
+    repeatedInvestigationValue.id !== investigationValue.id ||
+    repeatedInvestigationValue.state !== investigationValue.state ||
+    repeatedInvestigation.stderr.length !== 0
+  )
+    throw new Error("investigate must reuse the stable source/configuration investigation identity");
+
+  const scipArtifact = join(sandbox, "context.scip");
+  await writeFile(
+    scipArtifact,
+    toBinary(
+      IndexSchema,
+      create(IndexSchema, {
+        metadata: {
+          version: ProtocolVersion.UnspecifiedProtocolVersion,
+          toolInfo: {name: "fixture-indexer", version: "1.0.0"},
+          projectRoot: root,
+          textDocumentEncoding: TextEncoding.UTF8,
+        },
+        documents: [
+          {
+            language: "TypeScript",
+            relativePath: "fixtures/corpus/typescript/nested-scan.ts",
+            symbols: [{symbol: "local 0", displayName: "collect", kind: SymbolInformation_Kind.Function}],
+            occurrences: [{range: [0, 0, 7], symbol: "local 0", symbolRoles: SymbolRole.Definition}],
+          },
+        ],
+      }),
+    ),
+  );
+  const importedContext = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    investigationValue.id,
+    "--format",
+    "json",
+  ]);
+  const importedContextValue = JSON.parse(importedContext.stdout);
+  if (
+    importedContext.code !== 0 ||
+    importedContextValue.schemaVersion !== "footgun.context-import.v1" ||
+    importedContextValue.state === "unavailable" ||
+    importedContext.stderr.length !== 0
+  )
+    throw new Error("SCIP context-import contract failed");
+  const contextPointer = JSON.parse(
+    await readFile(join(sandbox, "data", "investigations", investigationValue.id, "latest.json"), "utf8"),
+  );
+  const contextBundle = JSON.parse(
+    await readFile(
+      join(
+        sandbox,
+        "data",
+        "investigations",
+        investigationValue.id,
+        "snapshots",
+        `${contextPointer.bundleDigest}.json`,
+      ),
+      "utf8",
+    ),
+  );
+  const contextEvidence = contextBundle.evidence.find((evidence) => evidence.kind === "context");
+  if (contextEvidence === undefined) throw new Error("context import must append investigation evidence");
+  const storedContext = await readFile(
+    join(sandbox, "data", "investigations", investigationValue.id, contextEvidence.artifact),
+  );
+  if (contextEvidence.digest !== createHash("sha256").update(storedContext).digest("hex"))
+    throw new Error("context evidence digest must match its stored artifact");
 
   const firstPlan = await run([
     entry,
@@ -116,6 +205,23 @@ try {
 
   const scanArtifact = join(sandbox, "scan-report.json");
   await writeFile(scanArtifact, scan.stdout, "utf8");
+  const invalidArtifact = join(root, "package.json");
+  const invalidArtifactDigest = createHash("sha256")
+    .update(await readFile(invalidArtifact))
+    .digest("hex");
+  const invalidReport = await run([entry, "report", invalidArtifact, "--format", "json"]);
+  const invalidReportValue = JSON.parse(invalidReport.stdout);
+  const invalidArtifactStored = await access(join(sandbox, "data", "artifacts", "sha256", invalidArtifactDigest)).then(
+    () => true,
+    () => false,
+  );
+  if (
+    invalidReport.code !== 2 ||
+    invalidReportValue.schemaVersion !== "footgun.problem.v1" ||
+    invalidArtifactStored ||
+    invalidReport.stderr.length !== 0
+  )
+    throw new Error("invalid report input must be rejected before artifact storage");
   const renderedReport = await run([entry, "report", scanArtifact, "--format", "json"]);
   const renderedValue = JSON.parse(renderedReport.stdout);
   if (
@@ -178,6 +284,72 @@ try {
   )
     throw new Error("comparison SARIF stream contract failed");
 
+  const retryInvestigationId = "inv_0123456789abcdef";
+  const retryInvestigationDirectory = join(sandbox, "data", "investigations", retryInvestigationId);
+  await mkdir(retryInvestigationDirectory, {recursive: true});
+  await writeFile(
+    join(retryInvestigationDirectory, "bundle.json"),
+    JSON.stringify({
+      schemaVersion: "footgun.investigation-bundle.v2",
+      id: retryInvestigationId,
+      state: "baseline-measured",
+      root: ".",
+      createdAt: new Date().toISOString(),
+      reports: ["../measurements/seed.json"],
+      evidence: [
+        {
+          schemaVersion: "footgun.evidence.v2",
+          id: `${retryInvestigationId}:measurement:seed`,
+          kind: "measurement",
+          claimClass: "constant-factor",
+          summary: "Seed measurement",
+          artifact: "../measurements/seed.json",
+        },
+      ],
+      diagnostics: [],
+    }),
+    "utf8",
+  );
+  const retryBaselineArtifact = join(sandbox, "retry-baseline.json");
+  const retryCandidateArtifact = join(sandbox, "retry-candidate.json");
+  await writeFile(
+    retryBaselineArtifact,
+    JSON.stringify({...measurement("c", 10), investigation: retryInvestigationId}),
+    "utf8",
+  );
+  await writeFile(
+    retryCandidateArtifact,
+    JSON.stringify({...measurement("d", 8), investigation: retryInvestigationId}),
+    "utf8",
+  );
+  const initialComparison = await run([
+    entry,
+    "compare",
+    retryBaselineArtifact,
+    retryCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const pointerAfterInitialComparison = await readFile(join(retryInvestigationDirectory, "latest.json"), "utf8");
+  const retriedComparison = await run([
+    entry,
+    "compare",
+    retryBaselineArtifact,
+    retryCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const pointerAfterRetriedComparison = await readFile(join(retryInvestigationDirectory, "latest.json"), "utf8");
+  if (
+    initialComparison.code !== 0 ||
+    retriedComparison.code !== 0 ||
+    JSON.parse(retriedComparison.stdout).schemaVersion !== "footgun.comparison.v2" ||
+    initialComparison.stderr.length !== 0 ||
+    retriedComparison.stderr.length !== 0 ||
+    pointerAfterInitialComparison !== pointerAfterRetriedComparison
+  )
+    throw new Error("a completed comparison must be retry-safe without changing its investigation snapshot");
+
   const policy = await run([entry, "scan", "fixtures/corpus/typescript", "--format", "json", "--fail-on", "finding"]);
   if (
     policy.code !== 4 ||
@@ -207,11 +379,82 @@ try {
   ]);
   const selectedValue = JSON.parse(selectedScanner.stdout);
   if (
-    selectedScanner.code !== 3 ||
-    selectedValue.coverage[0]?.parseStatus !== "unavailable" ||
+    selectedScanner.code !== 0 ||
+    !selectedValue.coverage.some(
+      (coverage) => coverage.scanner === "footgun.typescript-semantic" && coverage.parseStatus === "complete",
+    ) ||
+    selectedValue.coverage.some((coverage) => coverage.scanner === "footgun.structural") ||
     selectedScanner.stderr.length !== 0
   )
     throw new Error("explicit scanner selection coverage contract failed");
+
+  const canonicalPython = await run([
+    entry,
+    "scan",
+    "fixtures/corpus/python",
+    "--scanner",
+    "footgun.python-semantic",
+    "--format",
+    "json",
+    "--strict",
+  ]);
+  const canonicalPythonValue = JSON.parse(canonicalPython.stdout);
+  if (
+    canonicalPython.code !== 0 ||
+    !canonicalPythonValue.findings.some((finding) => finding.scanner === "footgun.python-semantic") ||
+    canonicalPython.stderr.length !== 0
+  )
+    throw new Error("advertised canonical scanner IDs must be selectable");
+
+  const unknownScanner = await run([
+    entry,
+    "scan",
+    "fixtures/corpus/python",
+    "--scanner",
+    "definitely-not-a-scanner",
+    "--format",
+    "json",
+  ]);
+  const unknownScannerValue = JSON.parse(unknownScanner.stdout);
+  if (
+    unknownScanner.code !== 2 ||
+    unknownScannerValue.code !== "invalid-scanner-selection" ||
+    unknownScanner.stderr.length !== 0
+  )
+    throw new Error("unknown scanner IDs must fail before traversal");
+
+  const unmatchedScope = await run([
+    entry,
+    "scan",
+    "fixtures/corpus",
+    "--only",
+    "missing",
+    "--format",
+    "json",
+    "--strict",
+  ]);
+  const unmatchedScopeValue = JSON.parse(unmatchedScope.stdout);
+  if (
+    unmatchedScope.code !== 3 ||
+    !unmatchedScopeValue.diagnostics.some((diagnostic) => diagnostic.code === "scan-scope-unmatched") ||
+    unmatchedScope.stderr.length !== 0
+  )
+    throw new Error("unmatched explicit scope must remain incomplete under strict mode");
+
+  const unmatchedPythonScope = await run([
+    entry,
+    "scan",
+    "fixtures/corpus",
+    "--only",
+    "missing",
+    "--scanner",
+    "footgun.python-semantic",
+    "--format",
+    "json",
+    "--strict",
+  ]);
+  if (unmatchedPythonScope.code !== 3 || JSON.parse(unmatchedPythonScope.stdout).diagnostics.length === 0)
+    throw new Error("unmatched explicit scope must remain incomplete for selected Python scanning");
 
   const adapterProbeMarker = join(sandbox, "adapter-probe-marker");
   await writeFile(join(sandbox, "fixture.ts"), "export const value = 1;\n", "utf8");
@@ -244,6 +487,63 @@ try {
     !untrustedAdapterValue.diagnostics.some((diagnostic) => diagnostic.code === "adapter-execution-required")
   )
     throw new Error("repository-configured adapters must not execute during static scans");
+
+  await writeFile(join(sandbox, "smokinggun.config.json"), "{}", "utf8");
+  const rejectedAuthorizedSelection = await run([
+    entry,
+    "scan",
+    join(root, "fixtures", "corpus", "python"),
+    "--cwd",
+    sandbox,
+    "--adapter",
+    "adapter.json",
+    "--scanner",
+    "definitely-not-a-scanner",
+    "--allow-adapter-execution",
+    "--format",
+    "json",
+  ]);
+  const adapterExecutedBeforeSelectionFailure = await access(adapterProbeMarker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    rejectedAuthorizedSelection.code !== 2 ||
+    JSON.parse(rejectedAuthorizedSelection.stdout).code !== "invalid-scanner-selection" ||
+    adapterExecutedBeforeSelectionFailure
+  )
+    throw new Error("invalid scanner selection must fail before authorized adapter probing");
+
+  const adapterAgainstSeparateTarget = await run([
+    entry,
+    "scan",
+    join(root, "fixtures", "corpus", "python"),
+    "--cwd",
+    sandbox,
+    "--adapter",
+    "adapter.json",
+    "--scanner",
+    "untrusted-adapter",
+    "--allow-adapter-execution",
+    "--format",
+    "json",
+  ]);
+  const adapterAgainstSeparateTargetValue = JSON.parse(adapterAgainstSeparateTarget.stdout);
+  const authorizedAdapterRan = await access(adapterProbeMarker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    adapterAgainstSeparateTarget.code !== 0 ||
+    !authorizedAdapterRan ||
+    !adapterAgainstSeparateTargetValue.coverage.some(
+      (coverage) => coverage.scanner === "footgun.adapter:untrusted-adapter",
+    ) ||
+    adapterAgainstSeparateTargetValue.diagnostics.some(
+      (diagnostic) => diagnostic.code === "adapter-manifest-read-failed",
+    )
+  )
+    throw new Error("adapter manifests must be resolved once before scanning a separate target");
 
   let rawTrace = false;
   if (process.platform !== "win32") {
@@ -316,6 +616,67 @@ try {
     markerExists
   )
     throw new Error("invalid investigation must fail before executing the workload");
+
+  const unreadyInvestigationId = "inv_1111111111111111";
+  const unreadyInvestigationDirectory = join(sandbox, "data", "investigations", unreadyInvestigationId);
+  await mkdir(unreadyInvestigationDirectory, {recursive: true});
+  await writeFile(
+    join(unreadyInvestigationDirectory, "bundle.json"),
+    JSON.stringify({
+      schemaVersion: "footgun.investigation-bundle.v2",
+      id: unreadyInvestigationId,
+      state: "created",
+      root: ".",
+      createdAt: new Date().toISOString(),
+      reports: [],
+      evidence: [],
+      diagnostics: [],
+    }),
+    "utf8",
+  );
+  const unreadyInvestigation = await run([
+    entry,
+    "measure",
+    unreadyInvestigationId,
+    "--workload",
+    workload,
+    "--execute",
+    "--format",
+    "json",
+  ]);
+  const unreadyInvestigationValue = JSON.parse(unreadyInvestigation.stdout);
+  const unreadyMarkerExists = await access(marker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    unreadyInvestigation.code !== 1 ||
+    unreadyInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
+    unreadyInvestigationValue.code !== "investigation-not-measurable" ||
+    unreadyMarkerExists
+  )
+    throw new Error("an unready investigation must fail before executing or persisting a measurement");
+
+  const unreadyContext = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    unreadyInvestigationId,
+    "--format",
+    "json",
+  ]);
+  const unreadyContextValue = JSON.parse(unreadyContext.stdout);
+  const unreadyInvestigationFiles = await readdir(unreadyInvestigationDirectory);
+  if (
+    unreadyContext.code !== 1 ||
+    unreadyContextValue.schemaVersion !== "footgun.problem.v1" ||
+    unreadyContextValue.code !== "investigation-not-context-ready" ||
+    unreadyInvestigationFiles.length !== 1 ||
+    unreadyInvestigationFiles[0] !== "bundle.json"
+  )
+    throw new Error("an unready investigation must fail before persisting imported context");
 
   const missingContext = await run([
     entry,
@@ -394,10 +755,12 @@ function measurement(id, medianMs) {
       datasetDigests: {},
     },
     behaviorValidated: true,
+    behaviorChecks: [{check: "exit-code:0", passed: true}],
     executionProfile: "container-exec",
     environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
     isolation: {
       backend: "bwrap",
+      runner: {runtime: "bwrap"},
       controlsRequested: ["network-none"],
       controlsApplied: ["network-none"],
       downgradeReasons: [],
