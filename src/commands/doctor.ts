@@ -2,7 +2,7 @@ import {readFile} from "node:fs/promises";
 import {Flags} from "@oclif/core";
 import {execa} from "execa";
 import {z} from "zod";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {probeTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {probeIsolation} from "../execution/capabilities.js";
@@ -20,7 +20,7 @@ export default class Doctor extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Doctor);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     const lock = await readFile(new URL("../../grammar.lock.json", import.meta.url), "utf8").catch(() => "{}");
     const treeSitter = await probeTreeSitter();
     const registry = parsed.flags["check-updates"]

@@ -1,6 +1,6 @@
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {readFile} from "node:fs/promises";
 import {join} from "node:path";
 import {measureParsedWorkload} from "../execution/measure.js";
@@ -37,7 +37,7 @@ export default class Measure extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Measure);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     if (!parsed.flags.workload || !parsed.flags.execute) {
       this.emitActionRequired(
         {

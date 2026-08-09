@@ -1,7 +1,7 @@
 import {Args, Flags} from "@oclif/core";
 import {createHash} from "node:crypto";
 import {join} from "node:path";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../../cli/base-command.js";
 import {printResult} from "../../cli/command-output.js";
 import {importScip} from "../../context/scip.js";
 import {
@@ -23,7 +23,7 @@ export default class ContextImport extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(ContextImport);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     const result = await importScip(parsed.args.artifact, context.config.cwd);
     const index = result.state === "unavailable" ? undefined : result.index;
     const value = {

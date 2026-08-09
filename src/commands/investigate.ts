@@ -2,7 +2,7 @@ import {createHash} from "node:crypto";
 import {join} from "node:path";
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {scanRepository} from "../scan/repository.js";
 import type {InvestigationBundleV2, ScanReportV2} from "../protocol/index.js";
@@ -27,7 +27,7 @@ export default class Investigate extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Investigate);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     try {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
       const finding = parsed.flags.finding;

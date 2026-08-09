@@ -1,6 +1,6 @@
 import {Args, Flags} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {renderScanReport} from "../reports/render.js";
 import {parseScanReport} from "../protocol/index.js";
 import {writeResult, shouldPrint} from "../cli/output.js";
@@ -43,7 +43,7 @@ export default class Report extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Report);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     try {
       if (parsed.flags.investigation !== undefined) {
         try {

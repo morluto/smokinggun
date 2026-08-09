@@ -1,6 +1,6 @@
 import {Args} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
-import {BaseCommand, globalFlags, type ParsedGlobalFlags} from "../cli/base-command.js";
+import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import type {RuntimeContext} from "../cli/context.js";
 import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
@@ -39,7 +39,7 @@ export default class Compare extends BaseCommand {
 
   public async run(): Promise<void> {
     const parsed = await this.parse(Compare);
-    const context = await this.context(parsed.flags as ParsedGlobalFlags);
+    const context = await this.context(parsed.flags);
     try {
       const baselineBytes = await readFile(parsed.args.baseline);
       const candidateBytes = await readFile(parsed.args.candidate);
