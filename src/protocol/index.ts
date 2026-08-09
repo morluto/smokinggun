@@ -15,9 +15,10 @@ function isRepositoryRelativePath(path: string): boolean {
 
 function isPortableRepositoryPath(path: string): boolean {
   return (
-    isRepositoryRelativePath(path) &&
-    !path.includes("\\") &&
-    path.split("/").every((segment) => segment.length > 0 && segment !== ".")
+    path === "." ||
+    (isRepositoryRelativePath(path) &&
+      !path.includes("\\") &&
+      path.split("/").every((segment) => segment.length > 0 && segment !== "."))
   );
 }
 
@@ -1022,6 +1023,7 @@ const benchmarkRecordSchema = z
     z.strictObject({...benchmarkRecordFields, ...noRawArtifactFields}),
   ])
   .superRefine((record, context) => {
+    if (record.metadata.summaryOnly === true) return;
     const sorted = [...record.samplesMs].sort((left, right) => left - right);
     const middle = Math.floor(sorted.length / 2);
     const median =

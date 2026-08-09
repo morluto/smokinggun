@@ -3,6 +3,7 @@ import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {expect, it} from "vitest";
+import {Protocol} from "../protocol/index.js";
 import {
   adapterExecutionAuthorized,
   adapterExecutionNotAuthorized,
@@ -107,5 +108,17 @@ it("does not expose host paths for an invalid manifest outside the repository", 
   } finally {
     await rm(root, {recursive: true, force: true});
     await rm(external, {recursive: true, force: true});
+  }
+});
+
+it("identifies an unreadable manifest at the repository root", async () => {
+  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-root-manifest-"));
+  try {
+    const result = await parseExternalAdapters([root], root);
+    const diagnostic = result.diagnostics[0];
+    expect(diagnostic).toMatchObject({code: "adapter-manifest-read-failed", path: "."});
+    expect(Protocol.problem.safeParse(diagnostic).success).toBe(true);
+  } finally {
+    await rm(root, {recursive: true, force: true});
   }
 });

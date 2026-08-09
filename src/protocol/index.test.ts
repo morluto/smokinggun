@@ -26,6 +26,7 @@ describe("protocol contracts", () => {
       complexity: {},
     };
     expect(Protocol.finding.safeParse(finding).success).toBe(true);
+    expect(Protocol.finding.safeParse({...finding, location: {...finding.location, path: "."}}).success).toBe(false);
     expect(Protocol.finding.safeParse({...finding, location: {...finding.location, path: "/fixture.ts"}}).success).toBe(
       false,
     );
@@ -52,6 +53,17 @@ describe("protocol contracts", () => {
     };
     expect(Protocol.evidence.safeParse(evidence).success).toBe(true);
     expect(Protocol.evidence.safeParse({...evidence, artifact: ""}).success).toBe(false);
+  });
+
+  it("allows diagnostics to identify the repository root without allowing root locations", () => {
+    const problem = {
+      schemaVersion: "footgun.problem.v1",
+      code: "fixture",
+      message: "Fixture diagnostic",
+      path: ".",
+      recovery: "Fix the fixture.",
+    };
+    expect(Protocol.problem.safeParse(problem).success).toBe(true);
   });
 
   it("requires report finding relations to resolve within that report", () => {
@@ -824,6 +836,13 @@ describe("protocol contracts", () => {
         records: [{...record, meanMs: 2}],
       }).success,
     ).toBe(false);
+    expect(
+      Protocol.benchmarkImport.safeParse({
+        ...result,
+        rawArtifact: "fixture.json",
+        records: [{...record, medianMs: 0.5, metadata: {summaryOnly: true}}],
+      }).success,
+    ).toBe(true);
     expect(
       Protocol.benchmarkImport.safeParse({
         ...result,

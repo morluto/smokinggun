@@ -35,6 +35,24 @@ describe("standard benchmark importers", () => {
     expect("code" in invalid && invalid.code).toBe("invalid-jmh");
   });
 
+  it("preserves distinct Criterion summary estimates", () => {
+    const result = importBenchmark(
+      {
+        mean: {point_estimate: 2_000_000},
+        median: {point_estimate: 1_000_000},
+      },
+      {tool: "criterion"},
+    );
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.records[0]).toMatchObject({
+      samplesMs: [2],
+      medianMs: 1,
+      meanMs: 2,
+      metadata: {summaryOnly: true},
+    });
+  });
+
   it("converts JMH throughput to milliseconds per operation", () => {
     const result = importBenchmark(
       [
