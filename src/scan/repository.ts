@@ -2,7 +2,7 @@ import {lstat, readFile, readdir, stat} from "node:fs/promises";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
 import type {AdapterRequestV1, CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
-import {parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
+import {grammarLanguageForPath, parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../scanners/tree-sitter-structural.js";
 import {
   scanPythonSemantic,
@@ -100,6 +100,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const runStructural = runsBuiltInScanner(options.selection, "structural");
   const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
   const runPython = runsBuiltInScanner(options.selection, "python-semantic");
+  const selectedTypeScriptFiles = runTypeScript ? files.filter(isTypeScriptPath) : [];
   const selectedPythonFiles = runPython ? files.filter((file) => extensionOf(file).toLowerCase() === ".py") : [];
   const findings: FindingV2[] = [];
   const skippedFiles: string[] = [];
@@ -120,6 +121,19 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       reasons: Set<string>;
     }
   >();
+  const parserEntryFor = (language: string) => {
+    const entry = parserCoverage.get(language) ?? {
+      discovered: 0,
+      analyzed: 0,
+      partial: 0,
+      unavailable: 0,
+      skipped: [],
+      reasons: new Set<string>(),
+    };
+    parserCoverage.set(language, entry);
+    return entry;
+  };
+  const typeScriptSemanticSkipped: string[] = [];
   let pythonSemanticAnalyzed = 0;
   let pythonSemanticPartial = 0;
   let pythonSemanticUnavailable = 0;
@@ -132,6 +146,17 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     } catch {
       const reportPath = portablePath(relative(pathRoot, file));
       skippedFiles.push(reportPath);
+      if (runStructural) {
+        const language = grammarLanguageForPath(file);
+        if (language !== undefined) {
+          const parserEntry = parserEntryFor(language);
+          parserEntry.discovered += 1;
+          parserEntry.unavailable += 1;
+          parserEntry.skipped.push(reportPath);
+          parserEntry.reasons.add("One or more selected source files could not be read.");
+        }
+      }
+      if (runTypeScript && isTypeScriptPath(file)) typeScriptSemanticSkipped.push(reportPath);
       if (runPython && extensionOf(reportPath).toLowerCase() === ".py") {
         pythonSemanticUnavailable += 1;
         pythonSemanticSkipped.push(reportPath);
@@ -163,14 +188,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     }
     if (runStructural) {
       const parserResult = treeStructural?.coverage ?? (await parseWithTreeSitter(reportPath, source, options.signal));
-      const parserEntry = parserCoverage.get(parserResult.language) ?? {
-        discovered: 0,
-        analyzed: 0,
-        partial: 0,
-        unavailable: 0,
-        skipped: [],
-        reasons: new Set<string>(),
-      };
+      const parserEntry = parserEntryFor(parserResult.language);
       parserEntry.discovered += 1;
       if (parserResult.status === "complete") parserEntry.analyzed += 1;
       if (parserResult.status === "partial") {
@@ -214,6 +232,15 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   findings.push(...semantic.findings);
   parseDiagnostics.push(...semantic.diagnostics);
   const semanticIndex = semantic.state === "unavailable" ? undefined : semantic.index;
+  const semanticSkippedFiles = [
+    ...new Set([...(semanticIndex?.coverage.skippedFiles ?? []), ...typeScriptSemanticSkipped]),
+  ].sort(comparePortable);
+  const semanticReasons = [
+    ...semantic.diagnostics.map((diagnostic) => diagnostic.message),
+    ...(typeScriptSemanticSkipped.length === 0
+      ? []
+      : ["One or more selected TypeScript source files could not be read."]),
+  ];
   const repository = await repositoryIdentity(root, files);
   const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
   const sourceDigest = sourceHasher.digest("hex");
@@ -339,18 +366,16 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             scanner: semanticScannerId,
             version: semanticScannerVersion,
             language: "typescript-javascript",
-            filesDiscovered: analyzedFiles.filter(isTypeScriptPath).length,
+            filesDiscovered: selectedTypeScriptFiles.length,
             filesAnalyzed: semanticIndex?.coverage.filesIndexed ?? 0,
-            skippedFiles: [...(semanticIndex?.coverage.skippedFiles ?? [])],
+            skippedFiles: semanticSkippedFiles,
           },
-          scopeMatchedNothing || semantic.state === "partial"
-            ? "partial"
-            : semantic.state === "complete"
-              ? "complete"
-              : "unavailable",
-          semantic.diagnostics.length === 0
-            ? undefined
-            : semantic.diagnostics.map((diagnostic) => diagnostic.message).join(" "),
+          semantic.state === "unavailable"
+            ? "unavailable"
+            : scopeMatchedNothing || semantic.state === "partial" || semanticSkippedFiles.length > 0
+              ? "partial"
+              : "complete",
+          semanticReasons.length === 0 ? undefined : semanticReasons.join(" "),
         )
       : undefined;
   const pythonCoverage: CoverageRecordV1 | undefined =
@@ -372,6 +397,14 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
               : "complete",
           scopeMatchedNothing ? "The explicit --only filter matched no supported Python source paths." : undefined,
         );
+  const coverageRecords = [
+    ...(coverage === undefined ? [] : [coverage]),
+    ...parserRecords,
+    ...(semanticCoverage === undefined ? [] : [semanticCoverage]),
+    ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
+    ...adapterRun.coverage,
+  ];
+  const resolvedCoverage = resolveCoverageIdentityCollisions(coverageRecords);
   const report: ScanReportV2 = {
     schemaVersion: "footgun.scan-report.v2",
     tool: toolIdentity,
@@ -380,15 +413,9 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     sourceDigest,
     configDigest: options.configDigest,
     findings: allFindings,
-    coverage: [
-      ...(coverage === undefined ? [] : [coverage]),
-      ...parserRecords,
-      ...(semanticCoverage === undefined ? [] : [semanticCoverage]),
-      ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
-      ...adapterRun.coverage,
-    ],
+    coverage: resolvedCoverage.records,
     ...(semanticIndex === undefined ? {} : {context: semanticIndex}),
-    diagnostics,
+    diagnostics: [...diagnostics, ...resolvedCoverage.diagnostics],
     timings: {startedAt, durationMs: Math.max(0, performance.now() - started)},
     assumptions: [
       "Structural findings are candidates; type, caller, workload, and runtime evidence were not inferred.",
@@ -701,6 +728,59 @@ function pruneFindingRelations(findings: ReadonlyArray<FindingV2>): FindingV2[] 
     ...finding,
     relatedFindings: finding.relatedFindings.filter((id) => retainedIds.has(id)),
   }));
+}
+
+function resolveCoverageIdentityCollisions(records: ReadonlyArray<CoverageRecordV1>): {
+  readonly records: CoverageRecordV1[];
+  readonly diagnostics: ProblemV1[];
+} {
+  const grouped = new Map<string, CoverageRecordV1[]>();
+  for (const record of records) {
+    const identity = `${record.scanner}\0${record.version}\0${record.language}`;
+    const matches = grouped.get(identity) ?? [];
+    matches.push(record);
+    grouped.set(identity, matches);
+  }
+  const resolved: CoverageRecordV1[] = [];
+  const diagnostics: ProblemV1[] = [];
+  for (const matches of grouped.values()) {
+    const first = matches[0];
+    if (first === undefined) continue;
+    if (matches.length === 1) {
+      resolved.push(first);
+      continue;
+    }
+    const skippedFiles = [...new Set(matches.flatMap((record) => record.skippedFiles))].sort(comparePortable);
+    const filesDiscovered = Math.max(...matches.map((record) => record.filesDiscovered));
+    const filesAnalyzed = Math.min(...matches.map((record) => record.filesAnalyzed));
+    const status = matches.some((record) => record.parseStatus === "failed")
+      ? "failed"
+      : matches.some((record) => record.parseStatus === "unavailable")
+        ? "unavailable"
+        : "partial";
+    const reason = `Multiple coverage records claimed ${first.scanner}@${first.version} for ${first.language}.`;
+    resolved.push(
+      coverageRecord(
+        {
+          scanner: first.scanner,
+          version: first.version,
+          language: first.language,
+          filesDiscovered,
+          filesAnalyzed,
+          skippedFiles,
+        },
+        status,
+        reason,
+      ),
+    );
+    diagnostics.push({
+      schemaVersion: "footgun.problem.v1",
+      code: "duplicate-coverage-identity",
+      message: reason,
+      recovery: "Configure each scanner or adapter to report a distinct coverage identity.",
+    });
+  }
+  return {records: resolved, diagnostics};
 }
 
 function findingFamily(ruleId: string): string {

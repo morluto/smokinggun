@@ -5,6 +5,7 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
 import {Protocol} from "../protocol/index.js";
+import {scannerId, scannerVersion} from "../scanners/structural.js";
 import {scanRepository} from "./repository.js";
 import {automaticScannerSelection, entireScanRoot, parseScanScope, parseScannerSelection} from "./selection.js";
 import {
@@ -81,6 +82,25 @@ describe("repository scan seam", () => {
         skippedFiles: ["unreadable.ts"],
       });
       expect(result.report.coverage[0]?.reason).toContain("could not be read");
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({
+          scanner: "footgun.tree-sitter",
+          language: "typescript",
+          filesDiscovered: 2,
+          filesAnalyzed: 1,
+          parseStatus: "unavailable",
+          skippedFiles: ["unreadable.ts"],
+        }),
+      );
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({
+          scanner: "footgun.typescript-semantic",
+          filesDiscovered: 2,
+          filesAnalyzed: 1,
+          parseStatus: "partial",
+          skippedFiles: ["unreadable.ts"],
+        }),
+      );
       expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
     } finally {
       await chmod(unreadable, 0o600).catch(() => undefined);
@@ -145,6 +165,42 @@ describe("repository scan seam", () => {
       expect(result.report.diagnostics.filter((diagnostic) => diagnostic.code === "duplicate-adapter-id")).toHaveLength(
         2,
       );
+      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("downgrades conflicting coverage identities returned by an external adapter", async () => {
+    const root = await mkdtemp(join(tmpdir(), "footgun-scan-colliding-coverage-"));
+    try {
+      await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
+      const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'footgun.adapter-result.v2',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],diagnostics:[],rawArtifacts:[]}));});`;
+      const manifest = join(root, "adapter.json");
+      await writeFile(
+        manifest,
+        JSON.stringify({
+          schemaVersion: "footgun.adapter-manifest.v1",
+          id: "coverage-collider",
+          version: "1.0.0",
+          command: [execPath, "-e", script],
+          capabilities: ["static-scan"],
+          limits: {timeoutMs: 2_000, maxOutputBytes: 100_000, maxArtifactBytes: 10_000},
+        }),
+        "utf8",
+      );
+      const adapters = await parseExternalAdapters([manifest], root);
+      const result = await scanRepository(root, {
+        ...defaultScanOptions,
+        adapters,
+        adapterAuthorization: adapterExecutionAuthorized,
+        configDigest: "e".repeat(64),
+      });
+      expect(result.report.coverage.filter((record) => record.scanner === scannerId)).toHaveLength(1);
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({scanner: scannerId, parseStatus: "partial"}),
+      );
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "duplicate-coverage-identity"}));
       expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
     } finally {
       await rm(root, {recursive: true, force: true});

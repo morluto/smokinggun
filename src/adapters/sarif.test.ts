@@ -48,6 +48,7 @@ describe("SARIF import boundary", () => {
     });
     expect(result.rawArtifacts).toHaveLength(1);
     expect(result.diagnostics[0]?.code).toBe("sarif-invocation-failed");
+    expect(result.coverage[0]?.parseStatus).toBe("partial");
     expect(result.filesModified).toEqual([]);
   });
 
@@ -68,6 +69,7 @@ describe("SARIF import boundary", () => {
     expect("code" in outside).toBe(false);
     if (!("code" in outside))
       expect(outside.diagnostics.map((diagnostic) => diagnostic.code)).toContain("sarif-path-outside-root");
+    if (!("code" in outside)) expect(outside.coverage[0]?.parseStatus).toBe("partial");
     const malformed = importSarif({version: "2.0.0", runs: []}, "/repo", "a".repeat(64));
     expect("code" in malformed && malformed.code).toBe("invalid-sarif");
   });
