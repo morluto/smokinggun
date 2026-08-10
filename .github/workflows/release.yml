@@ -54,11 +54,11 @@ jobs:
       # Prerequisite: a GitHub Actions trusted publisher must be configured on
       # npmjs.com for morluto/smokinggun, workflow filename release.yml.
       - name: Upgrade npm for OIDC trusted publishing
-        if: steps.changesets.outputs['has-changesets'] == 'false'
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: npm install --global npm@12.0.1
       - name: Publish to npm
         id: publish
-        if: steps.changesets.outputs['has-changesets'] == 'false'
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
           version=$(node -p "require('./package.json').version")
           if npm view "smokinggun@$version" version >/dev/null 2>&1; then
