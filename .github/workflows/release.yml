@@ -32,12 +32,46 @@ jobs:
           pnpm evaluate:corpus
           pnpm test:package
           pnpm verify:release
-      - name: Create release pull request or publish
+      # Version only: when pending changesets exist, changesets/action opens a
+      # "Version Packages" PR. When none exist (a Version Packages PR was just
+      # merged), it no-ops and we publish below.
+      - name: Version packages
         id: changesets
         uses: changesets/action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           version: pnpm version:packages
-          publish: pnpm publish:packages
           title: "Release packages"
+      # Publish directly with `npm publish` instead of changesets/action's
+      # `publish` input. When `publish` is set, the action writes a .npmrc with
+      # NPM_TOKEN auth, which blocks npm's OIDC trusted-publishing auto-detection
+      # and surfaces as an opaque E404. Calling `npm publish` directly lets
+      # npm >= 11.5.1 exchange the GitHub OIDC token (id-token: write) for a
+      # short-lived publish credential with automatic provenance. This mirrors
+      # the release workflows in morluto/leantoken and morluto/jacobian.
+      #
+      # Prerequisite: a GitHub Actions trusted publisher must be configured on
+      # npmjs.com for morluto/smokinggun, workflow filename release.yml.
+      - name: Upgrade npm for OIDC trusted publishing
+        if: steps.changesets.outputs['has-changesets'] == 'false'
+        run: npm install --global npm@12.0.1
+      - name: Publish to npm
+        id: publish
+        if: steps.changesets.outputs['has-changesets'] == 'false'
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "smokinggun@$version" version >/dev/null 2>&1; then
+            echo "smokinggun@$version is already published"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            npm publish --access public --provenance
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create GitHub release
+        if: steps.publish.outputs.published == 'true'
+        run: |
+          version=$(node -p "require('./package.json').version")
+          gh release create "v$version" --title "v$version" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
