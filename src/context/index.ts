@@ -63,12 +63,12 @@ export function prepareSnapshotTypeScriptAnalysis(
   sources: ReadonlyArray<TypeScriptSourceInput>,
 ): TypeScriptAnalysis {
   const absoluteRoot = resolve(root);
-  const sourceTexts = new Map(
-    sources
-      .filter((source) => supportedExtensions.has(extensionOf(source.path)))
-      .map((source) => [canonicalPath(resolve(absoluteRoot, source.path)), source.text] as const),
-  );
-  const sourcePaths = [...sourceTexts.keys()];
+  const selectedSources = sources
+    .filter((source) => supportedExtensions.has(extensionOf(source.path)))
+    .map((source) => ({path: resolve(absoluteRoot, source.path), text: source.text}));
+  const sourceTexts = new Map(selectedSources.map((source) => [canonicalPath(source.path), source.text] as const));
+  const sourcePaths = selectedSources.map((source) => source.path);
+  const canonicalSourcePaths = sourcePaths.map(canonicalPath);
   if (sourcePaths.length === 0) return {_tag: "NoSupportedTypeScriptSources"};
   const options: ts.CompilerOptions = {
     allowJs: true,
@@ -87,25 +87,25 @@ export function prepareSnapshotTypeScriptAnalysis(
     ...baseHost,
     directoryExists: (directory) => {
       const prefix = `${canonicalPath(resolve(directory))}${sep}`;
-      return sourcePaths.some((path) => path.startsWith(prefix));
+      return canonicalSourcePaths.some((path) => path.startsWith(prefix));
     },
     fileExists: (path) => sourceTexts.has(canonicalPath(resolve(path))),
     getCurrentDirectory: () => absoluteRoot,
     getDefaultLibFileName: () => resolve(absoluteRoot, ".smokinggun-no-lib.d.ts"),
-    getDirectories: (directory) => snapshotDirectories(directory, sourcePaths),
+    getDirectories: (directory) => snapshotDirectories(directory, canonicalSourcePaths),
     getSourceFile: (path, languageVersion) => {
       const absolutePath = canonicalPath(resolve(path));
       const text = sourceTexts.get(absolutePath);
-      return text === undefined ? undefined : ts.createSourceFile(absolutePath, text, languageVersion, true);
+      return text === undefined ? undefined : ts.createSourceFile(resolve(path), text, languageVersion, true);
     },
     readFile: (path) => sourceTexts.get(canonicalPath(resolve(path))),
-    realpath: (path) => canonicalPath(resolve(path)),
+    realpath: (path) => resolve(path),
     writeFile: () => undefined,
   };
   return {
     _tag: "PreparedTypeScriptAnalysis",
     sourcePaths,
-    selectedPaths: new Set(sourcePaths),
+    selectedPaths: new Set(canonicalSourcePaths),
     program: ts.createProgram({rootNames: sourcePaths, options, host}),
   };
 }
