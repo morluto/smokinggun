@@ -971,14 +971,14 @@
       "type": "array",
       "items": {
         "type": "string",
-        "minLength": 1
+        "pattern": "^artifact:\\/\\/sha256\\/[a-f0-9]{64}$"
       }
     },
     "rawArtifactDigests": {
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "minLength": 1
+        "pattern": "^artifact:\\/\\/sha256\\/[a-f0-9]{64}$"
       },
       "additionalProperties": {
         "type": "string",

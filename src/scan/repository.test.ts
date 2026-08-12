@@ -1,6 +1,7 @@
 import {chmod, mkdir, mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
 import {existsSync} from "node:fs";
 import {execFileSync} from "node:child_process";
+import {createHash} from "node:crypto";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -201,7 +202,10 @@ describe("repository scan seam", () => {
       const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-colliding-coverage-"));
       try {
         await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
-        const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]}));});`;
+        const artifactBytes = Buffer.from("adapter evidence");
+        const artifactDigest = createHash("sha256").update(artifactBytes).digest("hex");
+        const artifactReference = `artifact://sha256/${artifactDigest}`;
+        const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:['evidence.json'],rawArtifactDigests:{'evidence.json':'${artifactDigest}'},rawArtifactContents:{'evidence.json':'${artifactBytes.toString("base64")}'}}));});`;
         const manifest = join(root, "adapter.json");
         await writeFile(
           manifest,
@@ -220,6 +224,11 @@ describe("repository scan seam", () => {
           ...defaultScanOptions,
           adapters,
           adapterAuthorization: adapterExecutionAuthorized,
+          retainAdapterArtifact: async (path, bytes) => {
+            expect(path).toBe("evidence.json");
+            expect(bytes).toEqual(artifactBytes);
+            return {reference: artifactReference, digest: artifactDigest};
+          },
           configDigest: "e".repeat(64),
         });
         expect(result.report.coverage.filter((record) => record.scanner === scannerId)).toHaveLength(1);
@@ -229,6 +238,8 @@ describe("repository scan seam", () => {
         expect(result.report.diagnostics).not.toContainEqual(
           expect.objectContaining({code: "duplicate-coverage-identity"}),
         );
+        expect(result.report.rawArtifacts).toEqual([artifactReference]);
+        expect(result.report.rawArtifactDigests).toEqual({[artifactReference]: artifactDigest});
         expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
       } finally {
         await rm(root, {recursive: true, force: true});

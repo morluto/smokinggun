@@ -95,6 +95,15 @@ describe("protocol contracts", () => {
       rawArtifacts: [],
     };
     expect(Protocol.scanReport.safeParse(report).success).toBe(true);
+    const retainedArtifact = `artifact://sha256/${"a".repeat(64)}`;
+    expect(
+      Protocol.scanReport.safeParse({
+        ...report,
+        rawArtifacts: [retainedArtifact],
+        rawArtifactDigests: {[retainedArtifact]: "a".repeat(64)},
+      }).success,
+    ).toBe(true);
+    expect(Protocol.scanReport.safeParse({...report, rawArtifacts: ["adapter-output.json"]}).success).toBe(false);
     expect(
       Protocol.scanReport.safeParse({...report, findings: [{...finding, relatedFindings: ["sg_aaaaaaaaaaaaaaaa"]}]})
         .success,
@@ -519,6 +528,9 @@ describe("protocol contracts", () => {
     );
     expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: [""]}).success).toBe(false);
     expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: ["../result.json"]}).success).toBe(false);
+    expect(
+      Protocol.adapterResult.safeParse({...result, rawArtifacts: [`artifact://sha256/${"a".repeat(64)}`]}).success,
+    ).toBe(false);
     const validResult = {...result, rawArtifacts: ["result.json"]};
     expect(Protocol.adapterResult.safeParse({...validResult, state: "failed"}).success).toBe(false);
     expect(Protocol.adapterResult.safeParse({...validResult, state: "partial"}).success).toBe(false);

@@ -267,7 +267,9 @@ const timingsSchema = z.strictObject({
   durationMs: z.number().nonnegative(),
 });
 
-const rawArtifactSchema = portableRepositoryChildPathSchema;
+const adapterArtifactPathSchema = portableRepositoryChildPathSchema;
+const retainedArtifactReferenceSchema = z.string().regex(/^artifact:\/\/sha256\/[a-f0-9]{64}$/);
+const rawArtifactSchema = z.string().min(1);
 
 const commandSchema = z
   .array(z.string())
@@ -446,8 +448,8 @@ const scanReportSchema = z
     assumptions: z.array(z.string()),
     nextAction: z.string().optional(),
     filesModified: z.array(portableRepositoryChildPathSchema).length(0).default([]),
-    rawArtifacts: z.array(rawArtifactSchema),
-    rawArtifactDigests: z.record(rawArtifactSchema, z.string().regex(/^[a-f0-9]{64}$/)).optional(),
+    rawArtifacts: z.array(retainedArtifactReferenceSchema),
+    rawArtifactDigests: z.record(retainedArtifactReferenceSchema, z.string().regex(/^[a-f0-9]{64}$/)).optional(),
   })
   .superRefine((report, context) => {
     requireUniqueFindingIds(report.findings, context);
@@ -523,10 +525,13 @@ const adapterResultFields = {
   findings: z.array(findingSchema),
   coverage: z.array(coverageSchema),
   analyzedTargets: uniqueNonemptyStrings("Analyzed adapter targets must be unique.").default([]),
-  rawArtifacts: z.array(rawArtifactSchema),
-  rawArtifactDigests: z.record(rawArtifactSchema, z.string().regex(/^[a-f0-9]{64}$/)).default({}),
+  rawArtifacts: z.array(adapterArtifactPathSchema),
+  rawArtifactDigests: z.record(adapterArtifactPathSchema, z.string().regex(/^[a-f0-9]{64}$/)).default({}),
   rawArtifactContents: z
-    .record(rawArtifactSchema, z.string().regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/))
+    .record(
+      adapterArtifactPathSchema,
+      z.string().regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+    )
     .default({}),
   adapter: z
     .strictObject({
