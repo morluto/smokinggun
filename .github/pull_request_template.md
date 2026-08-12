@@ -15,7 +15,7 @@
 
 ## Context
 
-<!-- Link to issues, related PRs, or design notes (e.g. research/*.md). -->
+<!-- Link to issues, related PRs, or the authority architecture when relevant. -->
 
 ## Release
 

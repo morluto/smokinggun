@@ -2,7 +2,7 @@
 
 Optimization evidence for agents: find complexity hotspots and test whether a proposed change is worth making.
 
-It keeps static findings, estimates, and measurements distinct so agents can decide what to investigate next.
+It keeps static findings, estimates, imported measurements, and behavior evidence distinct so agents can decide what to investigate next.
 
 ## Install the agent skill
 
@@ -38,15 +38,15 @@ smokinggun scan . --format markdown
 smokinggun scan . --format sarif --output smokinggun.sarif
 ```
 
-Reports include the hotspot, supporting evidence, estimated impact, coverage, assumptions, risks, and tests or measurements needed next.
+Reports include the hotspot, supporting evidence, coverage, assumptions, and the validation needed next.
 
 Static scans are read-only, offline, and do not execute repository code or modify source files. Findings are candidates, not proof. SmokingGun imports measurement evidence from existing benchmark tools; it does not launch workloads or rewrite code.
 
-Semantic scanners consume the captured source snapshot directly. Explicitly authorized external adapters receive the same bytes through a private read-only view with no network namespace. Benchmark, profile, and measurement artifacts cross a strict import boundary and retain their declared provenance without granting execution authority. See [the authority architecture](docs/architecture.md) for the evidence invariants behind these choices.
+Semantic scanners consume the captured source snapshot directly. External adapters run only with explicit authorization and an enforcing read-only sandbox; they receive captured source bytes rather than the live checkout. Benchmark, profile, and measurement artifacts cross an import boundary without granting workload-execution authority. See [the authority architecture](docs/architecture.md) for the ownership rules behind these choices.
 
 ## About
 
-SmokingGun's authoritative path is immutable capture, snapshot-backed scanning, truthful coverage, content-addressed reporting, and explicit evidence imports. SARIF/SCIP, benchmarks, profiles, and measurements remain external inputs; missing or failed coverage stays visible instead of becoming a clean scan.
+SmokingGun's authoritative path is immutable capture, snapshot-backed scanning, truthful coverage, content-addressed reports, and explicit evidence imports. SARIF, SCIP, benchmarks, profiles, and measurements remain external inputs. Missing or failed coverage stays visible instead of becoming a clean scan.
 
 ## Development
 

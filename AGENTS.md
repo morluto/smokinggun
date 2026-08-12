@@ -9,7 +9,7 @@ SmokingGun is a local CLI for software-engineering agents: it finds code-complex
 - SmokingGun does not execute repository workloads; measurements enter as explicit external evidence artifacts.
 - Preserve stable protocol schemas, finding IDs, paths, output formats, exit codes, and artifact layout.
 - Machine output is one document on stdout; diagnostics belong on stderr.
-- No telemetry, MCP, Python runtime, implicit plugins, or automatic edits in 1.0.
+- No telemetry, MCP, bundled Python runtime, implicit plugins, or automatic edits.
 
 ## Code map
 
@@ -33,6 +33,6 @@ Releases go through changesets: run `pnpm changeset` to record a change intent, 
 
 - Files and directories: kebab-case (`tree-sitter-runtime.ts`, `typescript-semantic.ts`).
 - Functions and variables: camelCase; booleans read as questions (`isSupported`, `hasResult`).
-- Types, classes, and interfaces: PascalCase; protocol document types end in `V1` (`ScanReportV1`, `ProblemV1`).
+- Types, classes, and interfaces: PascalCase; versioned protocol document types carry their wire version (`ScanReportV2`, `ProblemV1`).
 - Constants: camelCase; keep protocol constant names stable (they are part of the public contract).
 - Tests: colocated `*.test.ts` beside the module under test.

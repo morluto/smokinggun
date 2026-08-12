@@ -56,19 +56,10 @@ external benchmark tool --> immutable measurement artifact --> import/compare
 
 `src/protocol` owns external document shapes. Domain and service modules do not treat those DTOs as operational proof. Trusted domain values are constructed only by the module that captures bytes, enforces scope, applies a capability, or commits state.
 
-SmokingGun is the product, executable, protocol namespace, scanner namespace, and finding-ID prefix. The 3.0 contract deliberately removes the former split identity instead of carrying obsolete branding through every public artifact.
+SmokingGun is the product, executable, protocol namespace, scanner namespace, and finding-ID prefix.
 
-## Deliberate feature freeze
+## Feature boundary
 
-Until these invariants are implemented end to end, new scanners, adapters, measurement models, and investigation states are out of scope. Existing features that cannot establish their claimed boundary are removed or explicitly reported as unavailable rather than preserved through compatibility logic.
+New scanners, adapters, measurement models, and investigation states must preserve these invariants end to end. A feature that cannot establish its claimed boundary is removed or reported as unavailable rather than preserved through compatibility logic.
 
 The authoritative scan path ends at content-addressed reports. Structural, TypeScript, and Python scanners consume captured text; explicitly authorized adapters receive a private read-only materialization of those same bytes plus narrow runtime roots explicitly selected by the host. Adapter manifests cannot widen host filesystem visibility. Adapter artifacts cross the bounded AdapterResultV3 JSON channel as base64 bytes and are retained by exact digest; artifact-free AdapterResultV2 remains accepted, and adapters receive no writable host mount. SmokingGun owns no workload runner or execution backend. Measurements and scaling analyses enter only as external artifacts; unverifiable provenance remains visible and blocks promotion.
-
-## External precedents
-
-The design follows established, deliberately boring patterns:
-
-- Git separates immutable objects from guarded mutable refs and commits trees through content identity.
-- Nix hashes canonical filesystem representations and rejects fixed-output content that does not match its declared digest.
-- Bazel distinguishes an execution root from OS sandboxing and binds actions to declared inputs and outputs.
-- Bubblewrap begins with an empty mount namespace and exposes only explicitly mounted paths; its arguments define a sandbox policy but do not independently prove that the requested policy was applied.

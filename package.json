@@ -27,6 +27,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "grammars",
     "skills/smokinggun",
     "schemas",

@@ -1,11 +1,11 @@
 ---
 name: smokinggun
-description: Use SmokingGun to find complexity candidates and build evidence-backed optimization investigations.
+description: Use SmokingGun to find complexity candidates and organize imported optimization evidence.
 ---
 
 # SmokingGun
 
-Use SmokingGun as a local evidence boundary for complexity and performance work. It scans repository source and context, imports external findings, and compares explicitly authorized measurements. It does not edit source files.
+Use SmokingGun as a local evidence boundary for complexity and performance work. It scans repository source and context, imports external findings, and compares immutable measurement artifacts. It does not execute repository workloads or edit source files.
 
 ## Start with a scan
 
