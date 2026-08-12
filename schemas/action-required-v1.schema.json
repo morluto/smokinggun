@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.action-required.v1"
+      "const": "smokinggun.action-required.v1"
     },
     "reason": {
       "type": "string",

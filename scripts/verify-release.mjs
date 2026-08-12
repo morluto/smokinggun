@@ -21,8 +21,8 @@ for (const grammar of grammarLock.grammars ?? []) {
 }
 // Windows does not model executable bits; the shebang and node invocation cover entry-point execution there.
 if (process.platform !== "win32") {
-  const binInfo = await stat("dist/bin/footgun.js").catch(() => undefined);
-  if (binInfo === undefined || (binInfo.mode & 0o111) === 0) failures.push("dist/bin/footgun.js is not executable");
+  const binInfo = await stat("dist/bin/smokinggun.js").catch(() => undefined);
+  if (binInfo === undefined || (binInfo.mode & 0o111) === 0) failures.push("dist/bin/smokinggun.js is not executable");
 }
 
 // Windows requires the shell to execute npm.cmd; Unix can invoke npm directly.
@@ -40,7 +40,7 @@ if (pack !== undefined) {
   }
   const schemaFiles = (await readdir("schemas")).filter((file) => file.endsWith(".schema.json"));
   for (const required of [
-    "dist/bin/footgun.js",
+    "dist/bin/smokinggun.js",
     "grammar.lock.json",
     "skills/smokinggun/SKILL.md",
     ...schemaFiles.map((file) => `schemas/${file}`),

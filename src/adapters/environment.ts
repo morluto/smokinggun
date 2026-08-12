@@ -13,7 +13,7 @@ const inheritedEnvironmentKeys = new Set([
   "ComSpec",
 ]);
 
-/** Provide only non-secret process settings unless a workload explicitly opts into full inheritance. */
+/** Provide only non-secret process settings unless an adapter explicitly opts into full inheritance. */
 export function executionEnvironment(
   explicit: Readonly<Record<string, string>>,
   inheritAll: boolean,
@@ -27,10 +27,9 @@ export function executionEnvironment(
 
 /** Redact secret-looking values before putting subprocess details into diagnostics. */
 export function redactSensitive(value: string): string {
-  return value.replace(
-    /((?:token|password|passwd|secret|api[_-]?key|authorization)[=:\s]+)([^\s,]+)/gi,
-    "$1[REDACTED]",
-  );
+  return value
+    .replace(/((?:authorization)[=:\s]+)(?:Bearer|Basic)\s+[^\s,]+/gi, "$1[REDACTED]")
+    .replace(/((?:token|password|passwd|secret|api[_-]?key|authorization)[=:\s]+)([^\s,]+)/gi, "$1[REDACTED]");
 }
 
 /** Keep reproduction commands useful while removing host paths and secret-looking arguments. */

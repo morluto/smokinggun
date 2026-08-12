@@ -4,7 +4,7 @@ import {homedir} from "node:os";
 import {dirname, isAbsolute, join, resolve} from "node:path";
 import {z} from "zod";
 import type {ProblemV1} from "./protocol/index.js";
-import {comparePortable} from "./paths.js";
+import {comparePortable, isWithinRoot} from "./paths.js";
 import {stableJson} from "./serialization.js";
 
 const outputFormats = ["human", "json", "markdown", "sarif"] as const;
@@ -124,10 +124,43 @@ export async function loadConfig(
       : configPath === undefined
         ? initialCwd
         : dirname(configPath);
+  const resolvedOutput = merged.output === undefined ? undefined : resolve(outputBase, merged.output);
+  const resolvedAdapters = resolveAdapterPaths(
+    merged.adapters ?? [],
+    configPath === undefined ? initialCwd : dirname(configPath),
+  );
+
+  // Validate auto-discovered config paths to prevent traversal attacks (#73)
+  if (configPath !== undefined && explicitPath === undefined) {
+    if (fileValues.cwd !== undefined && !isWithinRoot(initialCwd, cwd)) {
+      return configFailure(
+        "config-path-traversal",
+        "Auto-discovered configuration sets a working directory outside the invocation directory.",
+        `cwd resolves to ${cwd}, which escapes ${initialCwd}. Use --cwd to override explicitly.`,
+      );
+    }
+    if (resolvedOutput !== undefined && !isWithinRoot(initialCwd, resolvedOutput)) {
+      return configFailure(
+        "config-path-traversal",
+        "Auto-discovered configuration sets an output path outside the invocation directory.",
+        `output resolves to ${resolvedOutput}, which escapes ${initialCwd}. Use --output to override explicitly.`,
+      );
+    }
+    for (const adapterPath of resolvedAdapters) {
+      if (!isWithinRoot(initialCwd, adapterPath)) {
+        return configFailure(
+          "config-path-traversal",
+          "Auto-discovered configuration references an adapter outside the invocation directory.",
+          `adapter ${adapterPath} escapes ${initialCwd}. Use --adapter to override explicitly.`,
+        );
+      }
+    }
+  }
+
   const normalized: RuntimeConfig = {
     cwd,
     format: merged.format ?? "human",
-    output: merged.output === undefined ? undefined : resolve(outputBase, merged.output),
+    output: resolvedOutput,
     noColor: merged.noColor ?? false,
     quiet: merged.quiet ?? false,
     debug: merged.debug ?? false,
@@ -135,7 +168,7 @@ export async function loadConfig(
     strict: merged.strict ?? false,
     failOn: merged.failOn,
     exclude: uniqueSorted(merged.exclude ?? []),
-    adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
+    adapters: resolvedAdapters,
     maxFindings: merged.maxFindings ?? 80,
     source,
     digest: digestConfig({
@@ -148,7 +181,7 @@ export async function loadConfig(
       strict: merged.strict ?? false,
       failOn: merged.failOn,
       exclude: uniqueSorted(merged.exclude ?? []),
-      adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
+      adapters: resolvedAdapters,
       maxFindings: merged.maxFindings ?? 80,
     }),
   };
@@ -276,7 +309,7 @@ function isOutputFormat(value: string): value is OutputFormat {
 function configFailure(code: string, message: string, detail: string): ConfigFailure {
   return {
     _tag: "ConfigFailure",
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code,
     message,
     detail,

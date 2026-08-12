@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.scaling.v3"
+      "const": "smokinggun.scaling.v3"
     },
     "id": {
       "type": "string",
@@ -13,7 +13,7 @@
     "investigation": {
       "type": "string"
     },
-    "workloadDigest": {
+    "benchmarkDigest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
@@ -67,322 +67,66 @@
                 "type": "boolean"
               },
               "isolation": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend"
-                    ],
-                    "additionalProperties": false
+                "type": "object",
+                "properties": {
+                  "controlsRequested": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
-                  {
+                  "controlsApplied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "downgradeReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "backend": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "runtime": {
                     "type": "object",
                     "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
+                      "name": {
                         "type": "string",
                         "minLength": 1
                       },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "candidateWorkspace"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "version": {
                         "type": "string",
-                        "const": "docker"
+                        "minLength": 1
                       },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "docker"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "digest": {
                         "type": "string",
-                        "const": "podman"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "podman"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
+                        "pattern": "^[a-f0-9]{64}$"
                       }
                     },
                     "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "bwrap"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "bwrap"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "nsjail"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "nsjail"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
+                      "name"
                     ],
                     "additionalProperties": false
                   }
-                ]
+                },
+                "required": [
+                  "controlsRequested",
+                  "controlsApplied",
+                  "downgradeReasons",
+                  "backend"
+                ],
+                "additionalProperties": false
               },
               "diagnostic": {
                 "type": "string"
@@ -482,325 +226,70 @@
                 "additionalProperties": false
               },
               "behaviorValidated": {
-                "type": "boolean"
+                "type": "boolean",
+                "const": false
               },
               "isolation": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend"
-                    ],
-                    "additionalProperties": false
+                "type": "object",
+                "properties": {
+                  "controlsRequested": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
-                  {
+                  "controlsApplied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "downgradeReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "backend": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "runtime": {
                     "type": "object",
                     "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
+                      "name": {
                         "type": "string",
                         "minLength": 1
                       },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "candidateWorkspace"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "version": {
                         "type": "string",
-                        "const": "docker"
+                        "minLength": 1
                       },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "docker"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "digest": {
                         "type": "string",
-                        "const": "podman"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "podman"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
+                        "pattern": "^[a-f0-9]{64}$"
                       }
                     },
                     "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "bwrap"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "bwrap"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "nsjail"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "nsjail"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
+                      "name"
                     ],
                     "additionalProperties": false
                   }
-                ]
+                },
+                "required": [
+                  "controlsRequested",
+                  "controlsApplied",
+                  "downgradeReasons",
+                  "backend"
+                ],
+                "additionalProperties": false
               },
               "diagnostic": {
                 "type": "string"
@@ -901,325 +390,70 @@
                 "additionalProperties": false
               },
               "behaviorValidated": {
-                "type": "boolean"
+                "type": "boolean",
+                "const": false
               },
               "isolation": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend"
-                    ],
-                    "additionalProperties": false
+                "type": "object",
+                "properties": {
+                  "controlsRequested": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
-                  {
+                  "controlsApplied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "downgradeReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "backend": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "runtime": {
                     "type": "object",
                     "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
+                      "name": {
                         "type": "string",
                         "minLength": 1
                       },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "candidateWorkspace"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "version": {
                         "type": "string",
-                        "const": "docker"
+                        "minLength": 1
                       },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "docker"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "digest": {
                         "type": "string",
-                        "const": "podman"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "podman"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
+                        "pattern": "^[a-f0-9]{64}$"
                       }
                     },
                     "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "bwrap"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "bwrap"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "nsjail"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "nsjail"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
+                      "name"
                     ],
                     "additionalProperties": false
                   }
-                ]
+                },
+                "required": [
+                  "controlsRequested",
+                  "controlsApplied",
+                  "downgradeReasons",
+                  "backend"
+                ],
+                "additionalProperties": false
               },
               "diagnostic": {
                 "type": "string"
@@ -1320,325 +554,70 @@
                 "additionalProperties": false
               },
               "behaviorValidated": {
-                "type": "boolean"
+                "type": "boolean",
+                "const": false
               },
               "isolation": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend"
-                    ],
-                    "additionalProperties": false
+                "type": "object",
+                "properties": {
+                  "controlsRequested": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
-                  {
+                  "controlsApplied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "downgradeReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "backend": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "runtime": {
                     "type": "object",
                     "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "host-process"
-                      },
-                      "candidateWorkspace": {
+                      "name": {
                         "type": "string",
                         "minLength": 1
                       },
-                      "runner": {
-                        "not": {}
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "candidateWorkspace"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "version": {
                         "type": "string",
-                        "const": "docker"
+                        "minLength": 1
                       },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "docker"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
+                      "digest": {
                         "type": "string",
-                        "const": "podman"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "podman"
-                          },
-                          "image": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "runtime",
-                          "image"
-                        ],
-                        "additionalProperties": false
+                        "pattern": "^[a-f0-9]{64}$"
                       }
                     },
                     "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "bwrap"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "bwrap"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "controlsRequested": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "controlsApplied": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "downgradeReasons": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "backend": {
-                        "type": "string",
-                        "const": "nsjail"
-                      },
-                      "candidateWorkspace": {
-                        "not": {}
-                      },
-                      "runner": {
-                        "type": "object",
-                        "properties": {
-                          "runtime": {
-                            "type": "string",
-                            "const": "nsjail"
-                          }
-                        },
-                        "required": [
-                          "runtime"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "controlsRequested",
-                      "controlsApplied",
-                      "downgradeReasons",
-                      "backend",
-                      "runner"
+                      "name"
                     ],
                     "additionalProperties": false
                   }
-                ]
+                },
+                "required": [
+                  "controlsRequested",
+                  "controlsApplied",
+                  "downgradeReasons",
+                  "backend"
+                ],
+                "additionalProperties": false
               },
               "diagnostic": {
                 "type": "string"
@@ -1734,6 +713,36 @@
             "minLength": 1
           }
         },
+        "environmentDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "executable": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "path",
+            "digest"
+          ],
+          "additionalProperties": false
+        },
+        "subjectDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSetDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
         "timeoutMs": {
           "type": "integer",
           "exclusiveMinimum": 0,
@@ -1756,6 +765,18 @@
             "minLength": 1
           }
         },
+        "artifactDigests": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
         "datasetDigests": {
           "default": {},
           "type": "object",
@@ -1776,6 +797,7 @@
         "warmups",
         "repetitions",
         "expectedArtifacts",
+        "artifactDigests",
         "datasetDigests"
       ],
       "additionalProperties": false
@@ -1814,7 +836,7 @@
   "required": [
     "schemaVersion",
     "id",
-    "workloadDigest",
+    "benchmarkDigest",
     "parameters",
     "coordinatesDigest",
     "points",

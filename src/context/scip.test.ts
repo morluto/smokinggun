@@ -8,7 +8,7 @@ import {Protocol} from "../protocol/index.js";
 import {importScip} from "./scip.js";
 
 it("imports SCIP definitions and references with repository-relative coverage", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "footgun-scip-"));
+  const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
   try {
     const artifact = join(directory, "index.scip");
     const index = create(IndexSchema, {
@@ -42,7 +42,7 @@ it("imports SCIP definitions and references with repository-relative coverage", 
 });
 
 it("rejects symlinked SCIP artifacts at the import boundary", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "footgun-scip-"));
+  const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
   try {
     const artifact = join(directory, "index.scip");
     const link = join(directory, "index-link.scip");
@@ -57,7 +57,7 @@ it("rejects symlinked SCIP artifacts at the import boundary", async () => {
 });
 
 it("does not expose invalid SCIP document paths in context coverage or diagnostics", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "footgun-scip-"));
+  const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
   try {
     const artifact = join(directory, "index.scip");
     await writeFile(
@@ -77,7 +77,7 @@ it("does not expose invalid SCIP document paths in context coverage or diagnosti
 });
 
 it("marks duplicate SCIP document paths as partial before constructing the context index", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "footgun-scip-"));
+  const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
   try {
     const artifact = join(directory, "index.scip");
     await writeFile(

@@ -2,7 +2,6 @@ import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve} from "node:path";
 import {scanTypeScript} from "../dist/scanners/typescript-semantic.js";
-import {scanSource} from "../dist/scanners/structural.js";
 import {parseWithTreeSitter} from "../dist/parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../dist/scanners/tree-sitter-structural.js";
 import {scanPythonSemantic} from "../dist/scanners/python-semantic.js";
@@ -17,12 +16,7 @@ let expectedPositives = 0;
 for (const testCase of cases) {
   const source = await readFile(resolve(root, testCase.path), "utf8");
   const treeStructural = await scanWithTreeSitter(testCase.path, source);
-  const structural = new Set(
-    (treeStructural.coverage.status === "complete"
-      ? treeStructural.findings
-      : scanSource(testCase.path, source).findings
-    ).map((finding) => finding.ruleId),
-  );
+  const structural = new Set(treeStructural.findings.map((finding) => finding.ruleId));
   const semantic = new Set(
     (await scanTypeScript(root, [resolve(root, testCase.path)])).findings.map((finding) => finding.ruleId),
   );

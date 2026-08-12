@@ -53,7 +53,6 @@ export async function createRuntimeContext(
   const config = await loadConfig(flags);
   if (isConfigFailure(config)) return {...config, _tag: "ContextFailure", exitCode: 2};
   const artifacts = userDataDirectory();
-  await mkdir(join(artifacts, "artifacts"), {recursive: true});
   const artifactRoot = join(artifacts, "artifacts");
   return {
     ...streams,
@@ -62,8 +61,8 @@ export async function createRuntimeContext(
     artifacts,
     artifactStore: {
       root: artifactRoot,
-      put: (path, maxBytes) => storeArtifact(path, artifactRoot, maxBytes),
-      putBytes: (path, bytes, maxBytes) => storeArtifactBytes(path, bytes, artifactRoot, maxBytes),
+      put: (path, maxBytes) => storeArtifactWithLazyInit(path, artifactRoot, maxBytes),
+      putBytes: (path, bytes, maxBytes) => storeArtifactBytesWithLazyInit(path, bytes, artifactRoot, maxBytes),
     },
     executionPolicy: {network: "disabled", shell: false, maxOutputBytes: 1_000_000},
     clock: {now: () => Date.now(), nowIso: () => new Date().toISOString()},
@@ -73,4 +72,37 @@ export async function createRuntimeContext(
 
 export function isContextFailure(value: RuntimeContext | ContextFailure): value is ContextFailure {
   return "_tag" in value;
+}
+
+async function storeArtifactWithLazyInit(path: string, root: string, maxBytes?: number): Promise<StoredArtifact> {
+  try {
+    return await storeArtifact(path, root, maxBytes);
+  } catch (reason: unknown) {
+    if (isEnoentError(reason)) {
+      await mkdir(root, {recursive: true});
+      return storeArtifact(path, root, maxBytes);
+    }
+    throw reason;
+  }
+}
+
+async function storeArtifactBytesWithLazyInit(
+  path: string,
+  bytes: Uint8Array,
+  root: string,
+  maxBytes?: number,
+): Promise<StoredArtifact> {
+  try {
+    return await storeArtifactBytes(path, bytes, root, maxBytes);
+  } catch (reason: unknown) {
+    if (isEnoentError(reason)) {
+      await mkdir(root, {recursive: true});
+      return storeArtifactBytes(path, bytes, root, maxBytes);
+    }
+    throw reason;
+  }
+}
+
+function isEnoentError(reason: unknown): boolean {
+  return reason instanceof Error && "code" in reason && reason.code === "ENOENT";
 }

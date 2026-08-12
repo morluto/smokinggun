@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {constants} from "node:fs";
-import {lstat, mkdir, open, rename, rm, writeFile} from "node:fs/promises";
+import {link, lstat, mkdir, open, rm} from "node:fs/promises";
 import {basename, join} from "node:path";
 import {randomUUID} from "node:crypto";
 
@@ -44,8 +44,22 @@ export async function storeArtifactBytes(
     if (!(cause instanceof Error && "code" in cause && cause.code === "ENOENT")) throw cause;
     const temporary = join(directory, `.${digest}.${randomUUID()}.tmp`);
     try {
-      await writeFile(temporary, bytes, {flag: "wx"});
-      await rename(temporary, destination);
+      const handle = await open(temporary, "wx");
+      try {
+        await handle.writeFile(bytes);
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      try {
+        await link(temporary, destination);
+      } catch (linkCause: unknown) {
+        if (!(linkCause instanceof Error && "code" in linkCause && linkCause.code === "EEXIST")) throw linkCause;
+        const existing = await readArtifactBytes(destination, bytes.byteLength);
+        if (!existing.equals(bytes))
+          throw new Error("The content-addressed artifact destination does not match its digest.");
+      }
+      await rm(temporary, {force: true});
     } catch (writeCause: unknown) {
       await rm(temporary, {force: true}).catch(() => undefined);
       throw writeCause;

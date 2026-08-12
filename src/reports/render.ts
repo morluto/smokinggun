@@ -51,7 +51,7 @@ export function toSarif(report: ScanReportV2): Record<string, unknown> {
               },
             },
           ],
-          fingerprints: {footgunFindingId: finding.id},
+          fingerprints: {smokinggunFindingId: finding.id},
           properties: {
             confidence: finding.confidence,
             status: finding.status,

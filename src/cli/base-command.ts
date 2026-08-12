@@ -2,7 +2,7 @@ import {Command, Flags} from "@oclif/core";
 import {createRuntimeContext, isContextFailure, type GlobalFlags, type RuntimeContext} from "./context.js";
 import type {OutputFormat} from "../config.js";
 import type {ActionRequiredV1, ProblemV1} from "../protocol/index.js";
-import {redactSensitive} from "../execution/environment.js";
+import {redactSensitive} from "../adapters/environment.js";
 import {toolIdentity} from "../tool-identity.js";
 
 export const globalFlags = {
@@ -41,7 +41,7 @@ export abstract class BaseCommand extends Command {
       if (controller.signal.aborted)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "cancelled",
             message: "The command was cancelled.",
             recovery: "Rerun the command when the local resources are available.",
@@ -52,7 +52,7 @@ export abstract class BaseCommand extends Command {
         );
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "runtime-context-failed",
           message: "SmokingGun could not initialize its local runtime context.",
           ...(normalizedFlags.debug && cause instanceof Error ? {detail: redactSensitive(cause.message)} : {}),
@@ -107,7 +107,7 @@ export abstract class BaseCommand extends Command {
                 ],
               },
             ],
-            properties: {schemaVersion: "footgun.problem.v1", problem: safeProblem},
+            properties: {schemaVersion: "smokinggun.problem.v1", problem: safeProblem},
           },
         ],
       });

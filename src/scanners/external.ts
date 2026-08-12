@@ -2,8 +2,9 @@ import {readFile} from "node:fs/promises";
 import {isAbsolute, relative, resolve} from "node:path";
 import {execa} from "execa";
 import {Protocol, type AdapterManifestV1, type ProblemV1} from "../protocol/index.js";
-import {executionEnvironment, redactSensitive} from "../execution/environment.js";
+import {executionEnvironment, redactSensitive} from "../adapters/environment.js";
 import {comparePortable, portablePath} from "../paths.js";
+import {sandboxAdapterCommand} from "../adapters/sandbox.js";
 import type {ScannerDescriptor} from "./registry.js";
 
 export type ExternalScannerDescriptor = ScannerDescriptor & {
@@ -254,10 +255,10 @@ async function probeExternalAdapter(
   signal?: AbortSignal,
 ): Promise<ExternalAdapterProbe> {
   const command = manifest.probeCommand ?? [manifest.command[0] ?? "", "--version"];
-  const executable = command[0];
-  if (executable === undefined || executable === "") return {available: false, reason: "The adapter command is empty."};
+  const sandboxed = await sandboxAdapterCommand(command, root);
+  if ("schemaVersion" in sandboxed) return {available: false, reason: sandboxed.message};
   try {
-    const result = await execa(executable, command.slice(1), {
+    const result = await execa(sandboxed.executable, sandboxed.arguments, {
       cwd: root,
       env: executionEnvironment({}, false),
       extendEnv: false,
@@ -285,7 +286,7 @@ async function probeExternalAdapter(
 
 function problem(code: string, message: string, detail: string, path?: string): ProblemV1 {
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code,
     message,
     detail,

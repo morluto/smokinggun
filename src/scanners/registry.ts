@@ -17,11 +17,24 @@ export function listScanners(
   external: ReadonlyArray<ExternalScannerDescriptor> = [],
 ): ReadonlyArray<ScannerDescriptor> {
   return [
-    ...listBuiltInScanners().map((scanner): ScannerDescriptor => ({
-      ...scanner,
-      kind: "built-in",
-      availability: "available",
-    })),
+    ...listBuiltInScanners().map((scanner): ScannerDescriptor =>
+      scanner.availability === "available"
+        ? {
+            id: scanner.id,
+            version: scanner.version,
+            capabilities: scanner.capabilities,
+            kind: "built-in",
+            availability: "available",
+          }
+        : {
+            id: scanner.id,
+            version: scanner.version,
+            capabilities: scanner.capabilities,
+            kind: "built-in",
+            availability: "unavailable",
+            reason: scanner.reason ?? "The scanner is unavailable in this build.",
+          },
+    ),
     ...external,
   ];
 }

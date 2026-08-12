@@ -5,14 +5,14 @@ import {canonicalJson} from "./canonical-json.js";
 
 describe("protocol contracts", () => {
   it("rejects unknown fields in a scan report", () => {
-    const result = Protocol.scanReport.safeParse({schemaVersion: "footgun.scan-report.v2", extra: true});
+    const result = Protocol.scanReport.safeParse({schemaVersion: "smokinggun.scan-report.v2", extra: true});
     expect(result.success).toBe(false);
   });
 
   it("rejects self-referential or duplicated finding identities", () => {
     const finding = {
-      schemaVersion: "footgun.finding.v2",
-      id: "fg_0123456789abcdef",
+      schemaVersion: "smokinggun.finding.v2",
+      id: "sg_0123456789abcdef",
       scanner: "fixture",
       scannerVersion: "1.0.0",
       ruleId: "fixture-rule",
@@ -38,13 +38,13 @@ describe("protocol contracts", () => {
     ).toBe(false);
     expect(Protocol.finding.safeParse({...finding, relatedFindings: [finding.id]}).success).toBe(false);
     expect(
-      Protocol.finding.safeParse({...finding, relatedFindings: ["fg_1111111111111111", "fg_1111111111111111"]}).success,
+      Protocol.finding.safeParse({...finding, relatedFindings: ["sg_1111111111111111", "sg_1111111111111111"]}).success,
     ).toBe(false);
   });
 
   it("rejects an evidence artifact reference with no identity", () => {
     const evidence = {
-      schemaVersion: "footgun.evidence.v2",
+      schemaVersion: "smokinggun.evidence.v2",
       id: "fixture:scan",
       kind: "static",
       claimClass: "static-fact",
@@ -57,7 +57,7 @@ describe("protocol contracts", () => {
 
   it("allows diagnostics to identify the repository root without allowing root locations", () => {
     const problem = {
-      schemaVersion: "footgun.problem.v1",
+      schemaVersion: "smokinggun.problem.v1",
       code: "fixture",
       message: "Fixture diagnostic",
       path: ".",
@@ -68,8 +68,8 @@ describe("protocol contracts", () => {
 
   it("requires report finding relations to resolve within that report", () => {
     const finding = {
-      schemaVersion: "footgun.finding.v2",
-      id: "fg_0123456789abcdef",
+      schemaVersion: "smokinggun.finding.v2",
+      id: "sg_0123456789abcdef",
       scanner: "fixture",
       scannerVersion: "1.0.0",
       ruleId: "fixture-rule",
@@ -83,7 +83,7 @@ describe("protocol contracts", () => {
       complexity: {},
     };
     const report = {
-      schemaVersion: "footgun.scan-report.v2",
+      schemaVersion: "smokinggun.scan-report.v2",
       tool: {name: "smokinggun", version: "1.0.0"},
       repository: {root: ".", revision: null, dirty: false},
       configDigest: "a".repeat(64),
@@ -96,7 +96,7 @@ describe("protocol contracts", () => {
     };
     expect(Protocol.scanReport.safeParse(report).success).toBe(true);
     expect(
-      Protocol.scanReport.safeParse({...report, findings: [{...finding, relatedFindings: ["fg_aaaaaaaaaaaaaaaa"]}]})
+      Protocol.scanReport.safeParse({...report, findings: [{...finding, relatedFindings: ["sg_aaaaaaaaaaaaaaaa"]}]})
         .success,
     ).toBe(false);
     expect(Protocol.scanReport.safeParse({...report, filesModified: ["fixture.ts"]}).success).toBe(false);
@@ -111,7 +111,7 @@ describe("protocol contracts", () => {
     };
     expect(Protocol.scanReport.safeParse({...report, coverage: [coverage, coverage]}).success).toBe(false);
     const inventory = {
-      schemaVersion: "footgun.repository-inventory.v1",
+      schemaVersion: "smokinggun.repository-inventory.v1",
       languages: [],
       manifests: ["package.json"],
       packageManagers: ["pnpm"],
@@ -129,14 +129,14 @@ describe("protocol contracts", () => {
   });
 
   it("returns a typed problem for an unsupported artifact", () => {
-    const result = parseScanReport({schemaVersion: "footgun.scan-report.v2"});
+    const result = parseScanReport({schemaVersion: "smokinggun.scan-report.v2"});
     expect("_tag" in result).toBe(true);
     if ("_tag" in result) expect(result.code).toBe("invalid-scan-report");
   });
 
   it("rejects repeated adapter declaration and request capabilities", () => {
     const manifest = {
-      schemaVersion: "footgun.adapter-manifest.v1",
+      schemaVersion: "smokinggun.adapter-manifest.v1",
       id: "fixture",
       version: "1.0.0",
       command: ["fixture"],
@@ -147,7 +147,7 @@ describe("protocol contracts", () => {
     expect(Protocol.adapterManifest.safeParse(manifest).success).toBe(true);
     expect(Protocol.adapterManifest.safeParse({...manifest, capabilities: ["scan", "scan"]}).success).toBe(false);
     const request = {
-      schemaVersion: "footgun.adapter-request.v1",
+      schemaVersion: "smokinggun.adapter-request.v1",
       requestId: "fixture",
       root: ".",
       config: {},
@@ -188,7 +188,7 @@ describe("protocol contracts", () => {
 
   it("requires explained incomplete compiler context coverage", () => {
     const index = {
-      schemaVersion: "footgun.context-index.v1",
+      schemaVersion: "smokinggun.context-index.v1",
       tool: {name: "typescript", version: "1.0.0"},
       files: [],
       definitions: [],
@@ -229,159 +229,6 @@ describe("protocol contracts", () => {
     ).toBe(false);
   });
 
-  it("parses each workload execution mode as a distinct legal shape", () => {
-    const common = {
-      schemaVersion: "footgun.workload.v2",
-      command: ["node", "script.js", "0", "0"],
-      cwd: ".",
-      environment: {},
-      inheritEnvironment: false,
-      warmups: 0,
-      repetitions: 1,
-      timeoutMs: 1_000,
-      requestedProfile: "local-exec",
-      expectedArtifacts: [],
-      behaviorChecks: [],
-    };
-
-    expect(Protocol.workload.safeParse(common).success).toBe(true);
-    expect(Protocol.workload.safeParse({...common, command: [""]}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...common, command: ["node", ""]}).success).toBe(true);
-    expect(Protocol.workload.safeParse({...common, expectedArtifacts: ["output.json", "output.json"]}).success).toBe(
-      false,
-    );
-    expect(Protocol.workload.safeParse({...common, behaviorChecks: ["exit-code:0", "exit-code:0"]}).success).toBe(
-      false,
-    );
-    expect(Protocol.workload.safeParse({...common, runner: {runtime: "bwrap"}}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...common, candidateRoot: "candidates/fixture"}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...common, requestedProfile: "candidate-write"}).success).toBe(true);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        requestedProfile: "candidate-write",
-        candidateRoot: "candidates/fixture",
-      }).success,
-    ).toBe(true);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        requestedProfile: "candidate-write",
-        runner: {runtime: "bwrap"},
-      }).success,
-    ).toBe(false);
-    expect(Protocol.workload.safeParse({...common, requestedProfile: "container-exec"}).success).toBe(false);
-    expect(
-      Protocol.workload.safeParse({...common, requestedProfile: "container-exec", runner: {runtime: "docker"}}).success,
-    ).toBe(false);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        requestedProfile: "container-exec",
-        runner: {runtime: "docker", image: "registry.example/fixture@sha256:abc"},
-      }).success,
-    ).toBe(true);
-    expect(Protocol.workload.safeParse({...common, resourceLimits: {memoryBytes: 1}}).success).toBe(false);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        requestedProfile: "container-exec",
-        runner: {runtime: "bwrap"},
-        resourceLimits: {maxProcesses: 1},
-      }).success,
-    ).toBe(false);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        requestedProfile: "container-exec",
-        runner: {runtime: "podman", image: "registry.example/fixture@sha256:abc"},
-        resourceLimits: {cpuMs: 1},
-      }).success,
-    ).toBe(false);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        inputSizeParameterization: {name: "items", values: [1], commandIndex: 2},
-      }).success,
-    ).toBe(true);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        multiParameterization: {
-          parameters: [
-            {name: "paths", values: [1], commandIndex: 2},
-            {name: "terms", values: [1], commandIndex: 3},
-          ],
-          maxPoints: 1,
-        },
-      }).success,
-    ).toBe(true);
-  });
-
-  it("rejects incompatible or internally inconsistent workload plans at the boundary", () => {
-    const common = {
-      schemaVersion: "footgun.workload.v2",
-      command: ["node", "script.js", "0"],
-      cwd: ".",
-      environment: {},
-      inheritEnvironment: false,
-      warmups: 0,
-      repetitions: 1,
-      timeoutMs: 1_000,
-      requestedProfile: "local-exec",
-      expectedArtifacts: [],
-      behaviorChecks: [],
-    };
-    const inputSizeParameterization = {name: "items", values: [1], commandIndex: 2};
-    const multiParameterization = {
-      parameters: [
-        {name: "paths", values: [1, 2], commandIndex: 2},
-        {name: "paths", values: [1], commandIndex: 2},
-      ],
-      coordinates: [{paths: 1}],
-      maxPoints: 1,
-    };
-
-    expect(Protocol.workload.safeParse({...common, inputSizeParameterization, multiParameterization}).success).toBe(
-      false,
-    );
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        inputSizeParameterization: {...inputSizeParameterization, commandIndex: 3},
-      }).success,
-    ).toBe(false);
-    expect(Protocol.workload.safeParse({...common, multiParameterization}).success).toBe(false);
-    expect(
-      Protocol.workload.safeParse({
-        ...common,
-        inputSizeParameterization: {...inputSizeParameterization, values: [1, 1]},
-      }).success,
-    ).toBe(false);
-  });
-
-  it("requires workload paths to remain below the repository root", () => {
-    const workload = {
-      schemaVersion: "footgun.workload.v2",
-      command: ["node", "script.js"],
-      cwd: ".",
-      environment: {},
-      inheritEnvironment: false,
-      warmups: 0,
-      repetitions: 1,
-      timeoutMs: 1_000,
-      requestedProfile: "local-exec",
-      expectedArtifacts: ["output.json"],
-      behaviorChecks: [],
-    };
-    expect(Protocol.workload.safeParse(workload).success).toBe(true);
-    expect(Protocol.workload.safeParse({...workload, cwd: "../outside"}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...workload, cwd: "/outside"}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...workload, cwd: "C:\\outside"}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...workload, expectedArtifacts: ["../outside.json"]}).success).toBe(false);
-    expect(Protocol.workload.safeParse({...workload, candidateRoot: "."}).success).toBe(false);
-  });
-
   it("rejects scaling points whose duplicate state fields disagree", () => {
     const point = {
       value: 1,
@@ -415,9 +262,9 @@ describe("protocol contracts", () => {
       behaviorValidated: true,
     };
     const result = {
-      schemaVersion: "footgun.scaling.v3",
+      schemaVersion: "smokinggun.scaling.v3",
       id: `scale_${"a".repeat(16)}`,
-      workloadDigest: "b".repeat(64),
+      benchmarkDigest: "b".repeat(64),
       parameters: ["paths", "terms"],
       coordinatesDigest: createHash("sha256").update(canonicalJson(coordinates)).digest("hex"),
       points: [point],
@@ -464,9 +311,9 @@ describe("protocol contracts", () => {
     };
     const model = {name: "linear" as const, coefficients: [0, 1], residual: 0, rSquared: 1};
     const analysis = {
-      schemaVersion: "footgun.scaling.v2",
+      schemaVersion: "smokinggun.scaling.v2",
       id: `scale_${"a".repeat(16)}`,
-      workloadDigest: "b".repeat(64),
+      benchmarkDigest: "b".repeat(64),
       parameter: "items",
       points: [point],
       models: [model],
@@ -488,11 +335,14 @@ describe("protocol contracts", () => {
     expect(Protocol.scaling.safeParse({...analysis, models: [model, model]}).success).toBe(false);
     expect(Protocol.scaling.safeParse({...analysis, points: [point, {...point}]}).success).toBe(false);
     expect(Protocol.scaling.safeParse({...analysis, points: [{...point, samplesMs: [1, 1]}]}).success).toBe(false);
+    expect(Protocol.scaling.safeParse({...analysis, points: [{...point, behaviorValidated: false}]}).success).toBe(
+      false,
+    );
   });
 
   it("binds trace summary row fields to unique declared columns", () => {
     const summary = {
-      schemaVersion: "footgun.trace-summary.v1",
+      schemaVersion: "smokinggun.trace-summary.v1",
       id: `trace_${"b".repeat(16)}`,
       tool: "perfetto",
       sourceArtifact: "trace.pftrace",
@@ -509,7 +359,7 @@ describe("protocol contracts", () => {
 
   it("requires evidence for evidence-bearing investigation states", () => {
     const bundle = {
-      schemaVersion: "footgun.investigation-bundle.v2",
+      schemaVersion: "smokinggun.investigation-bundle.v2",
       id: `inv_${"a".repeat(16)}`,
       state: "scanned" as const,
       root: ".",
@@ -517,7 +367,7 @@ describe("protocol contracts", () => {
       reports: ["scan-report.json"],
       evidence: [
         {
-          schemaVersion: "footgun.evidence.v2",
+          schemaVersion: "smokinggun.evidence.v2",
           id: "inv_aaaaaaaaaaaaaaaa:scan",
           kind: "static",
           claimClass: "static-fact",
@@ -540,7 +390,7 @@ describe("protocol contracts", () => {
       Protocol.investigation.safeParse({...bundle, reports: ["scan-report.json", "scan-report.json"]}).success,
     ).toBe(false);
     expect(
-      Protocol.investigation.safeParse({...bundle, findingIds: ["fg_0123456789abcdef", "fg_0123456789abcdef"]}).success,
+      Protocol.investigation.safeParse({...bundle, findingIds: ["sg_0123456789abcdef", "sg_0123456789abcdef"]}).success,
     ).toBe(false);
     expect(
       Protocol.investigation.safeParse({...bundle, state: "baseline-measured", reports: ["measurement.json"]}).success,
@@ -559,9 +409,9 @@ describe("protocol contracts", () => {
 
   it("requires passing behavior evidence before a measurement can claim validation", () => {
     const measurement = {
-      schemaVersion: "footgun.measurement.v1",
+      schemaVersion: "smokinggun.measurement.v1",
       id: `meas_${"a".repeat(16)}`,
-      workloadDigest: "b".repeat(64),
+      benchmarkDigest: "b".repeat(64),
       samplesMs: [1],
       warmups: 0,
       repetitions: 1,
@@ -594,62 +444,17 @@ describe("protocol contracts", () => {
       Protocol.measurement.safeParse({
         ...measurement,
         behaviorChecks: [{check: "exit-code:0", passed: true}],
-        isolation: {...measurement.isolation, candidateWorkspace: "candidates/fixture"},
-      }).success,
-    ).toBe(false);
-    expect(
-      Protocol.measurement.safeParse({
-        ...measurement,
-        behaviorChecks: [{check: "exit-code:0", passed: true}],
-        executionProfile: "candidate-write",
-      }).success,
-    ).toBe(false);
-    const candidateMeasurement = {
-      ...measurement,
-      behaviorChecks: [{check: "exit-code:0", passed: true}],
-      executionProfile: "candidate-write" as const,
-      isolation: {
-        backend: "host-process" as const,
-        candidateWorkspace: "candidates/fixture",
-        controlsRequested: ["candidate-workspace"],
-        controlsApplied: ["candidate-workspace"],
-        downgradeReasons: [],
-      },
-    };
-    expect(Protocol.measurement.safeParse(candidateMeasurement).success).toBe(true);
-    expect(
-      Protocol.measurement.safeParse({
-        ...candidateMeasurement,
-        isolation: {...candidateMeasurement.isolation, controlsRequested: []},
-      }).success,
-    ).toBe(false);
-    expect(
-      Protocol.measurement.safeParse({
-        ...measurement,
-        behaviorChecks: [{check: "exit-code:0", passed: true}],
-        executionProfile: "container-exec",
-      }).success,
-    ).toBe(false);
-    const containerMeasurement = {
-      ...measurement,
-      behaviorChecks: [{check: "exit-code:0", passed: true}],
-      executionProfile: "container-exec" as const,
-      isolation: {
-        backend: "docker" as const,
-        runner: {runtime: "docker" as const, image: "registry.example/fixture@sha256:abc"},
-        controlsRequested: [],
-        controlsApplied: [],
-        downgradeReasons: [],
-      },
-    };
-    expect(Protocol.measurement.safeParse(containerMeasurement).success).toBe(true);
-    expect(
-      Protocol.measurement.safeParse({
-        ...containerMeasurement,
         isolation: {
-          ...containerMeasurement.isolation,
-          runner: {runtime: "podman", image: "registry.example/fixture@sha256:abc"},
+          ...measurement.isolation,
+          runtime: {name: "repository-benchmark", version: "1.0.0", digest: "c".repeat(64)},
         },
+      }).success,
+    ).toBe(true);
+    expect(
+      Protocol.measurement.safeParse({
+        ...measurement,
+        behaviorChecks: [{check: "exit-code:0", passed: true}],
+        isolation: {...measurement.isolation, undeclaredAuthority: true},
       }).success,
     ).toBe(false);
     expect(
@@ -691,7 +496,7 @@ describe("protocol contracts", () => {
 
   it("rejects adapter artifact digests that are detached from declared artifacts", () => {
     const result = {
-      schemaVersion: "footgun.adapter-result.v2",
+      schemaVersion: "smokinggun.adapter-result.v2",
       requestId: "request",
       state: "complete",
       findings: [],
@@ -765,14 +570,14 @@ describe("protocol contracts", () => {
 
   it("rejects evidence digests detached from artifacts within scan findings", () => {
     const result = Protocol.scanReport.safeParse({
-      schemaVersion: "footgun.scan-report.v2",
+      schemaVersion: "smokinggun.scan-report.v2",
       tool: {name: "smokinggun", version: "1.0.0"},
       repository: {root: ".", revision: null, dirty: false},
       configDigest: "0".repeat(64),
       findings: [
         {
-          schemaVersion: "footgun.finding.v2",
-          id: "fg_0123456789abcdef",
+          schemaVersion: "smokinggun.finding.v2",
+          id: "sg_0123456789abcdef",
           scanner: "fixture",
           scannerVersion: "1.0.0",
           ruleId: "fixture-rule",
@@ -785,7 +590,7 @@ describe("protocol contracts", () => {
           evidence: [],
           evidenceRecords: [
             {
-              schemaVersion: "footgun.evidence.v2",
+              schemaVersion: "smokinggun.evidence.v2",
               id: "fixture-evidence",
               kind: "static",
               summary: "fixture",
@@ -807,7 +612,7 @@ describe("protocol contracts", () => {
 
   it("rejects benchmark provenance digests without their artifact", () => {
     const record = {
-      schemaVersion: "footgun.benchmark-record.v2",
+      schemaVersion: "smokinggun.benchmark-record.v2",
       id: "bench_0123456789abcdef",
       tool: "hyperfine",
       name: "fixture",
@@ -820,7 +625,7 @@ describe("protocol contracts", () => {
       metadata: {},
     };
     const result = {
-      schemaVersion: "footgun.benchmark-import.v2",
+      schemaVersion: "smokinggun.benchmark-import.v2",
       tool: "hyperfine",
       records: [record],
       rawArtifactDigest: "0".repeat(64),
@@ -861,11 +666,11 @@ describe("protocol contracts", () => {
 
   it("keeps measurement and scaling comparison payloads disjoint", () => {
     const common = {
-      schemaVersion: "footgun.comparison.v2",
+      schemaVersion: "smokinggun.comparison.v2",
       id: "cmp_0123456789abcdef",
       baseline: "baseline.json",
       candidate: "candidate.json",
-      workloadDigest: "0".repeat(64),
+      benchmarkDigest: "0".repeat(64),
       behaviorValidated: true,
       improvement: true,
       statisticalPolicy: {kind: "median-improvement", minimumRelativeImprovement: 0},

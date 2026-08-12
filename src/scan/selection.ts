@@ -1,7 +1,7 @@
 import {extname, isAbsolute} from "node:path";
 import type {ProblemV1} from "../protocol/index.js";
 import {pythonSemanticScannerId, pythonSemanticScannerVersion} from "../scanners/python-semantic.js";
-import {scannerId, scannerVersion} from "../scanners/structural.js";
+import {scannerId, scannerVersion} from "../scanners/structural-finding.js";
 import {semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
 
 export type BuiltInScanBackend = "structural" | "typescript-semantic" | "python-semantic";
@@ -10,6 +10,8 @@ export type BuiltInScannerDescriptor = {
   readonly id: string;
   readonly version: string;
   readonly capabilities: ReadonlyArray<string>;
+  readonly availability: "available" | "unavailable";
+  readonly reason?: string;
 };
 
 type ScannerDefinition = BuiltInScannerDescriptor & {
@@ -17,7 +19,7 @@ type ScannerDefinition = BuiltInScannerDescriptor & {
   readonly aliases: ReadonlyArray<string>;
 };
 
-const treeSitterScannerId = "footgun.tree-sitter";
+const treeSitterScannerId = "smokinggun.tree-sitter";
 const treeSitterScannerVersion = "0.26.11";
 
 const scannerDefinitions: ReadonlyArray<ScannerDefinition> = [
@@ -25,6 +27,7 @@ const scannerDefinitions: ReadonlyArray<ScannerDefinition> = [
     id: scannerId,
     version: scannerVersion,
     capabilities: ["structural-complexity", "multi-language", "deterministic-json"],
+    availability: "available",
     backend: "structural",
     aliases: ["structural"],
   },
@@ -32,6 +35,7 @@ const scannerDefinitions: ReadonlyArray<ScannerDefinition> = [
     id: semanticScannerId,
     version: semanticScannerVersion,
     capabilities: ["symbols", "types", "calls"],
+    availability: "available",
     backend: "typescript-semantic",
     aliases: ["typescript", "typescript-semantic"],
   },
@@ -39,6 +43,7 @@ const scannerDefinitions: ReadonlyArray<ScannerDefinition> = [
     id: pythonSemanticScannerId,
     version: pythonSemanticScannerVersion,
     capabilities: ["interpreter-free", "collection-facts", "syntax-data-flow"],
+    availability: "available",
     backend: "python-semantic",
     aliases: ["python", "python-semantic"],
   },
@@ -46,6 +51,7 @@ const scannerDefinitions: ReadonlyArray<ScannerDefinition> = [
     id: treeSitterScannerId,
     version: treeSitterScannerVersion,
     capabilities: ["syntax-aware", "parse-coverage", "14-pinned-grammars"],
+    availability: "available",
     backend: "structural",
     aliases: ["tree-sitter"],
   },
@@ -240,7 +246,7 @@ function languageForExtension(extension: string): string {
 
 function invalidSelection(detail: string): ProblemV1 {
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code: "invalid-scanner-selection",
     message: "The scanner selection is invalid.",
     detail,
@@ -250,7 +256,7 @@ function invalidSelection(detail: string): ProblemV1 {
 
 function invalidScope(detail: string): ProblemV1 {
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code: "invalid-scan-scope",
     message: "The --only filter is invalid.",
     detail,

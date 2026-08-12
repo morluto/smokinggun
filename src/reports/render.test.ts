@@ -3,14 +3,14 @@ import type {ScanReportV2} from "../protocol/index.js";
 import {parseReportArtifact, renderScanReport, toSarif} from "./render.js";
 
 const report: ScanReportV2 = {
-  schemaVersion: "footgun.scan-report.v2",
+  schemaVersion: "smokinggun.scan-report.v2",
   tool: {name: "smokinggun", version: "2.0.0"},
   repository: {root: ".", revision: null, dirty: false},
   configDigest: "a".repeat(64),
   findings: [],
   coverage: [
     {
-      scanner: "footgun.structural",
+      scanner: "smokinggun.structural",
       version: "1.0.0",
       language: "mixed",
       filesDiscovered: 0,

@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.adapter-request.v1"
+      "const": "smokinggun.adapter-request.v1"
     },
     "requestId": {
       "type": "string",

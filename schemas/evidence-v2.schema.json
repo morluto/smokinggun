@@ -6,7 +6,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.evidence.v2"
+          "const": "smokinggun.evidence.v2"
         },
         "id": {
           "type": "string",
@@ -74,7 +74,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.evidence.v2"
+          "const": "smokinggun.evidence.v2"
         },
         "id": {
           "type": "string",

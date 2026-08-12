@@ -1,7 +1,8 @@
-import {lstat, readFile, readdir, stat} from "node:fs/promises";
+import {lstat, readdir, stat} from "node:fs/promises";
+import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
-import type {AdapterRequestV1, CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
+import type {CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
 import {grammarLanguageForPath, parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../scanners/tree-sitter-structural.js";
 import {
@@ -9,18 +10,13 @@ import {
   pythonSemanticScannerId,
   pythonSemanticScannerVersion,
 } from "../scanners/python-semantic.js";
-import {isSupportedExtension, scanSource, scannerId, scannerVersion} from "../scanners/structural.js";
-import {scanTypeScript, semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
-import {comparePortable, isWithinRoot, portablePath} from "../paths.js";
+import {isSupportedExtension, scannerId, scannerVersion} from "../scanners/structural-finding.js";
+import {scanTypeScriptSnapshot, semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
+import {comparePortable, portablePath} from "../paths.js";
 import {buildRepositoryInventory} from "./inventory.js";
-import {
-  resolveExternalAdapters,
-  type AdapterExecutionAuthorization,
-  type ParsedExternalAdapters,
-} from "../scanners/external.js";
-import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
-import {createHash} from "node:crypto";
+import type {AdapterExecutionAuthorization, ParsedExternalAdapters} from "../scanners/external.js";
 import {toolIdentity} from "../tool-identity.js";
+import {stableJson} from "../serialization.js";
 import {
   explicitlyRequiresScanner,
   hasUnmatchedExplicitScope,
@@ -30,6 +26,14 @@ import {
   type ScanScope,
   type ScannerSelection,
 } from "./selection.js";
+import {
+  captureSourceSnapshot,
+  defaultSourceCaptureLimits,
+  type SourceCaptureLimits,
+  type UnavailableSourceFile,
+} from "./source-snapshot.js";
+import {withSourceSnapshotView} from "./snapshot-view.js";
+import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
 
 type CoverageDetails = Pick<
   CoverageRecordV1,
@@ -76,6 +80,11 @@ export type ScanOptions = {
   readonly signal?: AbortSignal;
   readonly adapters: ParsedExternalAdapters;
   readonly adapterAuthorization: AdapterExecutionAuthorization;
+  readonly sourceCaptureLimits?: SourceCaptureLimits;
+  readonly retainAdapterArtifact?: (
+    path: string,
+    bytes: Uint8Array,
+  ) => Promise<{readonly reference: string; readonly digest: string}>;
 };
 
 export type ScanRepositoryResult = {
@@ -92,9 +101,20 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const rootInfo = await stat(root);
   const pathRoot = rootInfo.isDirectory() ? root : resolve(root, "..");
   const excludes = new Set([...defaultExcludes, ...(options.excludes ?? [])]);
-  const discovered = await collectFiles(root, excludes, options.signal);
+  const sourceCaptureLimits = options.sourceCaptureLimits ?? defaultSourceCaptureLimits;
+  const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
   const files = discovered.files.filter(inScope);
+  const sourceSnapshot = await captureSourceSnapshot(
+    pathRoot,
+    files,
+    sourceCaptureLimits,
+    options.signal === undefined ? {} : {signal: options.signal},
+  );
+  const capturedSources = new Map(sourceSnapshot.capturedFiles.map((file) => [file.path, file]));
+  const unavailableSources = new Map(
+    sourceSnapshot.files.flatMap((file) => (file._tag === "unavailable" ? [[file.path, file] as const] : [])),
+  );
   const skippedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
   const skippedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
   const runStructural = runsBuiltInScanner(options.selection, "structural");
@@ -108,7 +128,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   let partial = false;
   let partialReason: string | undefined;
   const parseDiagnostics: ProblemV1[] = [];
-  const sourceHasher = createHash("sha256");
   const analyzedFiles: string[] = [];
   const parserCoverage = new Map<
     string,
@@ -134,17 +153,12 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     return entry;
   };
   const typeScriptSemanticSkipped: string[] = [];
-  let pythonSemanticAnalyzed = 0;
-  let pythonSemanticPartial = 0;
-  let pythonSemanticUnavailable = 0;
   const pythonSemanticSkipped: string[] = [];
   for (const file of files) {
     options.signal?.throwIfAborted();
-    let source: string;
-    try {
-      source = await readFile(file, "utf8");
-    } catch {
-      const reportPath = portablePath(relative(pathRoot, file));
+    const reportPath = portablePath(relative(pathRoot, file));
+    const captured = capturedSources.get(reportPath);
+    if (captured === undefined) {
       skippedFiles.push(reportPath);
       if (runStructural) {
         const language = grammarLanguageForPath(file);
@@ -157,28 +171,29 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         }
       }
       if (runTypeScript && isTypeScriptPath(file)) typeScriptSemanticSkipped.push(reportPath);
-      if (runPython && extensionOf(reportPath).toLowerCase() === ".py") {
-        pythonSemanticUnavailable += 1;
-        pythonSemanticSkipped.push(reportPath);
-      }
+      if (runPython && extensionOf(file).toLowerCase() === ".py") pythonSemanticSkipped.push(reportPath);
       continue;
     }
-    const reportPath = portablePath(relative(pathRoot, file));
-    sourceHasher.update(reportPath).update("\0").update(source).update("\0");
+    const source = captured.text;
     analyzed += 1;
     analyzedFiles.push(file);
     const treeStructural = runStructural ? await scanWithTreeSitter(reportPath, source, options.signal) : undefined;
-    const fallback = runStructural ? scanSource(reportPath, source) : {findings: [], parseStatus: "complete" as const};
-    const result =
-      treeStructural?.coverage.status === "complete"
-        ? {findings: treeStructural.findings, parseStatus: "complete" as const}
-        : fallback;
+    const result = {
+      findings: treeStructural?.findings ?? [],
+      parseStatus:
+        treeStructural === undefined || treeStructural.coverage.status === "complete"
+          ? ("complete" as const)
+          : ("partial" as const),
+      ...(treeStructural?.coverage.status === "complete" || treeStructural === undefined
+        ? {}
+        : {reason: treeStructural.coverage.error}),
+    };
     findings.push(...result.findings);
     if (result.parseStatus === "partial") {
       partial = true;
       partialReason = result.reason;
       parseDiagnostics.push({
-        schemaVersion: "footgun.problem.v1",
+        schemaVersion: "smokinggun.problem.v1",
         code: "partial-parse",
         message: `Structural coverage is partial for ${reportPath}.`,
         path: reportPath,
@@ -202,7 +217,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       if (parserResult.status !== "complete") {
         parserEntry.reasons.add(parserResult.error);
         parseDiagnostics.push({
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: parserResult.status === "unavailable" ? "parser-unavailable" : "partial-parse",
           message: `Tree-sitter coverage is ${parserResult.status} for ${reportPath}.`,
           path: reportPath,
@@ -212,58 +227,51 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       }
       parserCoverage.set(parserResult.language, parserEntry);
     }
-    if (runPython) {
-      if (extensionOf(reportPath).toLowerCase() === ".py") {
-        const pythonResult = await scanPythonSemantic(reportPath, source, options.signal);
-        findings.push(...pythonResult.findings);
-        parseDiagnostics.push(...pythonResult.diagnostics);
-        if (pythonResult.coverage.status === "complete") pythonSemanticAnalyzed += 1;
-        if (pythonResult.coverage.status === "partial") pythonSemanticPartial += 1;
-        if (pythonResult.coverage.status === "unavailable") {
-          pythonSemanticUnavailable += 1;
-          pythonSemanticSkipped.push(reportPath);
-        }
-      }
-    }
   }
+  const semanticSources = selectedTypeScriptFiles.flatMap((file) => {
+    const path = portablePath(relative(pathRoot, file));
+    const captured = capturedSources.get(path);
+    return captured === undefined ? [] : [{path, text: captured.text}];
+  });
   const semantic = runTypeScript
-    ? await scanTypeScript(pathRoot, analyzedFiles, options.signal)
+    ? await scanTypeScriptSnapshot(pathRoot, semanticSources, options.signal)
     : {state: "unavailable" as const, diagnostics: [], findings: []};
   findings.push(...semantic.findings);
   parseDiagnostics.push(...semantic.diagnostics);
-  const semanticIndex = semantic.state === "unavailable" ? undefined : semantic.index;
-  const semanticSkippedFiles = [
-    ...new Set([...(semanticIndex?.coverage.skippedFiles ?? []), ...typeScriptSemanticSkipped]),
-  ].sort(comparePortable);
+  const pythonResults = [];
+  if (runPython)
+    for (const file of selectedPythonFiles) {
+      const path = portablePath(relative(pathRoot, file));
+      const captured = capturedSources.get(path);
+      if (captured === undefined) continue;
+      const result = await scanPythonSemantic(path, captured.text, options.signal);
+      pythonResults.push(result);
+      findings.push(...result.findings);
+      parseDiagnostics.push(...result.diagnostics);
+    }
+  const semanticSkippedFiles = [...new Set(typeScriptSemanticSkipped)].sort(comparePortable);
   const semanticReasons = [
     ...semantic.diagnostics.map((diagnostic) => diagnostic.message),
+    ...(discovered.traversalLimit === undefined ? [] : [discovered.traversalLimit]),
     ...(typeScriptSemanticSkipped.length === 0
       ? []
       : ["One or more selected TypeScript source files could not be read."]),
   ];
-  const repository = await repositoryIdentity(root, files);
+  const repository = await repositoryIdentity(root, files, options.signal);
   const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
-  const sourceDigest = sourceHasher.digest("hex");
-  const adapterRun = await runConfiguredAdapters(
-    options.adapters,
-    pathRoot,
-    options.configDigest,
-    repository.revision,
-    sourceDigest,
-    files,
-    options.selection,
-    options.adapterAuthorization,
-    options.signal,
-  );
+  const sourceDigest = sourceSnapshot.digest;
+  const adapterRun = await runConfiguredAdapters(options.adapters, sourceSnapshot, options);
   findings.push(...adapterRun.findings);
   parseDiagnostics.push(...adapterRun.diagnostics);
   parseDiagnostics.push(...scannerDisagreements(findings));
   const policyFindings = relateFindings(findings).sort(compareFindings);
-  const allFindings = pruneFindingRelations(policyFindings.slice(0, options.maxFindings ?? 80));
-  const scopeMatchedNothing = hasUnmatchedExplicitScope(
-    options.scope,
-    files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
-  );
+  const allFindings = pruneFindingRelations(selectRepresentativeFindings(policyFindings, options.maxFindings ?? 80));
+  const scopeMatchedNothing =
+    discovered.traversalLimit === undefined &&
+    hasUnmatchedExplicitScope(
+      options.scope,
+      files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
+    );
   const skippedSymlinkPaths = [...skippedSourceSymlinks, ...skippedDirectorySymlinks];
   const coverage: CoverageRecordV1 | undefined = runStructural
     ? coverageRecord(
@@ -278,27 +286,44 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             ...skippedSymlinkPaths.map((file) => portablePath(relative(pathRoot, file))),
           ].sort(comparePortable),
         },
-        scopeMatchedNothing || skippedFiles.length > 0 || skippedSymlinkPaths.length > 0 || partial
+        scopeMatchedNothing ||
+          discovered.traversalLimit !== undefined ||
+          skippedFiles.length > 0 ||
+          skippedSymlinkPaths.length > 0 ||
+          partial
           ? "partial"
           : files.length > 0 && analyzed === 0
             ? "unavailable"
             : "complete",
         partialReason ??
-          (scopeMatchedNothing
-            ? "The explicit --only filter matched no supported source paths."
-            : skippedFiles.length > 0
-              ? "One or more selected source files could not be read."
-              : skippedSymlinkPaths.length > 0
-                ? "Symlinks were skipped to preserve the repository boundary."
-                : undefined),
+          (discovered.traversalLimit !== undefined
+            ? discovered.traversalLimit
+            : scopeMatchedNothing
+              ? "The explicit --only filter matched no supported source paths."
+              : skippedFiles.length > 0
+                ? "One or more selected source files could not be read."
+                : skippedSymlinkPaths.length > 0
+                  ? "Symlinks were skipped to preserve the repository boundary."
+                  : undefined),
       )
     : undefined;
   const diagnostics: ProblemV1[] = [
     ...parseDiagnostics,
+    ...(discovered.traversalLimit === undefined
+      ? []
+      : [
+          {
+            schemaVersion: "smokinggun.problem.v1" as const,
+            code: "source-traversal-bounded",
+            message: "Source discovery stopped at a configured traversal bound.",
+            detail: discovered.traversalLimit,
+            recovery: "Narrow the scan scope or deliberately raise the source capture limits.",
+          },
+        ]),
     ...(scopeMatchedNothing
       ? [
           {
-            schemaVersion: "footgun.problem.v1" as const,
+            schemaVersion: "smokinggun.problem.v1" as const,
             code: "scan-scope-unmatched",
             message: "The explicit --only filter matched no supported source paths.",
             recovery: "Use a scan-root-relative path or a supported language or extension filter.",
@@ -306,14 +331,15 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         ]
       : []),
     ...skippedFiles.map((path): ProblemV1 => ({
-      schemaVersion: "footgun.problem.v1",
-      code: "file-unavailable",
-      message: `Skipped ${path} because it could not be read.`,
+      schemaVersion: "smokinggun.problem.v1",
+      code: "source-capture-incomplete",
+      message: `Skipped ${path} because immutable source capture was incomplete.`,
       path,
-      recovery: "Check file permissions and rerun the scan.",
+      detail: sourceCaptureReason(unavailableSources.get(path)),
+      recovery: "Check source capture bounds, encoding, file type, and permissions before rerunning the scan.",
     })),
     ...skippedSymlinkPaths.map((path): ProblemV1 => ({
-      schemaVersion: "footgun.problem.v1",
+      schemaVersion: "smokinggun.problem.v1",
       code: "symlink-skipped",
       message: `Skipped symlink ${portablePath(relative(pathRoot, path))}.`,
       path: portablePath(relative(pathRoot, path)),
@@ -323,7 +349,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       ? []
       : [
           {
-            schemaVersion: "footgun.problem.v1" as const,
+            schemaVersion: "smokinggun.problem.v1" as const,
             code: "findings-truncated",
             message: `Emitted ${allFindings.length} of ${policyFindings.length} findings due to the configured limit.`,
             recovery: "Increase maxFindings to review the remaining findings.",
@@ -341,7 +367,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       ].sort(comparePortable);
       return coverageRecord(
         {
-          scanner: "footgun.tree-sitter",
+          scanner: "smokinggun.tree-sitter",
           version: "0.26.11",
           language,
           filesDiscovered:
@@ -351,10 +377,13 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         },
         entry.unavailable > 0
           ? "unavailable"
-          : scopeMatchedNothing || entry.partial > 0 || parserSkippedFiles.length > 0
+          : scopeMatchedNothing ||
+              discovered.traversalLimit !== undefined ||
+              entry.partial > 0 ||
+              parserSkippedFiles.length > 0
             ? "partial"
             : "complete",
-        entry.reasons.size === 0 ? undefined : [...entry.reasons].sort(comparePortable).join(" "),
+        entry.reasons.size === 0 ? discovered.traversalLimit : [...entry.reasons].sort(comparePortable).join(" "),
       );
     });
   const semanticCoverage: CoverageRecordV1 | undefined =
@@ -367,12 +396,15 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             version: semanticScannerVersion,
             language: "typescript-javascript",
             filesDiscovered: selectedTypeScriptFiles.length,
-            filesAnalyzed: semanticIndex?.coverage.filesIndexed ?? 0,
+            filesAnalyzed: semantic.state === "unavailable" ? 0 : semanticSources.length,
             skippedFiles: semanticSkippedFiles,
           },
           semantic.state === "unavailable"
             ? "unavailable"
-            : scopeMatchedNothing || semantic.state === "partial" || semanticSkippedFiles.length > 0
+            : scopeMatchedNothing ||
+                discovered.traversalLimit !== undefined ||
+                semantic.state === "partial" ||
+                semanticSkippedFiles.length > 0
               ? "partial"
               : "complete",
           semanticReasons.length === 0 ? undefined : semanticReasons.join(" "),
@@ -387,15 +419,26 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
             version: pythonSemanticScannerVersion,
             language: "python",
             filesDiscovered: selectedPythonFiles.length,
-            filesAnalyzed: pythonSemanticAnalyzed,
-            skippedFiles: pythonSemanticSkipped.sort(comparePortable),
+            filesAnalyzed: pythonResults.length,
+            skippedFiles: [...pythonSemanticSkipped].sort(comparePortable),
           },
-          pythonSemanticUnavailable > 0
+          (selectedPythonFiles.length > 0 && pythonResults.length === 0) ||
+            pythonResults.some((result) => result.coverage.status === "unavailable")
             ? "unavailable"
-            : scopeMatchedNothing || pythonSemanticPartial > 0 || pythonSemanticSkipped.length > 0
+            : discovered.traversalLimit !== undefined ||
+                scopeMatchedNothing ||
+                pythonSemanticSkipped.length > 0 ||
+                pythonResults.some((result) => result.coverage.status === "partial")
               ? "partial"
               : "complete",
-          scopeMatchedNothing ? "The explicit --only filter matched no supported Python source paths." : undefined,
+          discovered.traversalLimit ??
+            (scopeMatchedNothing
+              ? "The explicit --only filter matched no supported Python source paths."
+              : pythonSemanticSkipped.length > 0
+                ? "One or more selected Python source files could not be captured."
+                : pythonResults
+                    .flatMap((result) => (result.coverage.status === "complete" ? [] : [result.coverage.error]))
+                    .join(" ") || undefined),
         );
   const coverageRecords = [
     ...(coverage === undefined ? [] : [coverage]),
@@ -406,7 +449,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   ];
   const resolvedCoverage = resolveCoverageIdentityCollisions(coverageRecords);
   const report: ScanReportV2 = {
-    schemaVersion: "footgun.scan-report.v2",
+    schemaVersion: "smokinggun.scan-report.v2",
     tool: toolIdentity,
     repository,
     inventory,
@@ -414,16 +457,16 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     configDigest: options.configDigest,
     findings: allFindings,
     coverage: resolvedCoverage.records,
-    ...(semanticIndex === undefined ? {} : {context: semanticIndex}),
     diagnostics: [...diagnostics, ...resolvedCoverage.diagnostics],
     timings: {startedAt, durationMs: Math.max(0, performance.now() - started)},
     assumptions: [
       "Structural findings are candidates; type, caller, workload, and runtime evidence were not inferred.",
+      "Structural rule coverage is limited to syntax-backed nested-loop and in-loop membership, sort, and transform rules; fallback-only recursion, I/O, and render rules are disabled.",
     ],
     nextAction:
       allFindings.length === 0
         ? "Review coverage and unknowns before concluding that no optimization candidate exists."
-        : "Inspect the highest-ranked finding, resolve repository context, and declare behavior checks before measuring.",
+        : "Inspect the first candidate from each represented repository area; ordering is deterministic, not runtime importance.",
     filesModified: [],
     rawArtifacts: [...adapterRun.rawArtifacts],
     ...(Object.keys(adapterRun.rawArtifactDigests).length === 0
@@ -435,14 +478,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
 
 async function runConfiguredAdapters(
   parsed: ParsedExternalAdapters,
-  root: string,
-  configDigest: string,
-  revision: string | null,
-  sourceDigest: string,
-  files: ReadonlyArray<string>,
-  selection: ScannerSelection,
-  authorization: AdapterExecutionAuthorization,
-  signal?: AbortSignal,
+  snapshot: Awaited<ReturnType<typeof captureSourceSnapshot>>,
+  options: ScanOptions,
 ): Promise<{
   readonly findings: ReadonlyArray<FindingV2>;
   readonly coverage: ReadonlyArray<CoverageRecordV1>;
@@ -458,20 +495,31 @@ async function runConfiguredAdapters(
       rawArtifacts: [],
       rawArtifactDigests: {},
     };
-  const loaded = await resolveExternalAdapters(parsed, root, {
-    authorization,
-    ...(signal === undefined ? {} : {signal}),
-  });
+  const selectedAdapters = selectExternalAdapters(parsed, options.selection);
+  if (
+    selectedAdapters.adapters.length === 0 &&
+    selectedAdapters.invalidDescriptors.length === 0 &&
+    selectedAdapters.diagnostics.length === 0
+  )
+    return {
+      findings: [],
+      coverage: [],
+      diagnostics: [],
+      rawArtifacts: [],
+      rawArtifactDigests: {},
+    };
   const findings: FindingV2[] = [];
   const coverage: CoverageRecordV1[] = [];
-  const diagnostics: ProblemV1[] = [...loaded.diagnostics];
+  const diagnostics: ProblemV1[] = [...selectedAdapters.diagnostics];
   const rawArtifacts: string[] = [];
   const rawArtifactDigests: Record<string, string> = {};
-  const sourceTargets = files.map((file) => portablePath(relative(root, file))).sort(comparePortable);
+  const sourceTargets = snapshot.capturedFiles.map((file) => file.path).sort(comparePortable);
+  const unavailableTargets = snapshot.files
+    .flatMap((file) => (file._tag === "unavailable" ? [file.path] : []))
+    .sort(comparePortable);
   const invalidCoverageIdentities = new Set<string>();
-  for (const descriptor of loaded.descriptors) {
-    if (descriptor.availability !== "invalid") continue;
-    const scanner = `footgun.adapter:${descriptor.id}`;
+  for (const descriptor of selectedAdapters.invalidDescriptors) {
+    const scanner = `smokinggun.adapter:${descriptor.id}`;
     const identity = `${scanner}\0${descriptor.version}\0mixed`;
     if (invalidCoverageIdentities.has(identity)) continue;
     invalidCoverageIdentities.add(identity);
@@ -479,106 +527,115 @@ async function runConfiguredAdapters(
       scanner,
       version: descriptor.version,
       language: "mixed",
-      filesDiscovered: files.length,
+      filesDiscovered: snapshot.requestedFileCount,
       filesAnalyzed: 0,
       parseStatus: "unavailable",
       skippedFiles: sourceTargets,
-      reason: descriptor.reason ?? "Adapter manifest validation failed.",
+      reason: descriptor.availability === "invalid" ? descriptor.reason : "Adapter manifest validation failed.",
     });
   }
-  for (const adapter of loaded.adapters) {
-    if (!runsAdapter(selection, adapter.manifest.id)) continue;
-    const language = adapter.manifest.languages.length === 1 ? (adapter.manifest.languages[0] ?? "mixed") : "mixed";
-    if (adapter.descriptor.availability !== "available") {
-      diagnostics.push({
-        schemaVersion: "footgun.problem.v1",
-        code: "adapter-unavailable",
-        message: `Adapter ${adapter.manifest.id} is unavailable.`,
-        detail: adapter.descriptor.reason,
-        recovery: "Install the declared adapter executable or remove it from the configured adapter list.",
+  const runAdapters = async (snapshotRoot: string): Promise<void> => {
+    for (const adapter of selectedAdapters.adapters) {
+      if (!runsAdapter(options.selection, adapter.manifest.id)) continue;
+      const language = adapter.manifest.languages.length === 1 ? (adapter.manifest.languages[0] ?? "mixed") : "mixed";
+      const unavailable = (code: string, message: string, recovery: string): void => {
+        diagnostics.push({schemaVersion: "smokinggun.problem.v1", code, message, recovery});
+        coverage.push({
+          scanner: `smokinggun.adapter:${adapter.manifest.id}`,
+          version: adapter.manifest.version,
+          language,
+          filesDiscovered: snapshot.requestedFileCount,
+          filesAnalyzed: 0,
+          parseStatus: "unavailable",
+          skippedFiles: sourceTargets,
+          reason: message,
+        });
+      };
+      if (!adapter.manifest.capabilities.includes("static-scan")) {
+        unavailable(
+          "adapter-capability-mismatch",
+          `Adapter ${adapter.manifest.id} does not declare the requested static-scan capability.`,
+          "Use an adapter whose manifest supports static-scan.",
+        );
+        continue;
+      }
+      if (options.adapterAuthorization._tag !== "AdapterExecutionAuthorized") {
+        unavailable(
+          "adapter-execution-required",
+          `Adapter ${adapter.manifest.id} was not executed because explicit authorization is missing.`,
+          "Rerun with --allow-adapter-execution.",
+        );
+        continue;
+      }
+      if (adapter.manifest.sideEffects.includes("network")) {
+        unavailable(
+          "adapter-network-blocked",
+          `Adapter ${adapter.manifest.id} requests network access during an offline static scan.`,
+          "Use an offline adapter with no network side effect.",
+        );
+        continue;
+      }
+      const request = {
+        schemaVersion: "smokinggun.adapter-request.v1" as const,
+        requestId: `req_${createHash("sha256").update(`${snapshot.digest}\0${adapter.manifest.id}`).digest("hex").slice(0, 16)}`,
+        root: ".",
+        config: {scanner: adapter.manifest.id},
+        operation: "scan" as const,
+        targets: sourceTargets,
+        revision: null,
+        sourceDigest: snapshot.digest,
+        configDigest: options.configDigest,
+        requestedCapabilities: ["static-scan"],
+        executionPolicy: {
+          network: "disabled" as const,
+          shell: false as const,
+          maxOutputBytes: adapter.manifest.limits.maxOutputBytes,
+        },
+      };
+      const result = await runParsedSubprocessAdapter(adapter.manifest, request, {
+        root: snapshotRoot,
+        ...(options.signal === undefined ? {} : {signal: options.signal}),
+        ...(options.retainAdapterArtifact === undefined ? {} : {retainArtifact: options.retainAdapterArtifact}),
       });
-      coverage.push({
-        scanner: `footgun.adapter:${adapter.manifest.id}`,
-        version: adapter.manifest.version,
-        language,
-        filesDiscovered: files.length,
-        filesAnalyzed: 0,
-        parseStatus: "unavailable",
-        skippedFiles: sourceTargets,
-        reason: adapter.descriptor.reason ?? "Capability probe failed.",
-      });
-      continue;
-    }
-    const request: AdapterRequestV1 = {
-      schemaVersion: "footgun.adapter-request.v1" as const,
-      requestId: `req_${createHash("sha256")
-        .update(`${adapter.manifest.id}\0${configDigest}\0${revision ?? ""}\0${sourceDigest}\0${files.join("\0")}`)
-        .digest("hex")
-        .slice(0, 16)}`,
-      root,
-      config: {scanner: adapter.manifest.id},
-      operation: "scan" as const,
-      targets: sourceTargets,
-      revision,
-      sourceDigest,
-      configDigest,
-      requestedCapabilities: adapter.manifest.capabilities,
-      executionPolicy: {
-        network: "disabled" as const,
-        shell: false as const,
-        maxOutputBytes: adapter.manifest.limits.maxOutputBytes,
-      },
-    };
-    const result = await runParsedSubprocessAdapter(adapter.manifest, request, {
-      root,
-      ...(signal === undefined ? {} : {signal}),
-    });
-    if ("code" in result) {
-      diagnostics.push(
-        isWithinRoot(root, adapter.path) ? {...result, path: portablePath(relative(root, adapter.path))} : result,
-      );
-      coverage.push({
-        scanner: `footgun.adapter:${adapter.manifest.id}`,
-        version: adapter.manifest.version,
-        language,
-        filesDiscovered: files.length,
-        filesAnalyzed: 0,
-        parseStatus: "unavailable",
-        skippedFiles: [...request.targets],
-        reason: result.message,
-      });
-      continue;
-    }
-    findings.push(...result.findings);
-    coverage.push(
-      ...(result.coverage.length === 0
-        ? [
-            coverageRecord(
+      if ("code" in result) {
+        unavailable(result.code, result.message, result.recovery ?? "Inspect the adapter diagnostic and retry.");
+        continue;
+      }
+      findings.push(...result.findings);
+      const adapterCoverage: ReadonlyArray<CoverageRecordV1> =
+        result.coverage.length > 0
+          ? result.coverage
+          : [
               {
-                scanner: `footgun.adapter:${adapter.manifest.id}`,
+                scanner: `smokinggun.adapter:${adapter.manifest.id}`,
                 version: adapter.manifest.version,
                 language,
-                filesDiscovered: files.length,
-                filesAnalyzed: result.state === "complete" ? files.length : 0,
-                skippedFiles: result.state === "complete" ? [] : [...request.targets],
+                filesDiscovered: snapshot.requestedFileCount,
+                filesAnalyzed: 0,
+                parseStatus: "unavailable",
+                skippedFiles: sourceTargets,
+                reason: `The adapter returned state ${result.state} without coverage.`,
               },
-              result.state === "complete" ? "complete" : result.state === "partial" ? "partial" : "unavailable",
-              result.state === "complete" ? undefined : `Adapter state: ${result.state}`,
-            ),
-          ]
-        : result.coverage),
-    );
-    diagnostics.push(...result.diagnostics);
-    rawArtifacts.push(...result.rawArtifacts);
-    Object.assign(rawArtifactDigests, result.rawArtifactDigests);
-    if (result.state !== "complete" && result.state !== "partial")
-      diagnostics.push({
-        schemaVersion: "footgun.problem.v1",
-        code: `adapter-${result.state}`,
-        message: `Adapter ${adapter.manifest.id} returned ${result.state} coverage.`,
-        recovery: "Inspect the adapter diagnostics and rerun with a compatible capability.",
-      });
-  }
+            ];
+      coverage.push(
+        ...adapterCoverage.map((record): CoverageRecordV1 =>
+          unavailableTargets.length === 0
+            ? record
+            : {
+                ...record,
+                filesDiscovered: snapshot.requestedFileCount,
+                parseStatus: record.parseStatus === "unavailable" ? "unavailable" : "partial",
+                skippedFiles: [...new Set([...record.skippedFiles, ...unavailableTargets])].sort(comparePortable),
+                reason: "One or more requested source files were absent from the immutable snapshot.",
+              },
+        ),
+      );
+      diagnostics.push(...result.diagnostics);
+      rawArtifacts.push(...result.rawArtifacts);
+      Object.assign(rawArtifactDigests, result.rawArtifactDigests);
+    }
+  };
+  if (selectedAdapters.adapters.length > 0) await withSourceSnapshotView(snapshot, runAdapters);
   return {
     findings,
     coverage,
@@ -588,27 +645,54 @@ async function runConfiguredAdapters(
   };
 }
 
+function selectExternalAdapters(parsed: ParsedExternalAdapters, selection: ScannerSelection): ParsedExternalAdapters {
+  if (selection._tag === "AutomaticScannerSelection") return parsed;
+  return {
+    adapters: parsed.adapters.filter((adapter) => runsAdapter(selection, adapter.manifest.id)),
+    // Invalid manifests have no trustworthy selectable identity. Explicit
+    // scanner selection therefore excludes them instead of letting unrelated
+    // configuration affect focused coverage or diagnostics.
+    invalidDescriptors: [],
+    diagnostics: [],
+  };
+}
+
 async function collectFiles(
   root: string,
   excludes: ReadonlySet<string>,
+  limits: SourceCaptureLimits,
   signal?: AbortSignal,
 ): Promise<{
   readonly files: ReadonlyArray<string>;
   readonly sourceSymlinks: ReadonlyArray<string>;
   readonly directorySymlinks: ReadonlyArray<string>;
+  readonly traversalLimit?: string;
 }> {
   const files: string[] = [];
   const sourceSymlinks: string[] = [];
   const directorySymlinks: string[] = [];
+  let directoriesVisited = 0;
+  let traversalLimit: string | undefined;
   const rootInfo = await stat(root);
   if (rootInfo.isFile())
     return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], sourceSymlinks, directorySymlinks};
   if (!rootInfo.isDirectory()) return {files, sourceSymlinks, directorySymlinks};
-  const visit = async (directory: string): Promise<void> => {
+  const visit = async (directory: string, depth: number): Promise<void> => {
+    if (traversalLimit !== undefined) return;
     signal?.throwIfAborted();
+    if (depth > limits.maxDepth) {
+      traversalLimit = `Traversal exceeded the maximum depth of ${limits.maxDepth}.`;
+      return;
+    }
+    directoriesVisited += 1;
+    if (directoriesVisited > limits.maxDirectories) {
+      traversalLimit = `Traversal exceeded the maximum directory count of ${limits.maxDirectories}.`;
+      return;
+    }
     const entries = await readdir(directory, {withFileTypes: true});
     entries.sort((left, right) => comparePortable(left.name, right.name));
     for (const entry of entries) {
+      if (traversalLimit !== undefined) return;
       signal?.throwIfAborted();
       if (excludes.has(entry.name)) continue;
       const path = resolve(directory, entry.name);
@@ -619,12 +703,23 @@ async function collectFiles(
         continue;
       }
       if (entry.isDirectory()) {
-        await visit(path);
-      } else if (entry.isFile() && isSupportedExtension(extensionOf(path))) files.push(path);
+        await visit(path, depth + 1);
+      } else if (entry.isFile() && isSupportedExtension(extensionOf(path))) {
+        if (files.length >= limits.maxFiles) {
+          traversalLimit = `Traversal exceeded the maximum source-file count of ${limits.maxFiles}.`;
+          return;
+        }
+        files.push(path);
+      }
     }
   };
-  await visit(root);
-  return {files, sourceSymlinks, directorySymlinks};
+  await visit(root, 0);
+  return {
+    files,
+    sourceSymlinks,
+    directorySymlinks,
+    ...(traversalLimit === undefined ? {} : {traversalLimit}),
+  };
 }
 
 function extensionOf(path: string): string {
@@ -640,41 +735,70 @@ function sourceLanguage(path: string): string {
   return extension.slice(1);
 }
 
+function sourceCaptureReason(file: UnavailableSourceFile | undefined): string {
+  switch (file?.reason) {
+    case "file-count-limit":
+      return "The scan exceeded the configured source-file count limit.";
+    case "file-size-limit":
+      return "The source file exceeded the configured per-file byte limit.";
+    case "total-size-limit":
+      return "Capturing the source file would exceed the configured cumulative byte limit.";
+    case "invalid-utf8":
+      return "The source bytes are not valid UTF-8 and cannot be analyzed as source text.";
+    case "outside-root":
+      return "The selected source path does not remain inside the scan root.";
+    case "read-failed":
+    case undefined:
+      return "The source path could not be opened and read as a regular non-symlink file.";
+  }
+}
+
 async function repositoryIdentity(
   root: string,
   analyzedFiles: ReadonlyArray<string>,
+  signal?: AbortSignal,
 ): Promise<ScanReportV2["repository"]> {
   const info = await stat(root);
   const repositoryRoot = info.isDirectory() ? root : resolve(root, "..");
-  const revisionResult = await execa("git", ["rev-parse", "HEAD"], {
+  const gitOptions = {
     cwd: repositoryRoot,
     reject: false,
+    timeout: 2_000,
+    ...(signal === undefined ? {} : {cancelSignal: signal}),
+  } as const;
+  const revisionResult = await execa("git", ["-c", "core.fsmonitor=false", "rev-parse", "HEAD"], {
+    ...gitOptions,
     stdin: "ignore",
   });
-  const dirtyResult = await execa("git", ["status", "--porcelain", "--untracked-files=all"], {
-    cwd: repositoryRoot,
-    reject: false,
-    stdin: "ignore",
-  });
+  const dirtyResult = await execa(
+    "git",
+    ["-c", "core.fsmonitor=false", "status", "--porcelain", "--untracked-files=all"],
+    {...gitOptions, stdin: "ignore"},
+  );
+  const pathspec = analyzedFiles.map((file) => relative(repositoryRoot, file)).join("\0");
   const ignoredAnalyzed = await execa(
     "git",
     [
+      "-c",
+      "core.fsmonitor=false",
       "ls-files",
       "--others",
       "--ignored",
       "--exclude-standard",
-      "--",
-      ...analyzedFiles.map((file) => relative(repositoryRoot, file)),
+      "--pathspec-from-file=-",
+      "--pathspec-file-nul",
     ],
-    {cwd: repositoryRoot, reject: false, stdin: "ignore"},
+    {...gitOptions, input: pathspec},
   );
+  const hasGitIdentity = revisionResult.exitCode === 0 && dirtyResult.exitCode === 0 && ignoredAnalyzed.exitCode === 0;
   return {
     // Portable reports must not leak the host checkout path.
     root: ".",
-    revision: revisionResult.exitCode === 0 ? revisionResult.stdout.trim() || null : null,
-    dirty:
-      (dirtyResult.exitCode === 0 && dirtyResult.stdout.trim().length > 0) ||
-      (ignoredAnalyzed.exitCode === 0 && ignoredAnalyzed.stdout.trim().length > 0),
+    // A working-tree scan captures exact bytes but does not read from an
+    // immutable Git tree, so a Git revision cannot be an authoritative input
+    // identity. A future Git-tree capture mode may populate this field.
+    revision: null,
+    dirty: !hasGitIdentity || dirtyResult.stdout.trim().length > 0 || ignoredAnalyzed.stdout.trim().length > 0,
   };
 }
 
@@ -689,15 +813,45 @@ function compareFindings(left: FindingV2, right: FindingV2): number {
   );
 }
 
+function selectRepresentativeFindings(findings: ReadonlyArray<FindingV2>, limit: number): FindingV2[] {
+  if (findings.length <= limit) return [...findings];
+  const groups = new Map<string, FindingV2[]>();
+  for (const finding of findings) {
+    const separator = finding.location.path.indexOf("/");
+    const area = separator === -1 ? "." : finding.location.path.slice(0, separator);
+    const group = groups.get(area) ?? [];
+    group.push(finding);
+    groups.set(area, group);
+  }
+  const orderedGroups = [...groups.values()];
+  const selected: FindingV2[] = [];
+  for (let offset = 0; selected.length < limit; offset += 1) {
+    let found = false;
+    for (const group of orderedGroups) {
+      const finding = group[offset];
+      if (finding === undefined) continue;
+      selected.push(finding);
+      found = true;
+      if (selected.length === limit) break;
+    }
+    if (!found) break;
+  }
+  return selected;
+}
+
 function relateFindings(findings: ReadonlyArray<FindingV2>): FindingV2[] {
   const result: FindingV2[] = [];
   const relatedFindingIds: Array<Set<string>> = [];
-  const exact = new Set<string>();
+  const exact = new Map<string, FindingV2>();
   const nearby = new Map<string, number[]>();
   for (const finding of findings) {
-    const exactKey = `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`;
-    if (exact.has(exactKey)) continue;
-    exact.add(exactKey);
+    const priorExact = exact.get(finding.id);
+    if (priorExact !== undefined) {
+      if (stableJson(priorExact) !== stableJson(finding))
+        throw new Error(`Finding ID ${finding.id} identifies conflicting evidence.`);
+      continue;
+    }
+    exact.set(finding.id, finding);
     const family = findingFamily(finding.ruleId);
     const key = `${family}\0${finding.location.path}`;
     const related = new Set(finding.relatedFindings);
@@ -774,7 +928,7 @@ function resolveCoverageIdentityCollisions(records: ReadonlyArray<CoverageRecord
       ),
     );
     diagnostics.push({
-      schemaVersion: "footgun.problem.v1",
+      schemaVersion: "smokinggun.problem.v1",
       code: "duplicate-coverage-identity",
       message: reason,
       recovery: "Configure each scanner or adapter to report a distinct coverage identity.",
@@ -804,7 +958,7 @@ function scannerDisagreements(findings: ReadonlyArray<FindingV2>): ReadonlyArray
     .map(([key, values]): ProblemV1 => {
       const [path, line, rule] = key.split("\0");
       return {
-        schemaVersion: "footgun.problem.v1",
+        schemaVersion: "smokinggun.problem.v1",
         code: "scanner-disagreement",
         message: `Scanners disagree or independently reported ${rule ?? "a finding"} at ${path ?? "unknown"}:${line ?? "?"}.`,
         detail: [...values].sort(comparePortable).join(", "),

@@ -4,11 +4,11 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.finding.v2"
+      "const": "smokinggun.finding.v2"
     },
     "id": {
       "type": "string",
-      "pattern": "^fg_[a-f0-9]{16}$"
+      "pattern": "^sg_[a-f0-9]{16}$"
     },
     "scanner": {
       "type": "string",
@@ -81,7 +81,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^fg_[a-f0-9]{16}$"
+        "pattern": "^sg_[a-f0-9]{16}$"
       }
     },
     "message": {
@@ -150,7 +150,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.evidence.v2"
+                "const": "smokinggun.evidence.v2"
               },
               "id": {
                 "type": "string",
@@ -218,7 +218,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.evidence.v2"
+                "const": "smokinggun.evidence.v2"
               },
               "id": {
                 "type": "string",

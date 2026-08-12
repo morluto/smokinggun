@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.scan-report.v2"
+      "const": "smokinggun.scan-report.v2"
     },
     "tool": {
       "type": "object",
@@ -12,7 +12,6 @@
         "name": {
           "type": "string",
           "enum": [
-            "footgun",
             "smokinggun"
           ]
         },
@@ -60,7 +59,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.repository-inventory.v1"
+          "const": "smokinggun.repository-inventory.v1"
         },
         "languages": {
           "type": "array",
@@ -167,11 +166,11 @@
         "properties": {
           "schemaVersion": {
             "type": "string",
-            "const": "footgun.finding.v2"
+            "const": "smokinggun.finding.v2"
           },
           "id": {
             "type": "string",
-            "pattern": "^fg_[a-f0-9]{16}$"
+            "pattern": "^sg_[a-f0-9]{16}$"
           },
           "scanner": {
             "type": "string",
@@ -244,7 +243,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "pattern": "^fg_[a-f0-9]{16}$"
+              "pattern": "^sg_[a-f0-9]{16}$"
             }
           },
           "message": {
@@ -313,7 +312,7 @@
                   "properties": {
                     "schemaVersion": {
                       "type": "string",
-                      "const": "footgun.evidence.v2"
+                      "const": "smokinggun.evidence.v2"
                     },
                     "id": {
                       "type": "string",
@@ -381,7 +380,7 @@
                   "properties": {
                     "schemaVersion": {
                       "type": "string",
-                      "const": "footgun.evidence.v2"
+                      "const": "smokinggun.evidence.v2"
                     },
                     "id": {
                       "type": "string",
@@ -605,7 +604,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.context-index.v1"
+          "const": "smokinggun.context-index.v1"
         },
         "tool": {
           "type": "object",
@@ -901,7 +900,7 @@
         "properties": {
           "schemaVersion": {
             "type": "string",
-            "const": "footgun.problem.v1"
+            "const": "smokinggun.problem.v1"
           },
           "code": {
             "type": "string",

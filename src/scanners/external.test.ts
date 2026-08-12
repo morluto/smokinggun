@@ -12,13 +12,13 @@ import {
 } from "./external.js";
 
 it("blocks network-capable adapters before capability probing", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-policy-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
   try {
     const manifest = join(root, "network.json");
     await writeFile(
       manifest,
       JSON.stringify({
-        schemaVersion: "footgun.adapter-manifest.v1",
+        schemaVersion: "smokinggun.adapter-manifest.v1",
         id: "network-adapter",
         version: "1.0.0",
         command: [execPath, "-e", "process.exit(1)"],
@@ -39,14 +39,14 @@ it("blocks network-capable adapters before capability probing", async () => {
 });
 
 it("does not execute adapter probes without explicit authorization", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-policy-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
   try {
     const marker = join(root, "marker");
     const manifest = join(root, "adapter.json");
     await writeFile(
       manifest,
       JSON.stringify({
-        schemaVersion: "footgun.adapter-manifest.v1",
+        schemaVersion: "smokinggun.adapter-manifest.v1",
         id: "untrusted-adapter",
         version: "1.0.0",
         command: [execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`],
@@ -67,13 +67,13 @@ it("does not execute adapter probes without explicit authorization", async () =>
 });
 
 it("rejects every manifest in an ambiguous adapter identity group", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-policy-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
   try {
     const first = join(root, "first.json");
     const second = join(root, "second.json");
     const manifest = (command: string[]) =>
       JSON.stringify({
-        schemaVersion: "footgun.adapter-manifest.v1",
+        schemaVersion: "smokinggun.adapter-manifest.v1",
         id: "duplicate-adapter",
         version: "1.0.0",
         command,
@@ -93,8 +93,8 @@ it("rejects every manifest in an ambiguous adapter identity group", async () => 
 });
 
 it("does not expose host paths for an invalid manifest outside the repository", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-root-"));
-  const external = await mkdtemp(join(tmpdir(), "footgun-adapter-external-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-root-"));
+  const external = await mkdtemp(join(tmpdir(), "smokinggun-adapter-external-"));
   try {
     const manifest = join(external, "invalid.json");
     await writeFile(manifest, "{", "utf8");
@@ -112,7 +112,7 @@ it("does not expose host paths for an invalid manifest outside the repository", 
 });
 
 it("identifies an unreadable manifest at the repository root", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-adapter-root-manifest-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-root-manifest-"));
   try {
     const result = await parseExternalAdapters([root], root);
     const diagnostic = result.diagnostics[0];

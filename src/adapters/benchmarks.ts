@@ -24,7 +24,7 @@ export function importBenchmark(input: unknown, options: BenchmarkImportOptions)
             : importJmh(input, options);
   if ("code" in records) return records;
   const result = {
-    schemaVersion: "footgun.benchmark-import.v2" as const,
+    schemaVersion: "smokinggun.benchmark-import.v2" as const,
     tool: options.tool,
     records,
     ...(options.rawArtifact === undefined ? {} : {rawArtifact: options.rawArtifact}),
@@ -114,7 +114,15 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
       "The input is not Google Benchmark JSON with a non-empty benchmarks array.",
       "Export Google Benchmark with --benchmark_format=json.",
     );
-  const records: BenchmarkRecordV2[] = [];
+  type GoogleBenchmarkGroup = {
+    readonly name: string;
+    readonly sourceUnit: string;
+    readonly firstIndex: number;
+    readonly samplesMs: number[];
+    readonly aggregateNames: Set<string>;
+  };
+  const groups = new Map<string, GoogleBenchmarkGroup>();
+  const aggregateNames = new Map<string, Set<string>>();
   for (const [index, value] of benchmarks.entries()) {
     const entry = objectValue(value);
     const realTime = finiteNumber(entry?.real_time);
@@ -126,6 +134,15 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
     )
       continue;
     const unit = entry.time_unit;
+    const runType = typeof entry.run_type === "string" ? entry.run_type : "iteration";
+    const aggregateName = typeof entry.aggregate_name === "string" ? entry.aggregate_name : undefined;
+    const name = googleBenchmarkRunName(entry.name, entry.run_name, runType, aggregateName);
+    if (runType === "aggregate") {
+      const names = aggregateNames.get(name) ?? new Set<string>();
+      names.add(aggregateName ?? entry.name);
+      aggregateNames.set(name, names);
+      continue;
+    }
     const convertedRealTime = convertToMilliseconds(realTime, unit);
     if (convertedRealTime === undefined)
       return problem(
@@ -142,21 +159,57 @@ function importGoogleBenchmark(input: unknown, options: BenchmarkImportOptions):
       );
     const normalized =
       samples.length > 0 ? samples.filter((sample): sample is number => sample !== undefined) : [convertedRealTime];
-    records.push(
-      makeRecord(options, entry.name, normalized, unit, {
-        index,
-        runType: typeof entry.run_type === "string" ? entry.run_type : "unknown",
-        ...(samples.length === 0 ? {summaryOnly: true} : {}),
+    const existing = groups.get(name);
+    if (existing !== undefined && existing.sourceUnit !== unit)
+      return problem(
+        "inconsistent-google-benchmark-time-unit",
+        `Google Benchmark repetitions for ${name} use multiple time units.`,
+        "Regenerate the benchmark so every repetition of one logical run uses the same time unit.",
+      );
+    const group = existing ?? {
+      name,
+      sourceUnit: unit,
+      firstIndex: index,
+      samplesMs: [],
+      aggregateNames: new Set<string>(),
+    };
+    group.samplesMs.push(...normalized);
+    groups.set(name, group);
+  }
+  for (const [name, names] of aggregateNames) {
+    const group = groups.get(name);
+    if (group !== undefined) for (const aggregateName of names) group.aggregateNames.add(aggregateName);
+  }
+  const records = [...groups.values()]
+    .sort((left, right) => left.firstIndex - right.firstIndex)
+    .map((group) =>
+      makeRecord(options, group.name, group.samplesMs, group.sourceUnit, {
+        index: group.firstIndex,
+        runType: "iteration",
+        repetitions: group.samplesMs.length,
+        aggregateCount: group.aggregateNames.size,
+        ...(group.aggregateNames.size === 0 ? {} : {aggregateNames: [...group.aggregateNames].sort().join(",")}),
       }),
     );
-  }
   return records.length === 0
     ? problem(
         "invalid-google-benchmark",
-        "No usable Google Benchmark records were found.",
-        "Each record needs name, real_time, and time_unit.",
+        "No raw Google Benchmark iteration records were found.",
+        "Provide iteration rows with name, real_time, and time_unit; aggregate rows alone are summaries, not samples.",
       )
     : records;
+}
+
+function googleBenchmarkRunName(
+  name: string,
+  runName: unknown,
+  runType: string,
+  aggregateName: string | undefined,
+): string {
+  if (typeof runName === "string" && runName.length > 0) return runName;
+  if (runType !== "aggregate" || aggregateName === undefined) return name;
+  const suffix = `_${aggregateName}`;
+  return name.endsWith(suffix) ? name.slice(0, -suffix.length) : name;
 }
 
 function importCriterion(input: unknown, options: BenchmarkImportOptions): BenchmarkRecordV2[] | ProblemV1 {
@@ -261,11 +314,11 @@ function makeRecord(
     )
     .digest("hex");
   return {
-    schemaVersion: "footgun.benchmark-record.v2",
+    schemaVersion: "smokinggun.benchmark-record.v2",
     id: `bench_${digest.slice(0, 16)}`,
     tool: options.tool,
     name,
-    samplesMs: sorted,
+    samplesMs,
     medianMs,
     meanMs,
     sourceUnit,
@@ -316,5 +369,5 @@ function finiteArray(value: unknown): number[] | undefined {
 }
 
 function problem(code: string, message: string, recovery: string): ProblemV1 {
-  return {schemaVersion: "footgun.problem.v1", code, message, recovery};
+  return {schemaVersion: "smokinggun.problem.v1", code, message, recovery};
 }

@@ -1,25 +1,25 @@
 import {expect, it} from "vitest";
 import * as fc from "fast-check";
-import {scanSource} from "./scanners/structural.js";
+import {scanWithTreeSitter} from "./scanners/tree-sitter-structural.js";
 import {comparePortable, portablePath} from "./paths.js";
 import {Protocol} from "./protocol/index.js";
 
-it("keeps finding identities stable across repeated scans", () => {
-  fc.assert(
-    fc.property(fc.array(fc.string({minLength: 0, maxLength: 60}), {maxLength: 12}), (lines) => {
+it("keeps finding identities stable across repeated scans", async () => {
+  await fc.assert(
+    fc.asyncProperty(fc.array(fc.string({minLength: 0, maxLength: 60}), {maxLength: 12}), async (lines) => {
       const source = lines.join("\n");
-      const first = scanSource("fixtures/generated.ts", source).findings;
-      const second = scanSource("fixtures/generated.ts", source).findings;
+      const first = (await scanWithTreeSitter("fixtures/generated.ts", source)).findings;
+      const second = (await scanWithTreeSitter("fixtures/generated.ts", source)).findings;
       expect(second).toEqual(first);
       expect(new Set(first.map((finding) => finding.id)).size).toBe(first.length);
-      expect(first.every((finding) => /^fg_[a-f0-9]{16}$/.test(finding.id))).toBe(true);
+      expect(first.every((finding) => /^sg_[a-f0-9]{16}$/.test(finding.id))).toBe(true);
     }),
   );
 });
 
-it("keeps structural findings uniquely ordered and serializable for arbitrary source", () => {
-  fc.assert(
-    fc.property(
+it("keeps structural findings uniquely ordered and serializable for arbitrary source", async () => {
+  await fc.assert(
+    fc.asyncProperty(
       fc.array(
         fc.constantFrom(
           "for (const item of items) { items.includes(item); }",
@@ -29,8 +29,8 @@ it("keeps structural findings uniquely ordered and serializable for arbitrary so
         ),
         {maxLength: 20},
       ),
-      (lines) => {
-        const findings = scanSource("src/fixture.ts", lines.join("\n")).findings;
+      async (lines) => {
+        const findings = (await scanWithTreeSitter("src/fixture.ts", lines.join("\n"))).findings;
         const keys = findings.map(
           (finding) => `${finding.location.path}\0${finding.location.startLine}\0${finding.ruleId}`,
         );

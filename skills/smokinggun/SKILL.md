@@ -38,13 +38,13 @@ Keep these categories separate in every report:
 
 - Static findings are observations from source, repository context, or imported artifacts.
 - Estimates are theoretical consequences of stated assumptions, such as a likely repeated lookup inside a loop.
-- Measurements are empirical results for a declared workload and runtime environment.
+- Measurements are empirical results for a declared benchmark plan and runtime environment.
 - Behavioral checks establish whether a proposed change preserves observed behavior; they do not prove all behavior is preserved.
-- Unknowns include missing coverage, unresolved types, unavailable tools, unrun workloads, and unverified assumptions.
+- Unknowns include missing coverage, unresolved types, unavailable tools, unrun benchmarks, and unverified assumptions.
 
 A finding is a candidate, not proof of a universal speedup or asymptotic bound. Missing or failed coverage must remain visible and must not be reported as clean coverage.
 
-## Investigate and measure
+## Investigate and compare measurements
 
 Create a durable investigation bundle when it will help organize evidence:
 
@@ -52,9 +52,9 @@ Create a durable investigation bundle when it will help organize evidence:
 smokinggun investigate <path>
 ```
 
-Before executing any repository workload, obtain explicit user authorization. A measurement must include a declared `WorkloadV2` descriptor and the `--execute` flag. `--yes` confirms an ordinary command choice; it never authorizes workload execution.
+SmokingGun does not execute repository workloads. Produce benchmark and profile artifacts with the repository's existing tools, then import or compare those immutable artifacts through SmokingGun.
 
-Keep baseline and candidate measurements tied to their workload, environment, artifacts, and behavior checks. Use `smokinggun compare <baseline> <candidate>` only after checking that both sides are comparable. Report what was not measured and which assumptions remain unresolved.
+Keep baseline and candidate measurements tied to their benchmark plan, subject digest, shared input-set digest, executable, environment, artifacts, and behavior checks. Use `smokinggun compare <baseline> <candidate>` only after checking that both sides are comparable. Report what was not measured and which assumptions remain unresolved.
 
 ## Safety and recovery
 

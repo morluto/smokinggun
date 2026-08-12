@@ -60,7 +60,7 @@ export function importPprof(input: Uint8Array, options: ProfileImportOptions): P
       .sort((left, right) => right.value - left.value || comparePortable(left.name, right.name))
       .slice(0, options.maxFunctions ?? 50);
     const result: ProfileSummaryV1 = {
-      schemaVersion: "footgun.profile-summary.v1",
+      schemaVersion: "smokinggun.profile-summary.v1",
       id: `prof_${sourceDigest.slice(0, 16)}`,
       tool: "pprof",
       sourceArtifact: options.sourceArtifact,
@@ -111,21 +111,28 @@ export function importPerfettoSummary(input: unknown, options: ProfileImportOpti
       "The input is not a bounded trace-processor JSON result.",
       "Run a bounded Perfetto SQL query and export its rows as JSON.",
     );
-  const rows = parsed.data.rows.slice(0, options.maxFunctions ?? 1000);
+  const maxRows = options.maxFunctions ?? 1000;
+  const allRows = parsed.data.rows;
+  const rows = allRows.slice(0, maxRows);
   const columns =
     parsed.data.columns.length > 0 ? parsed.data.columns : [...new Set(rows.flatMap((row) => Object.keys(row)))].sort();
   const sourceDigest = options.sourceDigest ?? createHash("sha256").update(stableJson(input)).digest("hex");
+  const truncated = allRows.length > maxRows;
+  const limitations = [
+    "This is a trace-processor query summary; raw .pftrace packets and unqueried slices are not embedded.",
+    ...(truncated ? [`Rows were truncated from ${allRows.length} to ${maxRows}.`] : []),
+  ];
   const result: TraceSummaryV1 = {
-    schemaVersion: "footgun.trace-summary.v1",
+    schemaVersion: "smokinggun.trace-summary.v1",
     id: `trace_${sourceDigest.slice(0, 16)}`,
     tool: "perfetto",
     sourceArtifact: options.sourceArtifact,
     sourceDigest,
     columns,
     rows,
-    limitations: [
-      "This is a trace-processor query summary; raw .pftrace packets and unqueried slices are not embedded.",
-    ],
+    limitations,
+    sourceRowCount: allRows.length,
+    truncated,
   };
   const checked = Protocol.traceSummary.safeParse(result);
   return checked.success
@@ -144,6 +151,12 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
       "invalid-perfetto-query",
       "The Perfetto query is empty or exceeds the bounded query length.",
       "Provide a bounded SQL query of at most 10,000 characters.",
+    );
+  if (options.query.includes(";"))
+    return problem(
+      "invalid-perfetto-query",
+      "The Perfetto query contains multiple statements.",
+      "Provide a single SQL statement without semicolons.",
     );
   const executable = options.executable ?? process.env.SMOKINGGUN_TRACE_PROCESSOR ?? "trace_processor";
   try {
@@ -184,7 +197,7 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
     if ("code" in rows) return rows;
     const sourceDigest = options.sourceDigest;
     const summary: TraceSummaryV1 = {
-      schemaVersion: "footgun.trace-summary.v1",
+      schemaVersion: "smokinggun.trace-summary.v1",
       id: `trace_${sourceDigest.slice(0, 16)}`,
       tool: "perfetto",
       sourceArtifact: options.sourceArtifact,
@@ -266,5 +279,5 @@ function numberValue(value: number | bigint): number {
 }
 
 function problem(code: string, message: string, recovery: string): ProblemV1 {
-  return {schemaVersion: "footgun.problem.v1", code, message, recovery};
+  return {schemaVersion: "smokinggun.problem.v1", code, message, recovery};
 }

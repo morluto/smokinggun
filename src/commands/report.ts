@@ -57,7 +57,7 @@ export default class Report extends BaseCommand {
         } catch (cause: unknown) {
           this.emitProblem(
             {
-              schemaVersion: "footgun.problem.v1",
+              schemaVersion: "smokinggun.problem.v1",
               code: "investigation-unavailable",
               message: "The requested investigation is invalid or does not exist.",
               ...(cause instanceof Error ? {detail: cause.message} : {}),
@@ -71,7 +71,7 @@ export default class Report extends BaseCommand {
       if (parsed.flags.benchmark !== undefined && parsed.flags.profile !== undefined)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "report-input-kind-conflict",
             message: "Choose one external artifact kind for report.",
             recovery: "Pass either --benchmark or --profile, not both.",
@@ -97,7 +97,7 @@ export default class Report extends BaseCommand {
         if (!isBenchmarkTool(tool))
           this.emitProblem(
             {
-              schemaVersion: "footgun.problem.v1",
+              schemaVersion: "smokinggun.problem.v1",
               code: "invalid-benchmark-tool",
               message: "The benchmark tool is not supported by this SmokingGun build.",
               recovery: "Choose hyperfine, pyperf, google-benchmark, criterion, or jmh.",
@@ -171,7 +171,7 @@ export default class Report extends BaseCommand {
       if (context.signal.aborted)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "cancelled",
             message: "The report operation was cancelled.",
             recovery: "Rerun the report command when the artifact is available.",
@@ -182,7 +182,7 @@ export default class Report extends BaseCommand {
       const message = cause instanceof Error ? cause.message : "The artifact could not be read.";
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "artifact-read-failed",
           message,
           recovery: "Pass a JSON ScanReportV2 artifact path.",
@@ -229,7 +229,7 @@ async function recordReportedArtifact(
     state: "reported" as const,
     reports: appendInvestigationReport(stored.bundle.reports, artifact),
     evidence: appendInvestigationEvidence(stored.bundle.evidence, {
-      schemaVersion: "footgun.evidence.v2" as const,
+      schemaVersion: "smokinggun.evidence.v2" as const,
       id: `${investigationId}:report:${artifact}`,
       kind,
       claimClass,
@@ -237,5 +237,5 @@ async function recordReportedArtifact(
       artifact,
     }),
   };
-  await recordParsedInvestigationSnapshot(context.artifacts, next);
+  await recordParsedInvestigationSnapshot(context.artifacts, next, stored.digest);
 }

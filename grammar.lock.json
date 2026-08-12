@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "footgun.grammar-lock.v1",
+  "schemaVersion": "smokinggun.grammar-lock.v1",
   "runtime": {
     "package": "web-tree-sitter",
     "version": "0.26.11",

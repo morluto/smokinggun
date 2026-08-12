@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import {isAbsolute, normalize, resolve, sep} from "node:path";
 import {fromBinary} from "@bufbuild/protobuf";
-import {IndexSchema, SymbolRole, type Occurrence} from "@scip-code/scip";
+import {IndexSchema, SymbolRole, type Occurrence, type SymbolInformation} from "@scip-code/scip";
 import type {
   ContextCallV1,
   ContextDefinitionV1,
@@ -31,6 +31,10 @@ export async function importScip(path: string, root: string): Promise<ScipImport
       diagnostics.push(
         problem("scip-metadata-missing", "SCIP metadata is missing; tool and revision coverage cannot be established."),
       );
+
+    // Build global symbol table for cross-document resolution (#119)
+    const globalSymbols = buildGlobalSymbolTable(parsed.documents, parsed.externalSymbols);
+
     const definitions: ContextDefinitionV1[] = [];
     const references: ContextReferenceV1[] = [];
     const calls: ContextCallV1[] = [];
@@ -75,7 +79,9 @@ export async function importScip(path: string, root: string): Promise<ScipImport
       for (const occurrence of document.occurrences) {
         if (occurrence.symbol.length === 0) continue;
         const range = occurrenceRange(occurrence);
-        const symbol = symbols.get(occurrence.symbol);
+        const localSymbol = symbols.get(occurrence.symbol);
+        const globalSymbol = globalSymbols.get(occurrence.symbol);
+        const symbol = localSymbol ?? globalSymbol;
         const name = symbol?.displayName || occurrence.symbol;
         if (range === undefined) {
           diagnostics.push(problem("scip-range-missing", `SCIP occurrence for ${name} has no usable range.`));
@@ -105,7 +111,7 @@ export async function importScip(path: string, root: string): Promise<ScipImport
     const indexedFiles = [...new Set(files)].sort(comparePortable);
     const tool = parsed.metadata?.toolInfo;
     const index: ContextIndexV1 = {
-      schemaVersion: "footgun.context-index.v1",
+      schemaVersion: "smokinggun.context-index.v1",
       tool: {name: tool?.name || "scip", version: tool?.version || "unknown"},
       files: indexedFiles,
       definitions: definitions.sort(compareDefinitions),
@@ -145,6 +151,26 @@ export async function importScip(path: string, root: string): Promise<ScipImport
   }
 }
 
+function buildGlobalSymbolTable(
+  documents: ReadonlyArray<{readonly symbols: ReadonlyArray<SymbolInformation>}>,
+  externalSymbols: ReadonlyArray<SymbolInformation>,
+): Map<string, SymbolInformation> {
+  const table = new Map<string, SymbolInformation>();
+  for (const document of documents) {
+    for (const symbol of document.symbols) {
+      if (!table.has(symbol.symbol)) {
+        table.set(symbol.symbol, symbol);
+      }
+    }
+  }
+  for (const symbol of externalSymbols) {
+    if (!table.has(symbol.symbol)) {
+      table.set(symbol.symbol, symbol);
+    }
+  }
+  return table;
+}
+
 function occurrenceRange(occurrence: Occurrence): {readonly line: number; readonly column: number} | undefined {
   if (occurrence.typedRange.case === "singleLineRange")
     return {line: occurrence.typedRange.value.line + 1, column: occurrence.typedRange.value.startCharacter};
@@ -164,7 +190,7 @@ function portableRelative(path: string): string | undefined {
 
 function problem(code: string, message: string, detail?: string): ProblemV1 {
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code,
     message,
     ...(detail === undefined ? {} : {detail}),

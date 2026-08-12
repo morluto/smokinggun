@@ -4,10 +4,10 @@ import {parseScannerSelection, parseScanScope} from "./selection.js";
 describe("scan selection boundary", () => {
   it("parses every advertised built-in scanner ID", () => {
     for (const id of [
-      "footgun.structural",
-      "footgun.typescript-semantic",
-      "footgun.python-semantic",
-      "footgun.tree-sitter",
+      "smokinggun.structural",
+      "smokinggun.typescript-semantic",
+      "smokinggun.python-semantic",
+      "smokinggun.tree-sitter",
     ]) {
       const selection = parseScannerSelection([id], []);
       expect("schemaVersion" in selection).toBe(false);
@@ -17,7 +17,7 @@ describe("scan selection boundary", () => {
   it("rejects unknown and ambiguous scanner requests before scanning", () => {
     const unknown = parseScannerSelection(["definitely-not-a-scanner"], []);
     expect(unknown).toMatchObject({code: "invalid-scanner-selection"});
-    const ambiguous = parseScannerSelection(["auto", "footgun.structural"], []);
+    const ambiguous = parseScannerSelection(["auto", "smokinggun.structural"], []);
     expect(ambiguous).toMatchObject({code: "invalid-scanner-selection"});
   });
 

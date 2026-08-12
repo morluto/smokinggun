@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.repository-inventory.v1"
+      "const": "smokinggun.repository-inventory.v1"
     },
     "languages": {
       "type": "array",
