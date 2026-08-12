@@ -1,5 +1,15 @@
 # smokinggun
 
+## 4.0.0
+
+### Major Changes
+
+- a9c3c02: Reset scanning, imported evidence, content storage, and investigation updates around immutable inputs and host-enforced authority boundaries. Reports use exact content-addressed bytes; semantic scanners consume captured text; authorized adapters receive a private read-only snapshot; and measurement execution is removed in favor of strict imports from existing benchmark tools. Bounded findings now represent repository areas, stable finding IDs require their source report, SARIF imports report unknown external coverage, Google Benchmark repetitions retain raw distributions, and investigations advance through parent-linked compare-and-swap commits.
+
+### Patch Changes
+
+- 8755bef: Remove obsolete design documents that described retired workload execution and align the public README, architecture guide, contributor instructions, and packaged agent skill with the import-only measurement boundary.
+
 ## 3.0.0
 
 ### Major Changes
