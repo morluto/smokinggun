@@ -59,7 +59,7 @@
     }
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint && pnpm format:check && pnpm check:boundaries"
+    "pre-commit": "npm run lint && npm run format:check && npm run check:boundaries"
   },
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json && node scripts/generate-schemas.mjs && node scripts/set-executable.mjs",
