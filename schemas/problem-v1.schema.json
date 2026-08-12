@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.problem.v1"
+      "const": "smokinggun.problem.v1"
     },
     "code": {
       "type": "string",

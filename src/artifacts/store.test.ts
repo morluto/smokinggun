@@ -6,7 +6,7 @@ import {expect, it} from "vitest";
 import {storeArtifact, storeArtifactBytes} from "./store.js";
 
 it("stores regular artifacts by digest and rejects symlink inputs", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-artifact-store-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-artifact-store-"));
   try {
     const source = join(root, "report.json");
     const store = join(root, "store");
@@ -25,7 +25,7 @@ it("stores regular artifacts by digest and rejects symlink inputs", async () => 
 });
 
 it("rejects an existing artifact path whose bytes do not match its digest", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-artifact-store-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-artifact-store-"));
   try {
     const source = join(root, "report.json");
     const store = join(root, "store");
@@ -39,7 +39,7 @@ it("rejects an existing artifact path whose bytes do not match its digest", asyn
 });
 
 it("stores the exact bytes already accepted by a command boundary", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-artifact-store-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-artifact-store-"));
   try {
     const store = join(root, "store");
     const stored = await storeArtifactBytes("report.json", Buffer.from("validated", "utf8"), store);

@@ -11,7 +11,7 @@ import {loadLatestInvestigation, recordParsedInvestigationSnapshot} from "../inv
 import {stableJson} from "../serialization.js";
 import {automaticScannerSelection, entireScanRoot} from "../scan/selection.js";
 import {adapterExecutionNotAuthorized, parseExternalAdapters} from "../scanners/external.js";
-import {writeFileAtomically} from "../files.js";
+import {encodeScanArtifact} from "../reports/scan-artifact.js";
 
 export default class Investigate extends BaseCommand {
   static override description = "Create a durable local investigation bundle from a scan.";
@@ -19,7 +19,7 @@ export default class Investigate extends BaseCommand {
     ...globalFlags,
     finding: Flags.string({description: "Focus on one stable finding ID."}),
     "plan-only": Flags.boolean({
-      description: "Create a measurement-planning bundle without executing workloads.",
+      description: "Create a plan for measurement evidence produced by an external benchmark tool.",
       default: false,
     }),
   };
@@ -31,10 +31,10 @@ export default class Investigate extends BaseCommand {
     try {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
       const finding = parsed.flags.finding;
-      if (finding !== undefined && !/^fg_[a-f0-9]{16}$/.test(finding))
+      if (finding !== undefined && !/^sg_[a-f0-9]{16}$/.test(finding))
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "invalid-finding-id",
             message: "The investigation finding ID is not a stable SmokingGun finding ID.",
             recovery: "Pass an ID returned by `smokinggun scan <path> --format json`.",
@@ -62,7 +62,7 @@ export default class Investigate extends BaseCommand {
         if (report === undefined)
           this.emitProblem(
             {
-              schemaVersion: "footgun.problem.v1",
+              schemaVersion: "smokinggun.problem.v1",
               code: "finding-validation-required",
               message: "A focused investigation requires a scan that can validate the finding ID.",
               recovery: "Rerun without --plan-only or omit --finding.",
@@ -73,7 +73,7 @@ export default class Investigate extends BaseCommand {
         if (!report.findings.some((candidate) => candidate.id === finding))
           this.emitProblem(
             {
-              schemaVersion: "footgun.problem.v1",
+              schemaVersion: "smokinggun.problem.v1",
               code: "finding-not-found",
               message: "The requested finding ID is not present in this scan report.",
               recovery: "Pass a finding ID from this repository's current scan output.",
@@ -108,17 +108,18 @@ export default class Investigate extends BaseCommand {
         );
         return;
       }
-      const reportPath = join(directory, "scan-report.json");
-      const reportBytes =
-        report === undefined ? undefined : Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8");
-      const reportDigest =
-        reportBytes === undefined ? undefined : createHash("sha256").update(reportBytes).digest("hex");
-      if (reportBytes !== undefined) await writeFileAtomically(reportPath, reportBytes);
+      const encodedReport = report === undefined ? undefined : encodeScanArtifact(report);
+      const storedReport =
+        encodedReport === undefined
+          ? undefined
+          : await context.artifactStore.putBytes("scan-report.json", encodedReport.bytes);
+      if (encodedReport !== undefined && storedReport?.digest !== encodedReport.digest)
+        throw new Error("The retained scan report does not match its canonical content digest.");
       const createdBundle: InvestigationBundleV2 =
         existing?.bundle.state === "created"
           ? existing.bundle
           : {
-              schemaVersion: "footgun.investigation-bundle.v2",
+              schemaVersion: "smokinggun.investigation-bundle.v2",
               id,
               state: "created",
               root: report?.repository.root ?? ".",
@@ -133,7 +134,7 @@ export default class Investigate extends BaseCommand {
                     workloads: report.inventory?.benchmarks ?? [],
                     assumptions: report.assumptions,
                     versions: {
-                      footgun: report.tool.version,
+                      smokinggun: report.tool.version,
                       ...(report.context === undefined
                         ? {}
                         : {[report.context.tool.name]: report.context.tool.version}),
@@ -145,62 +146,77 @@ export default class Investigate extends BaseCommand {
               diagnostics: [],
               ...(finding === undefined ? {} : {findingIds: [finding]}),
             };
-      if (existing?.bundle.state !== "created")
-        await recordParsedInvestigationSnapshot(context.artifacts, createdBundle);
+      const createdDigest =
+        existing !== undefined
+          ? existing.digest
+          : await recordParsedInvestigationSnapshot(context.artifacts, createdBundle, null);
       const inventoriedBundle: InvestigationBundleV2 =
         existing?.bundle.state === "inventoried" ? existing.bundle : {...createdBundle, state: "inventoried"};
-      if (existing?.bundle.state !== "inventoried")
-        await recordParsedInvestigationSnapshot(context.artifacts, inventoriedBundle);
-      const scannedBundle: InvestigationBundleV2 =
-        report === undefined
-          ? {...inventoriedBundle, state: "measurement-planned"}
-          : {
-              ...inventoriedBundle,
-              state: "scanned",
-              reports: ["scan-report.json"],
-              evidence: [
-                {
-                  schemaVersion: "footgun.evidence.v2",
-                  id: `${id}:scan`,
-                  kind: "static",
-                  claimClass: "static-fact",
-                  summary: "Built-in structural scan",
-                  artifact: "scan-report.json",
-                  digest: reportDigest,
-                },
-              ],
-              diagnostics: report.diagnostics,
-            };
-      const bundle: InvestigationBundleV2 =
-        report?.context === undefined || scannedBundle.state !== "scanned"
-          ? scannedBundle
-          : {
-              ...scannedBundle,
-              state: "context-resolved",
-              evidence: [
-                ...scannedBundle.evidence,
-                {
-                  schemaVersion: "footgun.evidence.v2",
-                  id: `${id}:context:scan`,
-                  kind: "context",
-                  claimClass: "static-fact",
-                  summary: "Compiler-backed repository context from the scan report",
-                  artifact: "scan-report.json",
-                  digest: reportDigest,
-                },
-              ],
-            };
-      const bundlePath = join(directory, "bundle.json");
-      await writeFileAtomically(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
-      await recordParsedInvestigationSnapshot(context.artifacts, scannedBundle);
-      if (bundle.state !== scannedBundle.state) await recordParsedInvestigationSnapshot(context.artifacts, bundle);
+      const inventoriedDigest =
+        existing?.bundle.state === "inventoried"
+          ? existing.digest
+          : await recordParsedInvestigationSnapshot(context.artifacts, inventoriedBundle, createdDigest);
+      let scannedBundle: InvestigationBundleV2;
+      let bundle: InvestigationBundleV2;
+      if (report === undefined) {
+        scannedBundle = {...inventoriedBundle, state: "measurement-planned"};
+        bundle = scannedBundle;
+      } else {
+        if (storedReport === undefined) throw new Error("A scanned investigation requires a retained report.");
+        scannedBundle = {
+          ...inventoriedBundle,
+          state: "scanned",
+          reports: [storedReport.reference],
+          evidence: [
+            {
+              schemaVersion: "smokinggun.evidence.v2",
+              id: `${id}:scan`,
+              kind: "static",
+              claimClass: "static-fact",
+              summary: "Built-in structural scan",
+              artifact: storedReport.reference,
+              digest: storedReport.digest,
+            },
+          ],
+          diagnostics: report.diagnostics,
+        };
+        bundle =
+          report.context === undefined
+            ? scannedBundle
+            : {
+                ...scannedBundle,
+                state: "context-resolved",
+                evidence: [
+                  ...scannedBundle.evidence,
+                  {
+                    schemaVersion: "smokinggun.evidence.v2",
+                    id: `${id}:context:scan`,
+                    kind: "context",
+                    claimClass: "static-fact",
+                    summary: "Compiler-backed repository context from the scan report",
+                    artifact: storedReport.reference,
+                    digest: storedReport.digest,
+                  },
+                ],
+              };
+      }
+      const scannedDigest = await recordParsedInvestigationSnapshot(
+        context.artifacts,
+        scannedBundle,
+        inventoriedDigest,
+      );
+      const bundleDigest =
+        bundle.state === scannedBundle.state
+          ? scannedDigest
+          : await recordParsedInvestigationSnapshot(context.artifacts, bundle, scannedDigest);
+      const bundlePath = join(directory, "snapshots", `${bundleDigest}.json`);
       await printResult(bundle, `Investigation ${id}\nState: ${bundle.state}\nBundle: ${bundlePath}`, context);
     } catch (cause: unknown) {
       if (cause instanceof ExitError) throw cause;
       if (context.signal.aborted)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "cancelled",
             message: "The investigation was cancelled.",
             recovery: "Rerun the investigation when the repository is available.",
@@ -211,7 +227,7 @@ export default class Investigate extends BaseCommand {
       const message = cause instanceof Error ? cause.message : "Investigation failed.";
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "investigation-failed",
           message,
           recovery: "Rerun with a readable local path.",

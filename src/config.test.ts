@@ -1,4 +1,4 @@
-import {mkdir, mkdtemp, writeFile} from "node:fs/promises";
+import {mkdir, mkdtemp, symlink, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
@@ -42,6 +42,51 @@ describe("configuration", () => {
     const result = await loadConfig({config, cwd: directory});
     expect(isConfigFailure(result)).toBe(false);
     if (!isConfigFailure(result)) expect(result.output).toBe(join(nested, "artifacts/report.json"));
+  });
+
+  it("bounds auto-discovered paths to the config project root, not the invocation subdirectory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const nested = join(directory, "packages", "example");
+    await mkdir(nested, {recursive: true});
+    await writeFile(
+      join(directory, "smokinggun.config.json"),
+      JSON.stringify({cwd: ".", output: "artifacts/report.json", adapters: ["adapters/example.json"]}),
+      "utf8",
+    );
+    const result = await loadConfig({}, {XDG_CONFIG_HOME: join(directory, "missing-user-config")}, nested);
+    expect(isConfigFailure(result)).toBe(false);
+    if (!isConfigFailure(result)) {
+      expect(result.cwd).toBe(directory);
+      expect(result.output).toBe(join(directory, "artifacts", "report.json"));
+      expect(result.adapters).toEqual([join(directory, "adapters", "example.json")]);
+    }
+  });
+
+  it("rejects an auto-discovered path that escapes the config project root", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const directory = join(parent, "repository");
+    const nested = join(directory, "src");
+    await mkdir(nested, {recursive: true});
+    await writeFile(join(directory, "smokinggun.config.json"), JSON.stringify({output: "../report.json"}), "utf8");
+    const result = await loadConfig({}, {XDG_CONFIG_HOME: join(parent, "missing-user-config")}, nested);
+    expect(result).toMatchObject({_tag: "ConfigFailure", code: "config-path-traversal"});
+  });
+
+  it("rejects auto-discovered config paths that escape through symlinks", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const directory = join(parent, "repository");
+    const nested = join(directory, "src");
+    const outside = join(parent, "outside");
+    await mkdir(nested, {recursive: true});
+    await mkdir(outside);
+    for (const field of ["cwd", "output", "adapters"] as const) {
+      const link = join(directory, `escape-${field}`);
+      await symlink(outside, link, "dir");
+      const value = field === "adapters" ? {[field]: [`escape-${field}/adapter.json`]} : {[field]: `escape-${field}`};
+      await writeFile(join(directory, "smokinggun.config.json"), JSON.stringify(value), "utf8");
+      const result = await loadConfig({}, {XDG_CONFIG_HOME: join(parent, "missing-user-config")}, nested);
+      expect(result).toMatchObject({_tag: "ConfigFailure", code: "config-path-traversal"});
+    }
   });
 
   it("canonicalizes duplicate set-like configuration and rejects empty path entries", async () => {

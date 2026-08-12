@@ -40,11 +40,13 @@ smokinggun scan . --format sarif --output smokinggun.sarif
 
 Reports include the hotspot, supporting evidence, estimated impact, coverage, assumptions, risks, and tests or measurements needed next.
 
-Static scans are read-only, offline, and do not execute repository code or modify source files. Findings are candidates, not proof. Measurement requires a declared workload and explicit execution authorization; SmokingGun never rewrites code automatically.
+Static scans are read-only, offline, and do not execute repository code or modify source files. Findings are candidates, not proof. SmokingGun imports measurement evidence from existing benchmark tools; it does not launch workloads or rewrite code.
+
+Semantic scanners consume the captured source snapshot directly. Explicitly authorized external adapters receive the same bytes through a private read-only view with no network namespace. Benchmark, profile, and measurement artifacts cross a strict import boundary and retain their declared provenance without granting execution authority. See [the authority architecture](docs/architecture.md) for the evidence invariants behind these choices.
 
 ## About
 
-SmokingGun supports structural and semantic scanning, repository context, SARIF/SCIP and benchmark imports, and JSON, Markdown, SARIF, and terminal reports. Missing or failed coverage remains visible instead of being treated as a clean scan.
+SmokingGun's authoritative path is immutable capture, snapshot-backed scanning, truthful coverage, content-addressed reporting, and explicit evidence imports. SARIF/SCIP, benchmarks, profiles, and measurements remain external inputs; missing or failed coverage stays visible instead of becoming a clean scan.
 
 ## Development
 

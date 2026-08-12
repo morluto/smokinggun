@@ -6,7 +6,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.investigation-bundle.v2"
+          "const": "smokinggun.investigation-bundle.v2"
         },
         "id": {
           "type": "string",
@@ -57,7 +57,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^fg_[a-f0-9]{16}$"
+            "pattern": "^sg_[a-f0-9]{16}$"
           }
         },
         "callers": {
@@ -112,7 +112,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -166,7 +166,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",
@@ -234,7 +234,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",
@@ -321,7 +321,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.investigation-bundle.v2"
+          "const": "smokinggun.investigation-bundle.v2"
         },
         "id": {
           "type": "string",
@@ -372,7 +372,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^fg_[a-f0-9]{16}$"
+            "pattern": "^sg_[a-f0-9]{16}$"
           }
         },
         "callers": {
@@ -427,7 +427,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -485,7 +485,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",
@@ -553,7 +553,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",
@@ -640,7 +640,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.investigation-bundle.v2"
+          "const": "smokinggun.investigation-bundle.v2"
         },
         "id": {
           "type": "string",
@@ -691,7 +691,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^fg_[a-f0-9]{16}$"
+            "pattern": "^sg_[a-f0-9]{16}$"
           }
         },
         "callers": {
@@ -746,7 +746,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -802,7 +802,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",
@@ -870,7 +870,7 @@
                 "properties": {
                   "schemaVersion": {
                     "type": "string",
-                    "const": "footgun.evidence.v2"
+                    "const": "smokinggun.evidence.v2"
                   },
                   "id": {
                     "type": "string",

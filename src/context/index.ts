@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {relative, resolve} from "node:path";
+import {relative, resolve, sep} from "node:path";
 import * as ts from "typescript";
 import type {
   ContextIndexV1,
@@ -28,6 +28,11 @@ export type TypeScriptAnalysis =
       readonly selectedPaths: ReadonlySet<string>;
     };
 
+export type TypeScriptSourceInput = {
+  readonly path: string;
+  readonly text: string;
+};
+
 const supportedExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const maxContextEntriesPerKind = 10_000;
 
@@ -49,6 +54,59 @@ export function prepareTypeScriptAnalysis(files: ReadonlyArray<string>): TypeScr
       skipLibCheck: true,
       target: ts.ScriptTarget.ES2022,
     }),
+  };
+}
+
+/** Prepare a compiler program whose host can read only the captured source snapshot. */
+export function prepareSnapshotTypeScriptAnalysis(
+  root: string,
+  sources: ReadonlyArray<TypeScriptSourceInput>,
+): TypeScriptAnalysis {
+  const absoluteRoot = resolve(root);
+  const selectedSources = sources
+    .filter((source) => supportedExtensions.has(extensionOf(source.path)))
+    .map((source) => ({path: resolve(absoluteRoot, source.path), text: source.text}));
+  const sourceTexts = new Map(selectedSources.map((source) => [canonicalPath(source.path), source.text] as const));
+  const sourcePaths = selectedSources.map((source) => source.path);
+  const canonicalSourcePaths = sourcePaths.map(canonicalPath);
+  if (sourcePaths.length === 0) return {_tag: "NoSupportedTypeScriptSources"};
+  const options: ts.CompilerOptions = {
+    allowJs: true,
+    allowSyntheticDefaultImports: true,
+    checkJs: false,
+    module: ts.ModuleKind.NodeNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+    noEmit: true,
+    noLib: true,
+    skipLibCheck: true,
+    target: ts.ScriptTarget.ES2022,
+    types: [],
+  };
+  const baseHost = ts.createCompilerHost(options, true);
+  const host: ts.CompilerHost = {
+    ...baseHost,
+    directoryExists: (directory) => {
+      const prefix = `${canonicalPath(resolve(directory))}${sep}`;
+      return canonicalSourcePaths.some((path) => path.startsWith(prefix));
+    },
+    fileExists: (path) => sourceTexts.has(canonicalPath(resolve(path))),
+    getCurrentDirectory: () => absoluteRoot,
+    getDefaultLibFileName: () => resolve(absoluteRoot, ".smokinggun-no-lib.d.ts"),
+    getDirectories: (directory) => snapshotDirectories(directory, canonicalSourcePaths),
+    getSourceFile: (path, languageVersion) => {
+      const absolutePath = canonicalPath(resolve(path));
+      const text = sourceTexts.get(absolutePath);
+      return text === undefined ? undefined : ts.createSourceFile(resolve(path), text, languageVersion, true);
+    },
+    readFile: (path) => sourceTexts.get(canonicalPath(resolve(path))),
+    realpath: (path) => resolve(path),
+    writeFile: () => undefined,
+  };
+  return {
+    _tag: "PreparedTypeScriptAnalysis",
+    sourcePaths,
+    selectedPaths: new Set(canonicalSourcePaths),
+    program: ts.createProgram({rootNames: sourcePaths, options, host}),
   };
 }
 
@@ -143,7 +201,7 @@ export function buildPreparedTypeScriptIndex(
 
     if (contextTruncated)
       diagnostics.push({
-        schemaVersion: "footgun.problem.v1",
+        schemaVersion: "smokinggun.problem.v1",
         code: "typescript-context-truncated",
         message: "The TypeScript context index reached its per-kind evidence limit.",
         recovery: "Use a narrower --only scope before relying on complete symbol, reference, or call context.",
@@ -153,7 +211,7 @@ export function buildPreparedTypeScriptIndex(
       .map((path) => portablePath(relative(absoluteRoot, path)))
       .sort(comparePortable);
     const index: ContextIndexV1 = {
-      schemaVersion: "footgun.context-index.v1",
+      schemaVersion: "smokinggun.context-index.v1",
       tool: {name: "typescript", version: ts.version},
       files: indexedFiles,
       definitions: definitions.sort(compareDefinitions),
@@ -184,7 +242,7 @@ export function buildPreparedTypeScriptIndex(
       state: "unavailable",
       diagnostics: [
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "typescript-index-failed",
           message: "TypeScript semantic indexing was unavailable.",
           detail: cause instanceof Error ? cause.message : "Unknown TypeScript compiler failure.",
@@ -202,6 +260,20 @@ export function isSelectedTypeScriptSource(analysis: TypeScriptAnalysis, path: s
 
 function canonicalPath(path: string): string {
   return ts.sys.useCaseSensitiveFileNames ? path : path.toLowerCase();
+}
+
+function snapshotDirectories(directory: string, sourcePaths: ReadonlyArray<string>): string[] {
+  const absoluteDirectory = canonicalPath(resolve(directory));
+  const prefix = `${absoluteDirectory}${sep}`;
+  return [
+    ...new Set(
+      sourcePaths.flatMap((path) => {
+        if (!path.startsWith(prefix)) return [];
+        const child = path.slice(prefix.length).split(sep)[0];
+        return child === undefined || !path.slice(prefix.length).includes(sep) ? [] : [child];
+      }),
+    ),
+  ];
 }
 
 function isDeclarationName(node: ts.Identifier): boolean {
@@ -257,7 +329,7 @@ function diagnosticToProblem(root: string, sourceFile: ts.SourceFile, diagnostic
   const location =
     diagnostic.start === undefined ? undefined : sourceFile.getLineAndCharacterOfPosition(diagnostic.start);
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code: "typescript-parse-error",
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, " "),
     path: portablePath(relative(root, sourceFile.fileName)),

@@ -10,11 +10,13 @@ import {
   buildPreparedTypeScriptIndex,
   isSelectedTypeScriptSource,
   prepareTypeScriptAnalysis,
+  prepareSnapshotTypeScriptAnalysis,
+  type TypeScriptSourceInput,
   type TypeScriptIndexResult,
 } from "../context/index.js";
 import {isWithinRoot, portablePath} from "../paths.js";
 
-export const semanticScannerId = "footgun.typescript-semantic";
+export const semanticScannerId = "smokinggun.typescript-semantic";
 export const semanticScannerVersion = "1.0.0";
 const semanticWorkerOldGenerationLimitMb = 768;
 
@@ -55,13 +57,72 @@ export async function scanTypeScript(
   }
 }
 
+/** Analyze only source text retained by the host-owned immutable snapshot. */
+export async function scanTypeScriptSnapshot(
+  root: string,
+  sources: ReadonlyArray<TypeScriptSourceInput>,
+  signal?: AbortSignal,
+): Promise<TypeScriptSemanticResult> {
+  signal?.throwIfAborted();
+  const workerUrl = new URL("./typescript-semantic-worker.js", import.meta.url);
+  if (!existsSync(fileURLToPath(workerUrl)))
+    return markSnapshotProjectContextPartial(scanTypeScriptSnapshotSynchronously(root, sources, signal));
+  try {
+    return markSnapshotProjectContextPartial(await runTypeScriptWorker(workerUrl, root, [], signal, sources));
+  } catch (cause: unknown) {
+    if (signal?.aborted) throw cause;
+    return {state: "unavailable", diagnostics: [workerFailureProblem(cause)], findings: []};
+  }
+}
+
+function markSnapshotProjectContextPartial(result: TypeScriptSemanticResult): TypeScriptSemanticResult {
+  if (result.state === "unavailable") return result;
+  const diagnostic: ProblemV1 = {
+    schemaVersion: "smokinggun.problem.v1",
+    code: "typescript-project-context-partial",
+    message:
+      "TypeScript sources were analyzed from immutable bytes without a captured project configuration or library set.",
+    recovery:
+      "Treat type resolution as partial until tsconfig, project references, and compiler libraries enter the snapshot.",
+  };
+  return {
+    ...result,
+    state: "partial",
+    diagnostics: [...result.diagnostics, diagnostic],
+    index: {
+      ...result.index,
+      coverage: {
+        ...result.index.coverage,
+        parseStatus: "partial",
+        reason: diagnostic.message,
+      },
+    },
+  };
+}
+
+/** Synchronous snapshot entrypoint used inside the bounded semantic worker. */
+export function scanTypeScriptSnapshotSynchronously(
+  root: string,
+  sources: ReadonlyArray<TypeScriptSourceInput>,
+  signal?: AbortSignal,
+): TypeScriptSemanticResult {
+  return scanPreparedTypeScript(root, prepareSnapshotTypeScriptAnalysis(root, sources), signal);
+}
+
 /** Analyze one selected TypeScript source set with one shared compiler Program and TypeChecker. */
 export function scanTypeScriptSynchronously(
   root: string,
   files: ReadonlyArray<string>,
   signal?: AbortSignal,
 ): TypeScriptSemanticResult {
-  const analysis = prepareTypeScriptAnalysis(files);
+  return scanPreparedTypeScript(root, prepareTypeScriptAnalysis(files), signal);
+}
+
+function scanPreparedTypeScript(
+  root: string,
+  analysis: ReturnType<typeof prepareTypeScriptAnalysis>,
+  signal?: AbortSignal,
+): TypeScriptSemanticResult {
   if (analysis._tag === "NoSupportedTypeScriptSources")
     return {...buildPreparedTypeScriptIndex(root, analysis, signal), findings: []};
   const {program} = analysis;
@@ -113,20 +174,6 @@ export function scanTypeScriptSynchronously(
               ),
             );
           }
-          if (name !== undefined && queryNames.has(name)) {
-            findings.push(
-              makeFinding(
-                relativePath,
-                sourceFile,
-                node,
-                "type-informed",
-                `Potential ${name} call occurs inside a TypeScript loop.`,
-                "Check for N+1 I/O or query behavior and batch only when authorization, ordering, errors, and caching remain equivalent.",
-                [`call resolved as ${name}`, `enclosing loop depth: ${loopDepth}`],
-                "typescript-call-in-loop",
-              ),
-            );
-          }
         }
         ts.forEachChild(node, (child) => visit(child, nextDepth));
       };
@@ -135,7 +182,7 @@ export function scanTypeScriptSynchronously(
     return {...context, findings: dedupe(findings)};
   } catch (cause: unknown) {
     const diagnostic: ProblemV1 = {
-      schemaVersion: "footgun.problem.v1",
+      schemaVersion: "smokinggun.problem.v1",
       code: "typescript-semantic-failed",
       message: "TypeScript semantic scanning was unavailable.",
       detail: cause instanceof Error ? cause.message : "Unknown TypeScript compiler failure.",
@@ -156,10 +203,11 @@ function runTypeScriptWorker(
   root: string,
   files: ReadonlyArray<string>,
   signal?: AbortSignal,
+  sources?: ReadonlyArray<TypeScriptSourceInput>,
 ): Promise<TypeScriptSemanticResult> {
   return new Promise((resolveResult, rejectResult) => {
     const worker = new Worker(workerUrl, {
-      workerData: {root, files},
+      workerData: {root, files, ...(sources === undefined ? {} : {sources})},
       execArgv: withoutWorkerHeapOverrides(process.execArgv),
       resourceLimits: {maxOldGenerationSizeMb: semanticWorkerOldGenerationLimitMb},
     });
@@ -216,7 +264,7 @@ function workerFailureProblem(cause: unknown): ProblemV1 {
   const detail = cause instanceof Error ? cause.message : "Unknown TypeScript semantic worker failure.";
   const reachedMemoryLimit = detail.includes("memory limit");
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code: reachedMemoryLimit ? "typescript-semantic-resource-limit" : "typescript-semantic-worker-failed",
     message: reachedMemoryLimit
       ? "TypeScript semantic analysis exceeded its worker memory limit."
@@ -236,7 +284,6 @@ const collectionOperationNames = new Set([
   "reduce",
   "sort",
 ]);
-const queryNames = new Set(["fetch", "query", "execute", "findMany", "findOne", "findUnique"]);
 const collectionTypePattern = /(?:\[\]|Array<|ReadonlyArray<|Set<|Map<|string)/;
 
 function makeFinding(
@@ -250,8 +297,9 @@ function makeFinding(
   ruleId: string,
 ): FindingV2 {
   const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   const line = start.line + 1;
-  const id = `fg_${createHash("sha256")
+  const id = `sg_${createHash("sha256")
     .update(`${path}\0${line}\0${ruleId}\0${node.getText(sourceFile)}`)
     .digest("hex")
     .slice(0, 16)}`;
@@ -259,11 +307,11 @@ function makeFinding(
     path,
     startLine: line,
     startColumn: start.character,
-    endLine: line,
-    endColumn: start.character + Math.max(1, node.getWidth(sourceFile)),
+    endLine: end.line + 1,
+    endColumn: end.character,
   };
   return {
-    schemaVersion: "footgun.finding.v2",
+    schemaVersion: "smokinggun.finding.v2",
     id,
     scanner: semanticScannerId,
     scannerVersion: semanticScannerVersion,

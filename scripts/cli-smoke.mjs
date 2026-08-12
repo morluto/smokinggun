@@ -7,15 +7,15 @@ import {create, toBinary} from "@bufbuild/protobuf";
 import {IndexSchema, ProtocolVersion, SymbolInformation_Kind, SymbolRole, TextEncoding} from "@scip-code/scip";
 
 const root = process.cwd();
-const entry = "dist/bin/footgun.js";
-const sandbox = await mkdtemp(join(tmpdir(), "footgun-cli-contract-"));
+const entry = "dist/bin/smokinggun.js";
+const sandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-contract-"));
 
 try {
   const scan = await run([entry, "scan", "fixtures/corpus/typescript", "--format", "json"]);
   const report = JSON.parse(scan.stdout);
   if (
     scan.code !== 0 ||
-    report.schemaVersion !== "footgun.scan-report.v2" ||
+    report.schemaVersion !== "smokinggun.scan-report.v2" ||
     scan.stderr.length !== 0 ||
     scan.stdout.includes("\u001b") ||
     scan.stdout.includes("SmokingGun scan:")
@@ -30,7 +30,7 @@ try {
   const scannerValue = JSON.parse(scanners.stdout);
   if (
     scanners.code !== 0 ||
-    scannerValue.schemaVersion !== "footgun.scanners.v1" ||
+    scannerValue.schemaVersion !== "smokinggun.scanners.v1" ||
     !Array.isArray(scannerValue.scanners) ||
     scanners.stderr.length !== 0
   )
@@ -46,11 +46,20 @@ try {
   const explanationValue = JSON.parse(explanation.stdout);
   if (
     explanation.code !== 0 ||
-    explanationValue.schemaVersion !== "footgun.explanation.v1" ||
+    explanationValue.schemaVersion !== "smokinggun.explanation.v1" ||
     explanationValue.ruleId !== "membership-in-loop" ||
     explanation.stderr.length !== 0
   )
     throw new Error("explain command contract failed");
+  const stableExplanation = await run([entry, "explain", "sg_0123456789abcdef", "--format", "json"]);
+  const stableExplanationValue = JSON.parse(stableExplanation.stdout);
+  if (
+    stableExplanation.code !== 2 ||
+    stableExplanationValue.code !== "finding-report-required" ||
+    !stableExplanationValue.recovery.includes("REPORT.json") ||
+    stableExplanation.stderr.length !== 0
+  )
+    throw new Error("stable finding IDs must require their source report");
 
   const investigation = await run([
     entry,
@@ -63,14 +72,16 @@ try {
   const investigationValue = JSON.parse(investigation.stdout);
   if (
     investigation.code !== 0 ||
-    investigationValue.schemaVersion !== "footgun.investigation-bundle.v2" ||
+    investigationValue.schemaVersion !== "smokinggun.investigation-bundle.v2" ||
     !["inventoried", "scanned", "context-resolved"].includes(investigationValue.state) ||
     investigation.stderr.length !== 0
   )
     throw new Error("investigation lifecycle contract failed");
-  const storedScan = await readFile(join(sandbox, "data", "investigations", investigationValue.id, "scan-report.json"));
+  const scanEvidence = investigationValue.evidence.find(
+    (evidence) => evidence.kind === "static" && evidence.artifact.startsWith("artifact://sha256/"),
+  );
+  const storedScan = await readFile(artifactPath(scanEvidence?.artifact));
   const storedScanDigest = createHash("sha256").update(storedScan).digest("hex");
-  const scanEvidence = investigationValue.evidence.find((evidence) => evidence.artifact === "scan-report.json");
   if (scanEvidence?.digest !== storedScanDigest)
     throw new Error("investigation scan evidence digest must match its stored artifact");
   const repeatedInvestigation = await run([
@@ -126,7 +137,7 @@ try {
   const importedContextValue = JSON.parse(importedContext.stdout);
   if (
     importedContext.code !== 0 ||
-    importedContextValue.schemaVersion !== "footgun.context-import.v1" ||
+    importedContextValue.schemaVersion !== "smokinggun.context-import.v1" ||
     importedContextValue.state === "unavailable" ||
     importedContext.stderr.length !== 0
   )
@@ -147,11 +158,9 @@ try {
       "utf8",
     ),
   );
-  const contextEvidence = contextBundle.evidence.find((evidence) => evidence.kind === "context");
+  const contextEvidence = contextBundle.bundle.evidence.find((evidence) => evidence.kind === "context");
   if (contextEvidence === undefined) throw new Error("context import must append investigation evidence");
-  const storedContext = await readFile(
-    join(sandbox, "data", "investigations", investigationValue.id, contextEvidence.artifact),
-  );
+  const storedContext = await readFile(artifactPath(contextEvidence.artifact));
   if (contextEvidence.digest !== createHash("sha256").update(storedContext).digest("hex"))
     throw new Error("context evidence digest must match its stored artifact");
 
@@ -189,7 +198,7 @@ try {
     "investigate",
     "fixtures/corpus/typescript",
     "--finding",
-    "fg_0000000000000000",
+    "sg_0000000000000000",
     "--format",
     "json",
     "--non-interactive",
@@ -197,7 +206,7 @@ try {
   const missingFindingValue = JSON.parse(missingFinding.stdout);
   if (
     missingFinding.code !== 2 ||
-    missingFindingValue.schemaVersion !== "footgun.problem.v1" ||
+    missingFindingValue.schemaVersion !== "smokinggun.problem.v1" ||
     missingFindingValue.code !== "finding-not-found" ||
     missingFinding.stderr.length !== 0
   )
@@ -217,7 +226,7 @@ try {
   );
   if (
     invalidReport.code !== 2 ||
-    invalidReportValue.schemaVersion !== "footgun.problem.v1" ||
+    invalidReportValue.schemaVersion !== "smokinggun.problem.v1" ||
     invalidArtifactStored ||
     invalidReport.stderr.length !== 0
   )
@@ -226,7 +235,7 @@ try {
   const renderedValue = JSON.parse(renderedReport.stdout);
   if (
     renderedReport.code !== 0 ||
-    renderedValue.schemaVersion !== "footgun.scan-report.v2" ||
+    renderedValue.schemaVersion !== "smokinggun.scan-report.v2" ||
     renderedReport.stderr.length !== 0
   )
     throw new Error("report JSON contract failed");
@@ -257,7 +266,7 @@ try {
   const invalidReportInvestigationValue = JSON.parse(invalidReportInvestigation.stdout);
   if (
     invalidReportInvestigation.code !== 2 ||
-    invalidReportInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
+    invalidReportInvestigationValue.schemaVersion !== "smokinggun.problem.v1" ||
     invalidReportInvestigationValue.code !== "investigation-unavailable" ||
     invalidReportInvestigation.stderr.length !== 0
   )
@@ -271,8 +280,9 @@ try {
   const comparisonValue = JSON.parse(comparison.stdout);
   if (
     comparison.code !== 0 ||
-    comparisonValue.schemaVersion !== "footgun.comparison.v2" ||
+    comparisonValue.schemaVersion !== "smokinggun.comparison.v2" ||
     comparisonValue.promotion !== "eligible" ||
+    comparisonValue.promotionReasons.length !== 0 ||
     comparison.stderr.length !== 0
   )
     throw new Error("comparison JSON contract failed");
@@ -290,7 +300,7 @@ try {
   await writeFile(
     join(retryInvestigationDirectory, "bundle.json"),
     JSON.stringify({
-      schemaVersion: "footgun.investigation-bundle.v2",
+      schemaVersion: "smokinggun.investigation-bundle.v2",
       id: retryInvestigationId,
       state: "baseline-measured",
       root: ".",
@@ -298,7 +308,7 @@ try {
       reports: ["../measurements/seed.json"],
       evidence: [
         {
-          schemaVersion: "footgun.evidence.v2",
+          schemaVersion: "smokinggun.evidence.v2",
           id: `${retryInvestigationId}:measurement:seed`,
           kind: "measurement",
           claimClass: "constant-factor",
@@ -322,6 +332,33 @@ try {
     JSON.stringify({...measurement("d", 8), investigation: retryInvestigationId}),
     "utf8",
   );
+  const retainedInvestigation = JSON.parse(await readFile(join(retryInvestigationDirectory, "bundle.json"), "utf8"));
+  retainedInvestigation.reports = ["retry-baseline.json", "retry-candidate.json"];
+  retainedInvestigation.evidence = [
+    {
+      schemaVersion: "smokinggun.evidence.v2",
+      id: `${retryInvestigationId}:measurement:baseline`,
+      kind: "measurement",
+      claimClass: "constant-factor",
+      summary: "Retained baseline measurement",
+      artifact: "retry-baseline.json",
+      digest: createHash("sha256")
+        .update(await readFile(retryBaselineArtifact))
+        .digest("hex"),
+    },
+    {
+      schemaVersion: "smokinggun.evidence.v2",
+      id: `${retryInvestigationId}:measurement:candidate`,
+      kind: "measurement",
+      claimClass: "constant-factor",
+      summary: "Retained candidate measurement",
+      artifact: "retry-candidate.json",
+      digest: createHash("sha256")
+        .update(await readFile(retryCandidateArtifact))
+        .digest("hex"),
+    },
+  ];
+  await writeFile(join(retryInvestigationDirectory, "bundle.json"), JSON.stringify(retainedInvestigation), "utf8");
   const initialComparison = await run([
     entry,
     "compare",
@@ -330,6 +367,8 @@ try {
     "--format",
     "json",
   ]);
+  if (initialComparison.code !== 0)
+    throw new Error(`initial investigation comparison failed: ${initialComparison.stdout}${initialComparison.stderr}`);
   const pointerAfterInitialComparison = await readFile(join(retryInvestigationDirectory, "latest.json"), "utf8");
   const retriedComparison = await run([
     entry,
@@ -343,7 +382,7 @@ try {
   if (
     initialComparison.code !== 0 ||
     retriedComparison.code !== 0 ||
-    JSON.parse(retriedComparison.stdout).schemaVersion !== "footgun.comparison.v2" ||
+    JSON.parse(retriedComparison.stdout).schemaVersion !== "smokinggun.comparison.v2" ||
     initialComparison.stderr.length !== 0 ||
     retriedComparison.stderr.length !== 0 ||
     pointerAfterInitialComparison !== pointerAfterRetriedComparison
@@ -353,7 +392,7 @@ try {
   const policy = await run([entry, "scan", "fixtures/corpus/typescript", "--format", "json", "--fail-on", "finding"]);
   if (
     policy.code !== 4 ||
-    JSON.parse(policy.stdout).schemaVersion !== "footgun.scan-report.v2" ||
+    JSON.parse(policy.stdout).schemaVersion !== "smokinggun.scan-report.v2" ||
     policy.stderr.length !== 0
   )
     throw new Error("fail-on exit contract failed");
@@ -361,7 +400,7 @@ try {
   const strictIncomplete = await run([entry, "scan", "fixtures/edge/malformed.ts", "--format", "json", "--strict"]);
   if (
     strictIncomplete.code !== 3 ||
-    JSON.parse(strictIncomplete.stdout).schemaVersion !== "footgun.scan-report.v2" ||
+    JSON.parse(strictIncomplete.stdout).schemaVersion !== "smokinggun.scan-report.v2" ||
     strictIncomplete.stderr.length !== 0 ||
     strictIncomplete.stdout.trim().split("\n").length === 0
   )
@@ -379,11 +418,11 @@ try {
   ]);
   const selectedValue = JSON.parse(selectedScanner.stdout);
   if (
-    selectedScanner.code !== 0 ||
+    selectedScanner.code !== 3 ||
     !selectedValue.coverage.some(
-      (coverage) => coverage.scanner === "footgun.typescript-semantic" && coverage.parseStatus === "complete",
+      (coverage) => coverage.scanner === "smokinggun.typescript-semantic" && coverage.parseStatus === "partial",
     ) ||
-    selectedValue.coverage.some((coverage) => coverage.scanner === "footgun.structural") ||
+    selectedValue.coverage.some((coverage) => coverage.scanner === "smokinggun.structural") ||
     selectedScanner.stderr.length !== 0
   )
     throw new Error("explicit scanner selection coverage contract failed");
@@ -393,7 +432,7 @@ try {
     "scan",
     "fixtures/corpus/python",
     "--scanner",
-    "footgun.python-semantic",
+    "smokinggun.python-semantic",
     "--format",
     "json",
     "--strict",
@@ -401,7 +440,10 @@ try {
   const canonicalPythonValue = JSON.parse(canonicalPython.stdout);
   if (
     canonicalPython.code !== 0 ||
-    !canonicalPythonValue.findings.some((finding) => finding.scanner === "footgun.python-semantic") ||
+    !canonicalPythonValue.findings.some((finding) => finding.scanner === "smokinggun.python-semantic") ||
+    !canonicalPythonValue.coverage.some(
+      (coverage) => coverage.scanner === "smokinggun.python-semantic" && coverage.parseStatus === "complete",
+    ) ||
     canonicalPython.stderr.length !== 0
   )
     throw new Error("advertised canonical scanner IDs must be selectable");
@@ -448,7 +490,7 @@ try {
     "--only",
     "missing",
     "--scanner",
-    "footgun.python-semantic",
+    "smokinggun.python-semantic",
     "--format",
     "json",
     "--strict",
@@ -462,7 +504,7 @@ try {
   await writeFile(
     join(sandbox, "adapter.json"),
     JSON.stringify({
-      schemaVersion: "footgun.adapter-manifest.v1",
+      schemaVersion: "smokinggun.adapter-manifest.v1",
       id: "untrusted-adapter",
       version: "1.0.0",
       command: [
@@ -529,25 +571,26 @@ try {
     "json",
   ]);
   const adapterAgainstSeparateTargetValue = JSON.parse(adapterAgainstSeparateTarget.stdout);
-  const authorizedAdapterRan = await access(adapterProbeMarker).then(
+  const authorizedAdapterEscaped = await access(adapterProbeMarker).then(
     () => true,
     () => false,
   );
   if (
     adapterAgainstSeparateTarget.code !== 0 ||
-    !authorizedAdapterRan ||
+    authorizedAdapterEscaped ||
     !adapterAgainstSeparateTargetValue.coverage.some(
-      (coverage) => coverage.scanner === "footgun.adapter:untrusted-adapter",
+      (coverage) =>
+        coverage.scanner === "smokinggun.adapter:untrusted-adapter" && coverage.parseStatus === "unavailable",
     ) ||
     adapterAgainstSeparateTargetValue.diagnostics.some(
       (diagnostic) => diagnostic.code === "adapter-manifest-read-failed",
     )
   )
-    throw new Error("adapter manifests must be resolved once before scanning a separate target");
+    throw new Error("adapter manifests must be resolved once while sandboxed execution remains confined");
 
   let rawTrace = false;
   if (process.platform !== "win32") {
-    const sandbox = await mkdtemp(join(tmpdir(), "footgun-cli-trace-"));
+    const sandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-trace-"));
     const trace = join(sandbox, "fixture.pftrace");
     const processor = join(sandbox, "trace_processor");
     try {
@@ -560,7 +603,7 @@ try {
       const traceValue = JSON.parse(traceResult.stdout);
       if (
         traceResult.code !== 0 ||
-        traceValue.schemaVersion !== "footgun.trace-summary.v1" ||
+        traceValue.schemaVersion !== "smokinggun.trace-summary.v1" ||
         traceValue.rows[0]?.name !== "main"
       )
         throw new Error("raw Perfetto trace report contract failed");
@@ -570,60 +613,13 @@ try {
     }
   }
 
-  const action = await run([entry, "measure", "inv_smoke", "--format", "json"]);
-  const actionValue = JSON.parse(action.stdout);
-  if (action.code !== 2 || actionValue.schemaVersion !== "footgun.action-required.v1" || action.stderr.length !== 0)
-    throw new Error("action-required exit contract failed");
-
-  const marker = join(sandbox, "invalid-investigation-marker");
-  const workload = join(sandbox, "invalid-investigation-workload.json");
-  await writeFile(
-    workload,
-    JSON.stringify({
-      schemaVersion: "footgun.workload.v2",
-      command: [process.execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`],
-      cwd: ".",
-      environment: {},
-      inheritEnvironment: false,
-      warmups: 0,
-      repetitions: 1,
-      timeoutMs: 2_000,
-      requestedProfile: "local-exec",
-      expectedArtifacts: [],
-      behaviorChecks: ["exit-code:0"],
-    }),
-    "utf8",
-  );
-  const invalidInvestigation = await run([
-    entry,
-    "measure",
-    "not-an-id",
-    "--workload",
-    workload,
-    "--execute",
-    "--format",
-    "json",
-  ]);
-  const invalidInvestigationValue = JSON.parse(invalidInvestigation.stdout);
-  const markerExists = await access(marker).then(
-    () => true,
-    () => false,
-  );
-  if (
-    invalidInvestigation.code !== 1 ||
-    invalidInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
-    invalidInvestigationValue.code !== "measurement-failed" ||
-    markerExists
-  )
-    throw new Error("invalid investigation must fail before executing the workload");
-
   const unreadyInvestigationId = "inv_1111111111111111";
   const unreadyInvestigationDirectory = join(sandbox, "data", "investigations", unreadyInvestigationId);
   await mkdir(unreadyInvestigationDirectory, {recursive: true});
   await writeFile(
     join(unreadyInvestigationDirectory, "bundle.json"),
     JSON.stringify({
-      schemaVersion: "footgun.investigation-bundle.v2",
+      schemaVersion: "smokinggun.investigation-bundle.v2",
       id: unreadyInvestigationId,
       state: "created",
       root: ".",
@@ -634,29 +630,6 @@ try {
     }),
     "utf8",
   );
-  const unreadyInvestigation = await run([
-    entry,
-    "measure",
-    unreadyInvestigationId,
-    "--workload",
-    workload,
-    "--execute",
-    "--format",
-    "json",
-  ]);
-  const unreadyInvestigationValue = JSON.parse(unreadyInvestigation.stdout);
-  const unreadyMarkerExists = await access(marker).then(
-    () => true,
-    () => false,
-  );
-  if (
-    unreadyInvestigation.code !== 1 ||
-    unreadyInvestigationValue.schemaVersion !== "footgun.problem.v1" ||
-    unreadyInvestigationValue.code !== "investigation-not-measurable" ||
-    unreadyMarkerExists
-  )
-    throw new Error("an unready investigation must fail before executing or persisting a measurement");
-
   const unreadyContext = await run([
     entry,
     "context",
@@ -671,7 +644,7 @@ try {
   const unreadyInvestigationFiles = await readdir(unreadyInvestigationDirectory);
   if (
     unreadyContext.code !== 1 ||
-    unreadyContextValue.schemaVersion !== "footgun.problem.v1" ||
+    unreadyContextValue.schemaVersion !== "smokinggun.problem.v1" ||
     unreadyContextValue.code !== "investigation-not-context-ready" ||
     unreadyInvestigationFiles.length !== 1 ||
     unreadyInvestigationFiles[0] !== "bundle.json"
@@ -690,7 +663,7 @@ try {
   const missingContextValue = JSON.parse(missingContext.stdout);
   if (
     missingContext.code !== 3 ||
-    missingContextValue.schemaVersion !== "footgun.context-import.v1" ||
+    missingContextValue.schemaVersion !== "smokinggun.context-import.v1" ||
     missingContextValue.state !== "unavailable" ||
     missingContext.stderr.length !== 0
   )
@@ -702,7 +675,6 @@ try {
       scanCoverage: report.coverage.length,
       scannerCount: scannerValue.scanners.length,
       investigationState: investigationValue.state,
-      actionExit: action.code,
       policyExit: policy.code,
       strictIncompleteExit: strictIncomplete.code,
       rawTrace,
@@ -734,9 +706,9 @@ function run(args, extraEnv = {}) {
 
 function measurement(id, medianMs) {
   return {
-    schemaVersion: "footgun.measurement.v1",
+    schemaVersion: "smokinggun.measurement.v1",
     id: `meas_${id.repeat(16)}`,
-    workloadDigest: "a".repeat(64),
+    benchmarkDigest: "a".repeat(64),
     samplesMs: [medianMs],
     warmups: 0,
     repetitions: 1,
@@ -748,22 +720,34 @@ function measurement(id, medianMs) {
       command: ["node", "fixture.js"],
       cwd: ".",
       environmentKeys: [],
+      environmentDigest: "b".repeat(64),
+      executable: {path: "[HOST_PATH]/node", digest: "c".repeat(64)},
+      subjectDigest: id.repeat(64),
+      inputSetDigest: "d".repeat(64),
       timeoutMs: 1000,
       warmups: 0,
       repetitions: 1,
       expectedArtifacts: [],
+      artifactDigests: {},
       datasetDigests: {},
     },
     behaviorValidated: true,
     behaviorChecks: [{check: "exit-code:0", passed: true}],
-    executionProfile: "container-exec",
+    executionProfile: "external-benchmark",
     environment: {node: process.versions.node, platform: process.platform, arch: process.arch},
     isolation: {
-      backend: "bwrap",
-      runner: {runtime: "bwrap"},
+      backend: "producer-declared",
+      hostDigest: "f".repeat(64),
+      runtime: {name: "fixture-runner", version: "1.0.0", digest: "e".repeat(64)},
       controlsRequested: ["network-none"],
       controlsApplied: ["network-none"],
       downgradeReasons: [],
     },
   };
+}
+
+function artifactPath(reference) {
+  const digest = reference?.match(/^artifact:\/\/sha256\/([a-f0-9]{64})$/)?.[1];
+  if (digest === undefined) throw new Error("expected a content-addressed artifact reference");
+  return join(sandbox, "data", "artifacts", "sha256", digest);
 }

@@ -48,7 +48,7 @@ describe("SARIF import boundary", () => {
     });
     expect(result.rawArtifacts).toHaveLength(1);
     expect(result.diagnostics[0]?.code).toBe("sarif-invocation-failed");
-    expect(result.coverage[0]?.parseStatus).toBe("partial");
+    expect(result.coverage[0]?.parseStatus).toBe("unavailable");
     expect(result.filesModified).toEqual([]);
   });
 
@@ -69,12 +69,12 @@ describe("SARIF import boundary", () => {
     expect("code" in outside).toBe(false);
     if (!("code" in outside))
       expect(outside.diagnostics.map((diagnostic) => diagnostic.code)).toContain("sarif-path-outside-root");
-    if (!("code" in outside)) expect(outside.coverage[0]?.parseStatus).toBe("partial");
+    if (!("code" in outside)) expect(outside.coverage[0]?.parseStatus).toBe("unavailable");
     const malformed = importSarif({version: "2.0.0", runs: []}, "/repo", "a".repeat(64));
     expect("code" in malformed && malformed.code).toBe("invalid-sarif");
   });
 
-  it("counts unique result locations as analyzed files", () => {
+  it("keeps result locations distinct from analyzed-file coverage", () => {
     const result = importSarif(
       {
         version: "2.1.0",
@@ -100,7 +100,29 @@ describe("SARIF import boundary", () => {
     expect("code" in result).toBe(false);
     if ("code" in result) return;
     expect(result.findings).toHaveLength(2);
-    expect(result.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
+    expect(result.coverage[0]).toMatchObject({
+      filesDiscovered: 1,
+      filesAnalyzed: 0,
+      parseStatus: "unavailable",
+      skippedFiles: ["src/example.ts"],
+    });
+  });
+
+  it.each([
+    {version: "2.1.0", runs: []},
+    {
+      version: "2.1.0",
+      runs: [{tool: {driver: {name: "tool"}}, invocations: [{executionSuccessful: true}], results: []}],
+    },
+  ])("does not turn result-free SARIF into complete coverage", (input) => {
+    const result = importSarif(input, "/repo", "a".repeat(64));
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.coverage[0]).toMatchObject({
+      filesDiscovered: 0,
+      filesAnalyzed: 0,
+      parseStatus: "unavailable",
+    });
   });
 
   it("keeps a reused SARIF fingerprint distinct across locations and removes exact duplicates", () => {

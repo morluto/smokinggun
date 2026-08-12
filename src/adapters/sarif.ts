@@ -54,7 +54,7 @@ export function importSarif(
   const parsed = sarifDocument.safeParse(input);
   if (!parsed.success || parsed.data.version !== "2.1.0")
     return {
-      schemaVersion: "footgun.problem.v1",
+      schemaVersion: "smokinggun.problem.v1",
       _tag: "ProtocolProblem",
       code: "invalid-sarif",
       message: "The artifact is not SARIF 2.1.0.",
@@ -70,7 +70,7 @@ export function importSarif(
     scannerNames.push(scanner);
     if (run.invocations?.some((invocation) => invocation.executionSuccessful === false))
       diagnostics.push({
-        schemaVersion: "footgun.problem.v1",
+        schemaVersion: "smokinggun.problem.v1",
         code: "sarif-invocation-failed",
         message: `SARIF run ${runIndex} reported an unsuccessful invocation.`,
         recovery: "Inspect the preserved SARIF artifact before treating imported findings as complete.",
@@ -80,7 +80,7 @@ export function importSarif(
       const path = location?.artifactLocation?.uri;
       if (location === undefined || path === undefined) {
         diagnostics.push({
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "sarif-location-missing",
           message: `SARIF result ${runIndex}:${resultIndex} has no primary location.`,
           recovery: "Re-run the external scanner with file locations enabled.",
@@ -90,7 +90,7 @@ export function importSarif(
       const portablePath = normalizeSarifPath(path, root);
       if (portablePath === undefined) {
         diagnostics.push({
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "sarif-path-outside-root",
           message: `SARIF result ${runIndex}:${resultIndex} is outside the repository boundary.`,
           recovery: "Regenerate SARIF with repository-relative artifact URIs.",
@@ -101,7 +101,7 @@ export function importSarif(
       const line = Math.max(1, region?.startLine ?? 1);
       const fingerprint =
         result.fingerprints === undefined ? `${path}\0${line}\0${resultIndex}` : stableJson(result.fingerprints);
-      const id = `fg_${createHash("sha256")
+      const id = `sg_${createHash("sha256")
         .update(
           `${scanner}\0${result.ruleId ?? "unknown"}\0${portablePath}\0${line}\0${Math.max(0, (region?.startColumn ?? 1) - 1)}\0${Math.max(line, region?.endLine ?? line)}\0${Math.max(0, (region?.endColumn ?? region?.startColumn ?? 1) - 1)}\0${fingerprint}`,
         )
@@ -109,7 +109,7 @@ export function importSarif(
         .slice(0, 16)}`;
       if (findingIds.has(id)) {
         diagnostics.push({
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "sarif-finding-duplicate",
           message: `SARIF result ${runIndex}:${resultIndex} duplicates an imported finding identity.`,
           recovery: "Inspect duplicate SARIF results; SmokingGun retained the first occurrence.",
@@ -124,7 +124,7 @@ export function importSarif(
         runProperties: run.properties,
       });
       findings.push({
-        schemaVersion: "footgun.finding.v2",
+        schemaVersion: "smokinggun.finding.v2",
         id,
         scanner: `sarif:${scanner}`,
         scannerVersion: driver.version ?? "unknown",
@@ -160,37 +160,33 @@ export function importSarif(
       comparePortable(left.id, right.id),
   );
   const analyzedPaths = new Set(findings.map((finding) => finding.location.path));
-  const coverageComplete = diagnostics.length === 0;
   return {
-    schemaVersion: "footgun.scan-report.v2",
+    schemaVersion: "smokinggun.scan-report.v2",
     tool: toolIdentity,
     repository: {root: ".", revision: null, dirty: false},
     configDigest,
     findings,
     coverage: [
       {
-        scanner: "footgun.sarif-import",
+        scanner: "smokinggun.sarif-import",
         version: "1.0.0",
         language: "mixed",
         filesDiscovered: analyzedPaths.size,
-        filesAnalyzed: analyzedPaths.size,
-        parseStatus: coverageComplete ? "complete" : "partial",
-        skippedFiles: [],
-        ...(coverageComplete
-          ? {
-              reason:
-                scannerNames.length === 0
-                  ? "SARIF contained no runs."
-                  : `Imported ${scannerNames.join(", ")}; file coverage reflects unique result locations.`,
-            }
-          : {
-              reason: `SARIF import retained ${analyzedPaths.size} located file${analyzedPaths.size === 1 ? "" : "s"} with ${diagnostics.length} diagnostic${diagnostics.length === 1 ? "" : "s"}.`,
-            }),
+        filesAnalyzed: 0,
+        parseStatus: "unavailable",
+        skippedFiles: [...analyzedPaths].sort(comparePortable),
+        reason:
+          scannerNames.length === 0
+            ? "SARIF contained no runs and does not establish an analyzed file scope."
+            : `Imported results from ${scannerNames.join(", ")}, but result locations do not establish external scan coverage.`,
       },
     ],
     diagnostics,
     timings: {startedAt: new Date().toISOString(), durationMs: 0},
-    assumptions: ["Imported third-party SARIF results are evidence references, not independent SmokingGun findings."],
+    assumptions: [
+      "Imported third-party SARIF results are evidence references, not independent SmokingGun findings.",
+      "SARIF result locations identify files with findings, not the complete file set analyzed by the producer.",
+    ],
     filesModified: [],
     rawArtifacts: rawArtifact === undefined ? [] : [rawArtifact],
     rawArtifactDigests: {},

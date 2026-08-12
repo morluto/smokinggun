@@ -4,7 +4,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.trace-summary.v1"
+      "const": "smokinggun.trace-summary.v1"
     },
     "id": {
       "type": "string",
@@ -63,6 +63,14 @@
       "items": {
         "type": "string"
       }
+    },
+    "sourceRowCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "truncated": {
+      "type": "boolean"
     }
   },
   "required": [

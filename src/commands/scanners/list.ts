@@ -36,7 +36,7 @@ export default class ScannersList extends BaseCommand {
       ),
     ].join("\n");
     await printResult(
-      {schemaVersion: "footgun.scanners.v1", scanners, diagnostics: external.diagnostics},
+      {schemaVersion: "smokinggun.scanners.v1", scanners, diagnostics: external.diagnostics},
       human,
       context,
     );

@@ -5,7 +5,6 @@ import {z} from "zod";
 import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {probeTreeSitter} from "../parsers/tree-sitter-runtime.js";
-import {probeIsolation} from "../execution/capabilities.js";
 import {toolIdentity} from "../tool-identity.js";
 import {adapterExecutionNotAuthorized, loadExternalAdapters} from "../scanners/external.js";
 import {listScanners} from "../scanners/registry.js";
@@ -15,7 +14,6 @@ export default class Doctor extends BaseCommand {
   static override flags = {
     ...globalFlags,
     "check-updates": Flags.boolean({description: "Perform an explicit bounded npm registry check.", default: false}),
-    "probe-isolation": Flags.boolean({description: "Probe optional local isolation executables.", default: false}),
   };
 
   public async run(): Promise<void> {
@@ -26,27 +24,13 @@ export default class Doctor extends BaseCommand {
     const registry = parsed.flags["check-updates"]
       ? await checkRegistry(context.config.cwd, context.signal)
       : {state: "not-requested" as const};
-    const isolation = parsed.flags["probe-isolation"] ? await probeIsolation(context.signal) : [];
     const external = await loadExternalAdapters(context.config.adapters, context.config.cwd, {
       signal: context.signal,
       authorization: adapterExecutionNotAuthorized,
     });
     const scanners = listScanners(external.descriptors);
-    const hostControls = {
-      processTree: {
-        status: "best-effort",
-        mechanism: "execa cleanup and forceKillAfterDelay",
-        limitation:
-          process.platform === "win32"
-            ? "Windows job-object accounting is not asserted by the host runner."
-            : "Child-process cleanup is delegated to the host runner.",
-      },
-      filesystemIsolation: process.platform === "linux" ? "optional-namespace-runners" : "unavailable-in-core",
-      networkIsolation: process.platform === "linux" ? "bwrap-nsjail-or-container" : "unavailable-in-core",
-      platform: process.platform,
-    };
     const result = {
-      schemaVersion: "footgun.doctor.v1",
+      schemaVersion: "smokinggun.doctor.v1",
       version: toolIdentity.version,
       node: process.versions.node,
       platform: process.platform,
@@ -55,14 +39,8 @@ export default class Doctor extends BaseCommand {
       network: registry,
       grammarLockPresent: lock.length > 2,
       treeSitter,
-      isolation,
-      hostControls,
       scanners,
     };
-    const isolationSummary =
-      isolation.length === 0
-        ? "not requested"
-        : isolation.map((entry) => `${entry.backend}: ${entry.available ? "available" : entry.reason}`).join(", ");
     const scannerSummary = scanners.map((scanner) => `${scanner.id}: ${scanner.availability}`).join(", ");
     const human = [
       `SmokingGun ${toolIdentity.version}`,
@@ -71,7 +49,6 @@ export default class Doctor extends BaseCommand {
       `Network checks: ${registry.state}`,
       `Scanners: ${scannerSummary}`,
       `Tree-sitter runtime: ${treeSitter.runtime}; grammars: ${treeSitter.grammars} (${treeSitter.languages.length} loaded)`,
-      `Isolation probes: ${isolationSummary}`,
     ].join("\n");
     await printResult(result, human, context);
   }

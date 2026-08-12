@@ -1,10 +1,10 @@
 import {createHash} from "node:crypto";
-import {readFile} from "node:fs/promises";
+import {readFile, realpath} from "node:fs/promises";
 import {homedir} from "node:os";
-import {dirname, isAbsolute, join, resolve} from "node:path";
+import {basename, dirname, isAbsolute, join, resolve} from "node:path";
 import {z} from "zod";
 import type {ProblemV1} from "./protocol/index.js";
-import {comparePortable} from "./paths.js";
+import {comparePortable, isWithinRoot} from "./paths.js";
 import {stableJson} from "./serialization.js";
 
 const outputFormats = ["human", "json", "markdown", "sarif"] as const;
@@ -79,8 +79,9 @@ const defaults: FileConfig = {
 export async function loadConfig(
   overrides: CliOverrides,
   environment: NodeJS.ProcessEnv = process.env,
+  invocationCwd: string = process.cwd(),
 ): Promise<RuntimeConfig | ConfigFailure> {
-  const cwdInput = overrides.cwd ?? environment.SMOKINGGUN_CWD ?? process.cwd();
+  const cwdInput = overrides.cwd ?? environment.SMOKINGGUN_CWD ?? invocationCwd;
   const initialCwd = resolve(cwdInput);
   const explicitPath = overrides.config ?? environment.SMOKINGGUN_CONFIG;
   let configPath: string | undefined;
@@ -124,10 +125,45 @@ export async function loadConfig(
       : configPath === undefined
         ? initialCwd
         : dirname(configPath);
+  const resolvedOutput = merged.output === undefined ? undefined : resolve(outputBase, merged.output);
+  const resolvedAdapters = resolveAdapterPaths(
+    merged.adapters ?? [],
+    configPath === undefined ? initialCwd : dirname(configPath),
+  );
+
+  // Validate auto-discovered config paths to prevent traversal attacks (#73)
+  if (configPath !== undefined && explicitPath === undefined) {
+    const configRoot = await canonicalProspectivePath(dirname(configPath));
+    const canonicalCwd = await canonicalProspectivePath(cwd);
+    if (fileValues.cwd !== undefined && !isWithinRoot(configRoot, canonicalCwd)) {
+      return configFailure(
+        "config-path-traversal",
+        "Auto-discovered configuration sets a working directory outside its project root.",
+        `cwd resolves to ${cwd}, which escapes ${configRoot}. Use --cwd to override explicitly.`,
+      );
+    }
+    if (resolvedOutput !== undefined && !isWithinRoot(configRoot, await canonicalProspectivePath(resolvedOutput))) {
+      return configFailure(
+        "config-path-traversal",
+        "Auto-discovered configuration sets an output path outside its project root.",
+        `output resolves to ${resolvedOutput}, which escapes ${configRoot}. Use --output to override explicitly.`,
+      );
+    }
+    for (const adapterPath of resolvedAdapters) {
+      if (!isWithinRoot(configRoot, await canonicalProspectivePath(adapterPath))) {
+        return configFailure(
+          "config-path-traversal",
+          "Auto-discovered configuration references an adapter outside its project root.",
+          `adapter ${adapterPath} escapes ${configRoot}. Use --adapter to override explicitly.`,
+        );
+      }
+    }
+  }
+
   const normalized: RuntimeConfig = {
     cwd,
     format: merged.format ?? "human",
-    output: merged.output === undefined ? undefined : resolve(outputBase, merged.output),
+    output: resolvedOutput,
     noColor: merged.noColor ?? false,
     quiet: merged.quiet ?? false,
     debug: merged.debug ?? false,
@@ -135,7 +171,7 @@ export async function loadConfig(
     strict: merged.strict ?? false,
     failOn: merged.failOn,
     exclude: uniqueSorted(merged.exclude ?? []),
-    adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
+    adapters: resolvedAdapters,
     maxFindings: merged.maxFindings ?? 80,
     source,
     digest: digestConfig({
@@ -148,11 +184,28 @@ export async function loadConfig(
       strict: merged.strict ?? false,
       failOn: merged.failOn,
       exclude: uniqueSorted(merged.exclude ?? []),
-      adapters: resolveAdapterPaths(merged.adapters ?? [], configPath === undefined ? initialCwd : dirname(configPath)),
+      adapters: resolvedAdapters,
       maxFindings: merged.maxFindings ?? 80,
     }),
   };
   return normalized;
+}
+
+async function canonicalProspectivePath(path: string): Promise<string> {
+  const missingSegments: string[] = [];
+  let existing = resolve(path);
+  while (true) {
+    try {
+      const canonical = await realpath(existing);
+      return resolve(canonical, ...missingSegments.reverse());
+    } catch (cause: unknown) {
+      if (!isErrno(cause, "ENOENT")) throw cause;
+      const parent = dirname(existing);
+      if (parent === existing) throw cause;
+      missingSegments.push(basename(existing));
+      existing = parent;
+    }
+  }
 }
 
 async function readJsonConfig(
@@ -276,7 +329,7 @@ function isOutputFormat(value: string): value is OutputFormat {
 function configFailure(code: string, message: string, detail: string): ConfigFailure {
   return {
     _tag: "ConfigFailure",
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code,
     message,
     detail,

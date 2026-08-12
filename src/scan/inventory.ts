@@ -79,7 +79,7 @@ export async function buildRepositoryInventory(
   );
   const generated = relativeFiles.filter((file) => /(?:^|\/)(?:generated|gen|dist|build|coverage)(?:\/|$)/i.test(file));
   const valueWithoutDigest = {
-    schemaVersion: "footgun.repository-inventory.v1" as const,
+    schemaVersion: "smokinggun.repository-inventory.v1" as const,
     languages: [...languageCounts.entries()]
       .sort(([left], [right]) => comparePortable(left, right))
       .map(([language, value]) => ({

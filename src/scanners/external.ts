@@ -2,8 +2,9 @@ import {readFile} from "node:fs/promises";
 import {isAbsolute, relative, resolve} from "node:path";
 import {execa} from "execa";
 import {Protocol, type AdapterManifestV1, type ProblemV1} from "../protocol/index.js";
-import {executionEnvironment, redactSensitive} from "../execution/environment.js";
+import {executionEnvironment, redactSensitive} from "../adapters/environment.js";
 import {comparePortable, portablePath} from "../paths.js";
+import {sandboxAdapterCommand} from "../adapters/sandbox.js";
 import type {ScannerDescriptor} from "./registry.js";
 
 export type ExternalScannerDescriptor = ScannerDescriptor & {
@@ -152,7 +153,11 @@ export async function parseExternalAdapters(
 export async function resolveExternalAdapters(
   parsed: ParsedExternalAdapters,
   root: string,
-  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly authorization: AdapterExecutionAuthorization;
+    readonly runtimeRoots?: ReadonlyArray<string>;
+  },
 ): Promise<LoadedExternalAdapters> {
   const {signal} = options;
   const executionAuthorized = options.authorization._tag === "AdapterExecutionAuthorized";
@@ -207,7 +212,7 @@ export async function resolveExternalAdapters(
       adapters.push({manifest, path, descriptor});
       continue;
     }
-    const probe = await probeExternalAdapter(manifest, root, signal);
+    const probe = await probeExternalAdapter(manifest, root, options.runtimeRoots, signal);
     const descriptor: ExternalScannerDescriptor = probe.available
       ? {
           id: manifest.id,
@@ -242,7 +247,11 @@ export async function resolveExternalAdapters(
 export async function loadExternalAdapters(
   paths: ReadonlyArray<string>,
   root: string,
-  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly authorization: AdapterExecutionAuthorization;
+    readonly runtimeRoots?: ReadonlyArray<string>;
+  },
 ): Promise<LoadedExternalAdapters> {
   const parsed = await parseExternalAdapters(paths, root, options.signal);
   return resolveExternalAdapters(parsed, root, options);
@@ -251,13 +260,14 @@ export async function loadExternalAdapters(
 async function probeExternalAdapter(
   manifest: AdapterManifestV1,
   root: string,
+  runtimeRoots?: ReadonlyArray<string>,
   signal?: AbortSignal,
 ): Promise<ExternalAdapterProbe> {
   const command = manifest.probeCommand ?? [manifest.command[0] ?? "", "--version"];
-  const executable = command[0];
-  if (executable === undefined || executable === "") return {available: false, reason: "The adapter command is empty."};
+  const sandboxed = await sandboxAdapterCommand(command, root, runtimeRoots);
+  if ("schemaVersion" in sandboxed) return {available: false, reason: sandboxed.message};
   try {
-    const result = await execa(executable, command.slice(1), {
+    const result = await execa(sandboxed.executable, sandboxed.arguments, {
       cwd: root,
       env: executionEnvironment({}, false),
       extendEnv: false,
@@ -285,7 +295,7 @@ async function probeExternalAdapter(
 
 function problem(code: string, message: string, detail: string, path?: string): ProblemV1 {
   return {
-    schemaVersion: "footgun.problem.v1",
+    schemaVersion: "smokinggun.problem.v1",
     code,
     message,
     detail,

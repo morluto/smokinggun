@@ -1,7 +1,6 @@
 import {readFile} from "node:fs/promises";
 import {resolve} from "node:path";
 import {expect, it} from "vitest";
-import {scanSource} from "./scanners/structural.js";
 import {scanTypeScript} from "./scanners/typescript-semantic.js";
 import {parseWithTreeSitter} from "./parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "./scanners/tree-sitter-structural.js";
@@ -26,11 +25,8 @@ it("meets the labeled corpus precision and recall gate for the shipped rules", a
     const file = resolve(corpus, testCase.path);
     const source = await readFile(file, "utf8");
     const treeStructural = await scanWithTreeSitter(testCase.path, source);
-    const structural = (
-      treeStructural.coverage.status === "complete"
-        ? treeStructural.findings
-        : scanSource(testCase.path, source).findings
-    ).map((finding) => finding.ruleId);
+    expect(treeStructural.coverage.status, `${testCase.path} structural coverage`).toBe("complete");
+    const structural = treeStructural.findings.map((finding) => finding.ruleId);
     const semantic = (await scanTypeScript(corpus, [file])).findings.map((finding) => finding.ruleId);
     if (testCase.language === "python")
       semantic.push(...(await scanPythonSemantic(testCase.path, source)).findings.map((finding) => finding.ruleId));

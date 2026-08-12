@@ -5,15 +5,16 @@ import type {RuntimeContext} from "../cli/context.js";
 import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
-import {join} from "node:path";
 import {writeResult} from "../cli/output.js";
 import {renderCommandResult} from "../cli/command-output.js";
-import {parseMeasurementArtifact} from "../execution/measure.js";
+import {parseMeasurementArtifact} from "../measurements/artifacts.js";
 import {
   appendInvestigationEvidence,
   appendInvestigationReport,
   loadLatestInvestigation,
+  recordImportedInvestigationMeasurements,
   recordParsedInvestigationSnapshot,
+  type InvestigationMeasurementImport,
 } from "../investigations/store.js";
 import {
   Protocol,
@@ -27,9 +28,7 @@ import {
   buildMultiScalingComparison,
   buildScalingComparison,
   classifyComparableMeasurementArtifacts,
-  type ComparisonArtifactDigests,
-} from "../execution/compare.js";
-import {writeFileAtomically} from "../files.js";
+} from "../measurements/compare.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -49,6 +48,10 @@ export default class Compare extends BaseCommand {
       if ("code" in candidate) this.emitProblem(candidate, 2, context);
       const artifacts = classifyComparableMeasurementArtifacts(baseline, candidate);
       if ("code" in artifacts) this.emitProblem(artifacts, 2, context);
+      const inputs: ComparisonInputs = {
+        baseline: {path: parsed.args.baseline, bytes: baselineBytes, digest: digest(baselineBytes)},
+        candidate: {path: parsed.args.candidate, bytes: candidateBytes, digest: digest(candidateBytes)},
+      };
       if (
         artifacts.kind === "measurement" &&
         (artifacts.baseline.statisticalPolicy.kind !== artifacts.candidate.statisticalPolicy.kind ||
@@ -57,46 +60,32 @@ export default class Compare extends BaseCommand {
       )
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "statistical-policy-mismatch",
             message: "Baseline and candidate measurements use different statistical policies.",
-            recovery: "Measure both artifacts from the same WorkloadV2 descriptor and policy.",
+            recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
           },
           2,
           context,
         );
       if (artifacts.kind === "single-scaling") {
-        await this.compareScaling(
-          artifacts.baseline,
-          artifacts.candidate,
-          parsed.args.baseline,
-          parsed.args.candidate,
-          [digest(baselineBytes), digest(candidateBytes)],
-          context,
-        );
+        await this.compareScaling(artifacts.baseline, artifacts.candidate, inputs, context);
         return;
       }
       if (artifacts.kind === "multi-scaling") {
-        await this.compareMultiScaling(
-          artifacts.baseline,
-          artifacts.candidate,
-          parsed.args.baseline,
-          parsed.args.candidate,
-          [digest(baselineBytes), digest(candidateBytes)],
-          context,
-        );
+        await this.compareMultiScaling(artifacts.baseline, artifacts.candidate, inputs, context);
         return;
       }
       const {baseline: measurementBaseline, candidate: measurementCandidate} = artifacts;
       if (!measurementBaseline.behaviorValidated || !measurementCandidate.behaviorValidated) {
         this.emitActionRequired(
           {
-            schemaVersion: "footgun.action-required.v1",
+            schemaVersion: "smokinggun.action-required.v1",
             reason: "behavior-validation-required",
             explanation:
               "The measurement artifacts do not establish behavioral equivalence, so the comparison cannot be promoted.",
             recoveryCommands: [
-              "Add explicit behavior checks to WorkloadV2, validate them, then rerun measure and compare.",
+              "Produce both artifacts with explicit behavior checks, then import and compare them again.",
             ],
           },
           context,
@@ -105,11 +94,11 @@ export default class Compare extends BaseCommand {
       const result = buildMeasurementComparison(
         measurementBaseline,
         measurementCandidate,
-        parsed.args.baseline,
-        parsed.args.candidate,
-        [digest(baselineBytes), digest(candidateBytes)],
+        inputs.baseline.path,
+        inputs.candidate.path,
+        [inputs.baseline.digest, inputs.candidate.digest],
       );
-      await this.storeComparison(result, context, measurementBaseline, measurementCandidate);
+      await this.storeComparison(result, context, measurementBaseline, measurementCandidate, inputs);
       await this.writeComparison(
         result,
         `Comparison\nBaseline median: ${measurementBaseline.medianMs.toFixed(3)} ms\nCandidate median: ${measurementCandidate.medianMs.toFixed(3)} ms\nChange: ${result.deltaPercent?.toFixed(2) ?? "n/a"}%`,
@@ -120,7 +109,7 @@ export default class Compare extends BaseCommand {
       if (context.signal.aborted)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "cancelled",
             message: "The comparison was cancelled.",
             recovery: "Rerun the comparison when both artifacts are available.",
@@ -131,7 +120,7 @@ export default class Compare extends BaseCommand {
       const message = cause instanceof Error ? cause.message : "Comparison failed.";
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "comparison-failed",
           message,
           recovery: "Pass two valid MeasurementV1 or ScalingAnalysisV2 JSON artifacts.",
@@ -145,12 +134,9 @@ export default class Compare extends BaseCommand {
   private async compareScaling(
     baseline: ScalingAnalysisV2,
     candidate: ScalingAnalysisV2,
-    baselinePath: string,
-    candidatePath: string,
-    digests: ComparisonArtifactDigests,
+    inputs: ComparisonInputs,
     context: RuntimeContext,
   ): Promise<void> {
-    const [baselineDigest, candidateDigest] = digests;
     if (
       baseline.parameter !== candidate.parameter ||
       baseline.points.length !== candidate.points.length ||
@@ -158,10 +144,10 @@ export default class Compare extends BaseCommand {
     ) {
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "scaling-points-mismatch",
           message: "Baseline and candidate scaling artifacts do not use the same parameter points.",
-          recovery: "Measure both artifacts from the same immutable parameterized WorkloadV2 descriptor.",
+          recovery: "Import artifacts produced with the same immutable benchmark plan and scaling points.",
         },
         2,
         context,
@@ -177,10 +163,10 @@ export default class Compare extends BaseCommand {
     )
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "statistical-policy-mismatch",
           message: "Baseline and candidate scaling points use different statistical policies.",
-          recovery: "Measure both artifacts from the same parameterized WorkloadV2 descriptor and policy.",
+          recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
         },
         2,
         context,
@@ -191,21 +177,21 @@ export default class Compare extends BaseCommand {
     ) {
       this.emitActionRequired(
         {
-          schemaVersion: "footgun.action-required.v1",
+          schemaVersion: "smokinggun.action-required.v1",
           reason: "behavior-validation-required",
           explanation: "The scaling artifacts do not establish behavioral equivalence at every input point.",
           recoveryCommands: [
-            "Add explicit behavior checks to WorkloadV2, validate every point, then rerun measure and compare.",
+            "Produce both artifacts with explicit behavior checks at every point, then import and compare them again.",
           ],
         },
         context,
       );
     }
-    const result = buildScalingComparison(baseline, candidate, baselinePath, candidatePath, [
-      baselineDigest,
-      candidateDigest,
+    const result = buildScalingComparison(baseline, candidate, inputs.baseline.path, inputs.candidate.path, [
+      inputs.baseline.digest,
+      inputs.candidate.digest,
     ]);
-    await this.storeComparison(result, context, baseline, candidate);
+    await this.storeComparison(result, context, baseline, candidate, inputs);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
       result,
@@ -217,12 +203,9 @@ export default class Compare extends BaseCommand {
   private async compareMultiScaling(
     baseline: ScalingAnalysisV3,
     candidate: ScalingAnalysisV3,
-    baselinePath: string,
-    candidatePath: string,
-    digests: ComparisonArtifactDigests,
+    inputs: ComparisonInputs,
     context: RuntimeContext,
   ): Promise<void> {
-    const [baselineDigest, candidateDigest] = digests;
     const baselineCoordinates = baseline.points.map((point) => point.coordinates);
     const candidateCoordinates = candidate.points.map((point) => point.coordinates);
     const computedBaselineCoordinatesDigest = createHash("sha256")
@@ -240,10 +223,10 @@ export default class Compare extends BaseCommand {
     )
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "scaling-points-mismatch",
           message: "Baseline and candidate scaling artifacts do not use the same named coordinate grid.",
-          recovery: "Measure both artifacts from the same immutable multi-parameter workload descriptor.",
+          recovery: "Import artifacts produced with the same immutable benchmark plan and coordinates.",
         },
         2,
         context,
@@ -258,10 +241,10 @@ export default class Compare extends BaseCommand {
     )
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "statistical-policy-mismatch",
           message: "Baseline and candidate scaling coordinates use different statistical policies.",
-          recovery: "Measure both artifacts from the same immutable multi-parameter workload descriptor and policy.",
+          recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
         },
         2,
         context,
@@ -272,20 +255,20 @@ export default class Compare extends BaseCommand {
     )
       this.emitActionRequired(
         {
-          schemaVersion: "footgun.action-required.v1",
+          schemaVersion: "smokinggun.action-required.v1",
           reason: "behavior-validation-required",
           explanation: "The scaling artifacts do not establish behavioral equivalence at every coordinate.",
           recoveryCommands: [
-            "Add explicit behavior checks to WorkloadV2, validate every coordinate, then rerun measure and compare.",
+            "Produce both artifacts with explicit behavior checks at every coordinate, then import and compare them again.",
           ],
         },
         context,
       );
-    const result = buildMultiScalingComparison(baseline, candidate, baselinePath, candidatePath, [
-      baselineDigest,
-      candidateDigest,
+    const result = buildMultiScalingComparison(baseline, candidate, inputs.baseline.path, inputs.candidate.path, [
+      inputs.baseline.digest,
+      inputs.candidate.digest,
     ]);
-    await this.storeComparison(result, context, baseline, candidate);
+    await this.storeComparison(result, context, baseline, candidate, inputs);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
       result,
@@ -299,11 +282,14 @@ export default class Compare extends BaseCommand {
     context: RuntimeContext,
     baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
     candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    inputs: ComparisonInputs,
   ): Promise<void> {
     const comparison = Protocol.comparison.parse(result);
-    const directory = join(context.artifacts, "comparisons");
+    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
     const artifact = `${comparison.id}.json`;
-    const report = `../comparisons/${artifact}`;
+    const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
+    const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
+    const report = storedArtifact.reference;
     const investigationIds = [
       ...new Set(
         [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
@@ -313,6 +299,26 @@ export default class Compare extends BaseCommand {
     for (const investigationId of investigationIds) {
       const investigation = await loadLatestInvestigation(context.artifacts, investigationId);
       if (investigation === undefined) continue;
+      const baselineInputDigest = "baselineDigest" in comparison ? comparison.baselineDigest : undefined;
+      const candidateInputDigest = "candidateDigest" in comparison ? comparison.candidateDigest : undefined;
+      const requiredInputDigests = [
+        ...(baseline.investigation === investigationId && baselineInputDigest !== undefined
+          ? [baselineInputDigest]
+          : []),
+        ...(candidate.investigation === investigationId && candidateInputDigest !== undefined
+          ? [candidateInputDigest]
+          : []),
+      ];
+      const retainedDigests = new Set(
+        investigation.bundle.evidence.flatMap((evidence) =>
+          evidence.kind === "measurement" && evidence.digest !== undefined ? [evidence.digest] : [],
+        ),
+      );
+      const missingInput = requiredInputDigests.find((digest) => !retainedDigests.has(digest));
+      if (missingInput !== undefined)
+        throw new Error(
+          `Investigation ${investigationId} does not retain measurement input ${missingInput}; comparisons cannot attach unrelated artifacts.`,
+        );
       if (investigation.bundle.state === "behavior-validated") {
         const comparisonEvidenceId = `${investigationId}:comparison:${comparison.id}`;
         const validationEvidenceId = `${comparisonEvidenceId}:validated`;
@@ -329,36 +335,81 @@ export default class Compare extends BaseCommand {
         throw new Error(
           `Investigation ${investigationId} must be baseline-measured before recording comparison ${comparison.id}.`,
         );
-      pending.push({investigationId, bundle: investigation.bundle});
+      pending.push({investigationId, bundle: investigation.bundle, parentDigest: investigation.digest});
     }
-    await writeFileAtomically(join(directory, artifact), `${JSON.stringify(comparison, null, 2)}\n`);
-    for (const {investigationId, bundle} of pending) {
+    for (const {investigationId, bundle, parentDigest} of pending) {
       const candidateCompared = {
         ...bundle,
         state: "candidate-compared" as const,
         reports: appendInvestigationReport(bundle.reports, report),
         evidence: appendInvestigationEvidence(bundle.evidence, {
-          schemaVersion: "footgun.evidence.v2" as const,
+          schemaVersion: "smokinggun.evidence.v2" as const,
           id: `${investigationId}:comparison:${comparison.id}`,
           kind: "behavior" as const,
           claimClass: "behavioral" as const,
           summary: "Baseline and candidate comparison completed after declared behavior checks",
           artifact: report,
+          digest: storedArtifact.digest,
         }),
       };
-      await recordParsedInvestigationSnapshot(context.artifacts, candidateCompared);
-      await recordParsedInvestigationSnapshot(context.artifacts, {
-        ...candidateCompared,
-        state: "behavior-validated",
-        evidence: appendInvestigationEvidence(candidateCompared.evidence, {
-          schemaVersion: "footgun.evidence.v2" as const,
-          id: `${investigationId}:comparison:${comparison.id}:validated`,
-          kind: "behavior" as const,
-          claimClass: "behavioral" as const,
-          summary: "Baseline and candidate comparison passed declared behavior checks",
-          artifact: report,
-        }),
+      const candidateDigest = await recordParsedInvestigationSnapshot(
+        context.artifacts,
+        candidateCompared,
+        parentDigest,
+      );
+      await recordParsedInvestigationSnapshot(
+        context.artifacts,
+        {
+          ...candidateCompared,
+          state: "behavior-validated",
+          evidence: appendInvestigationEvidence(candidateCompared.evidence, {
+            schemaVersion: "smokinggun.evidence.v2" as const,
+            id: `${investigationId}:comparison:${comparison.id}:validated`,
+            kind: "behavior" as const,
+            claimClass: "behavioral" as const,
+            summary: "Baseline and candidate comparison passed declared behavior checks",
+            artifact: report,
+            digest: storedArtifact.digest,
+          }),
+        },
+        candidateDigest,
+      );
+    }
+  }
+
+  private async importInvestigationMeasurements(
+    context: RuntimeContext,
+    baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    inputs: ComparisonInputs,
+  ): Promise<void> {
+    const investigationIds = [
+      ...new Set(
+        [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
+      ),
+    ];
+    for (const investigationId of investigationIds) {
+      if ((await loadLatestInvestigation(context.artifacts, investigationId)) === undefined) continue;
+      const imports: InvestigationMeasurementImport[] = [];
+      const storedBaseline = await context.artifactStore.putBytes(inputs.baseline.path, inputs.baseline.bytes);
+      if (storedBaseline.digest !== inputs.baseline.digest)
+        throw new Error("The artifact store changed baseline measurement bytes.");
+      imports.push({
+        role: "baseline",
+        artifact: storedBaseline.reference,
+        digest: storedBaseline.digest,
+        claimClass: measurementClaimClass(baseline),
       });
+      const storedCandidate = await context.artifactStore.putBytes(inputs.candidate.path, inputs.candidate.bytes);
+      if (storedCandidate.digest !== inputs.candidate.digest)
+        throw new Error("The artifact store changed candidate measurement bytes.");
+      imports.push({
+        role: "candidate",
+        artifact: storedCandidate.reference,
+        digest: storedCandidate.digest,
+        claimClass: measurementClaimClass(candidate),
+      });
+      await recordImportedInvestigationMeasurements(context.artifacts, investigationId, imports);
     }
   }
 
@@ -371,4 +422,21 @@ export default class Compare extends BaseCommand {
 
 function digest(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+type ComparisonInput = {
+  readonly path: string;
+  readonly bytes: Uint8Array;
+  readonly digest: string;
+};
+
+type ComparisonInputs = {
+  readonly baseline: ComparisonInput;
+  readonly candidate: ComparisonInput;
+};
+
+function measurementClaimClass(
+  measurement: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+): "constant-factor" | "empirical-scaling" {
+  return measurement.schemaVersion === "smokinggun.measurement.v1" ? "constant-factor" : "empirical-scaling";
 }

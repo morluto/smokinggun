@@ -19,8 +19,7 @@ export {
   type ParsedExternalAdapter,
   type ParsedExternalAdapters,
 } from "./scanners/external.js";
-export {measureWorkload, parseMeasurement, parseMeasurementArtifact} from "./execution/measure.js";
-export {measureMultiScaling, measureScaling} from "./execution/scaling.js";
+export {parseMeasurement, parseMeasurementArtifact} from "./measurements/artifacts.js";
 export {importScip} from "./context/scip.js";
 export {buildTypeScriptIndex} from "./context/index.js";
 export {scanPythonSemantic} from "./scanners/python-semantic.js";

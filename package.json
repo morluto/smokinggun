@@ -16,7 +16,7 @@
     "access": "public"
   },
   "bin": {
-    "smokinggun": "dist/bin/footgun.js"
+    "smokinggun": "dist/bin/smokinggun.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -61,7 +61,7 @@
     "pre-commit": "pnpm lint && pnpm format:check && pnpm check:boundaries"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/generate-schemas.mjs && node scripts/set-executable.mjs",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/generate-schemas.mjs && node scripts/set-executable.mjs",
     "changeset": "changeset",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "clean": "node -e \"import('node:fs').then(({rmSync}) => rmSync('dist', {recursive: true, force: true}))\"",
@@ -72,7 +72,7 @@
     "lint": "oxlint",
     "pack:check": "npm pack --dry-run --json",
     "prepare": "simple-git-hooks",
-    "prepack": "npm run clean && npm run build",
+    "prepack": "npm run build",
     "publish:packages": "changeset publish",
     "test": "vitest run",
     "test:cli": "node scripts/cli-smoke.mjs",

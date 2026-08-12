@@ -13,8 +13,8 @@ const schemas = {
   "scan-report-v2": Protocol.scanReport,
   "adapter-manifest-v1": Protocol.adapterManifest,
   "adapter-request-v1": Protocol.adapterRequest,
-  "adapter-result-v2": Protocol.adapterResult,
-  "workload-v2": Protocol.workload,
+  "adapter-result-v2": Protocol.adapterResultV2,
+  "adapter-result-v3": Protocol.adapterResult,
   "evidence-v2": Protocol.evidence,
   "measurement-v1": Protocol.measurement,
   "benchmark-record-v2": Protocol.benchmarkRecord,
@@ -30,13 +30,13 @@ const schemas = {
 
 const semanticSchemas = new Set([
   "adapter-result-v2",
+  "adapter-result-v3",
   "benchmark-import-v2",
   "benchmark-record-v2",
   "evidence-v2",
   "finding-v2",
   "investigation-bundle-v2",
   "scan-report-v2",
-  "workload-v2",
 ]);
 
 await mkdir("schemas", {recursive: true});

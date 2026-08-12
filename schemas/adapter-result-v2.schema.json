@@ -6,7 +6,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.adapter-result.v2"
+          "const": "smokinggun.adapter-result.v2"
         },
         "requestId": {
           "type": "string",
@@ -19,11 +19,11 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.finding.v2"
+                "const": "smokinggun.finding.v2"
               },
               "id": {
                 "type": "string",
-                "pattern": "^fg_[a-f0-9]{16}$"
+                "pattern": "^sg_[a-f0-9]{16}$"
               },
               "scanner": {
                 "type": "string",
@@ -96,7 +96,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^fg_[a-f0-9]{16}$"
+                  "pattern": "^sg_[a-f0-9]{16}$"
                 }
               },
               "message": {
@@ -165,7 +165,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -233,7 +233,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -391,6 +391,14 @@
             "additionalProperties": false
           }
         },
+        "analyzedTargets": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "rawArtifacts": {
           "type": "array",
           "items": {
@@ -409,6 +417,9 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           }
+        },
+        "rawArtifactContents": {
+          "not": {}
         },
         "adapter": {
           "type": "object",
@@ -484,7 +495,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -519,6 +530,7 @@
         "requestId",
         "findings",
         "coverage",
+        "analyzedTargets",
         "rawArtifacts",
         "rawArtifactDigests",
         "state",
@@ -531,7 +543,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.adapter-result.v2"
+          "const": "smokinggun.adapter-result.v2"
         },
         "requestId": {
           "type": "string",
@@ -544,11 +556,11 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.finding.v2"
+                "const": "smokinggun.finding.v2"
               },
               "id": {
                 "type": "string",
-                "pattern": "^fg_[a-f0-9]{16}$"
+                "pattern": "^sg_[a-f0-9]{16}$"
               },
               "scanner": {
                 "type": "string",
@@ -621,7 +633,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^fg_[a-f0-9]{16}$"
+                  "pattern": "^sg_[a-f0-9]{16}$"
                 }
               },
               "message": {
@@ -690,7 +702,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -758,7 +770,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -977,6 +989,14 @@
             ]
           }
         },
+        "analyzedTargets": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "rawArtifacts": {
           "type": "array",
           "items": {
@@ -995,6 +1015,9 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           }
+        },
+        "rawArtifactContents": {
+          "not": {}
         },
         "adapter": {
           "type": "object",
@@ -1070,7 +1093,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -1105,6 +1128,7 @@
         "requestId",
         "findings",
         "coverage",
+        "analyzedTargets",
         "rawArtifacts",
         "rawArtifactDigests",
         "state",
@@ -1117,7 +1141,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "footgun.adapter-result.v2"
+          "const": "smokinggun.adapter-result.v2"
         },
         "requestId": {
           "type": "string",
@@ -1130,11 +1154,11 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.finding.v2"
+                "const": "smokinggun.finding.v2"
               },
               "id": {
                 "type": "string",
-                "pattern": "^fg_[a-f0-9]{16}$"
+                "pattern": "^sg_[a-f0-9]{16}$"
               },
               "scanner": {
                 "type": "string",
@@ -1207,7 +1231,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^fg_[a-f0-9]{16}$"
+                  "pattern": "^sg_[a-f0-9]{16}$"
                 }
               },
               "message": {
@@ -1276,7 +1300,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -1344,7 +1368,7 @@
                       "properties": {
                         "schemaVersion": {
                           "type": "string",
-                          "const": "footgun.evidence.v2"
+                          "const": "smokinggun.evidence.v2"
                         },
                         "id": {
                           "type": "string",
@@ -1563,6 +1587,14 @@
             ]
           }
         },
+        "analyzedTargets": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "rawArtifacts": {
           "type": "array",
           "items": {
@@ -1581,6 +1613,9 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           }
+        },
+        "rawArtifactContents": {
+          "not": {}
         },
         "adapter": {
           "type": "object",
@@ -1662,7 +1697,7 @@
             "properties": {
               "schemaVersion": {
                 "type": "string",
-                "const": "footgun.problem.v1"
+                "const": "smokinggun.problem.v1"
               },
               "code": {
                 "type": "string",
@@ -1697,6 +1732,7 @@
         "requestId",
         "findings",
         "coverage",
+        "analyzedTargets",
         "rawArtifacts",
         "rawArtifactDigests",
         "state",

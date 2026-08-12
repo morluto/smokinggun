@@ -5,7 +5,7 @@ import {expect, it} from "vitest";
 import {writeFileAtomically} from "./files.js";
 
 it("creates parent directories and atomically replaces file contents", async () => {
-  const root = await mkdtemp(join(tmpdir(), "footgun-files-"));
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-files-"));
   try {
     const path = join(root, "nested", "result.json");
     await writeFileAtomically(path, "first");

@@ -4,12 +4,12 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "footgun.adapter-manifest.v1"
+      "const": "smokinggun.adapter-manifest.v1"
     },
     "protocolVersion": {
-      "default": "footgun.adapter.v1",
+      "default": "smokinggun.adapter.v1",
       "type": "string",
-      "const": "footgun.adapter.v1"
+      "const": "smokinggun.adapter.v1"
     },
     "id": {
       "type": "string",

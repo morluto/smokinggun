@@ -29,6 +29,10 @@ export default class Scan extends BaseCommand {
       description: "Authorize execution of explicitly configured external adapters.",
       default: false,
     }),
+    "adapter-runtime-root": Flags.string({
+      description: "Host directory to expose read-only to authorized adapters; repeat for package dependencies.",
+      multiple: true,
+    }),
   };
   static override args = {path: Args.string({description: "Repository or directory to scan.", default: "."})};
 
@@ -40,6 +44,10 @@ export default class Scan extends BaseCommand {
       const scanner = parseOptionalStringArrayFlag(parsed.flags.scanner, "scanner");
       const only = parseOptionalStringArrayFlag(parsed.flags.only, "only");
       const adapter = parseOptionalStringArrayFlag(parsed.flags.adapter, "adapter");
+      const adapterRuntimeRoots = parseOptionalStringArrayFlag(
+        parsed.flags["adapter-runtime-root"],
+        "adapter-runtime-root",
+      )?.map((path) => resolveConfiguredPath(context.config.cwd, path));
       const adapterManifests = [
         ...context.config.adapters,
         ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
@@ -60,9 +68,11 @@ export default class Scan extends BaseCommand {
         maxFindings: context.config.maxFindings,
         signal: context.signal,
         adapters,
+        ...(adapterRuntimeRoots === undefined ? {} : {adapterRuntimeRoots}),
         adapterAuthorization: parsed.flags["allow-adapter-execution"]
           ? adapterExecutionAuthorized
           : adapterExecutionNotAuthorized,
+        retainAdapterArtifact: (_path, bytes) => context.artifactStore.putBytes("adapter-artifact", bytes),
       });
       const rendered = renderScanReport(report, context.config.format);
       await writeResult(rendered, context);
@@ -75,7 +85,7 @@ export default class Scan extends BaseCommand {
         if (context.config.format === "human")
           this.emitProblem(
             {
-              schemaVersion: "footgun.problem.v1",
+              schemaVersion: "smokinggun.problem.v1",
               code: "incomplete-coverage",
               message: "The scan completed with incomplete coverage.",
               recovery: "Inspect diagnostics or rerun without --strict.",
@@ -92,7 +102,7 @@ export default class Scan extends BaseCommand {
       if (context.signal.aborted)
         this.emitProblem(
           {
-            schemaVersion: "footgun.problem.v1",
+            schemaVersion: "smokinggun.problem.v1",
             code: "cancelled",
             message: "The scan was cancelled.",
             recovery: "Rerun the scan when the repository is available.",
@@ -103,7 +113,7 @@ export default class Scan extends BaseCommand {
       const message = cause instanceof Error ? cause.message : "The scan failed unexpectedly.";
       this.emitProblem(
         {
-          schemaVersion: "footgun.problem.v1",
+          schemaVersion: "smokinggun.problem.v1",
           code: "scan-failed",
           message,
           recovery: "Run with --debug for diagnostics.",
