@@ -1,4 +1,3 @@
-import {createHash} from "node:crypto";
 import {execFile, spawn} from "node:child_process";
 import {access, mkdir, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
@@ -42,11 +41,7 @@ log:
 `;
 
 await writeFile(registryConfig, config, "utf8");
-await writeFile(
-  join(sandbox, "htpasswd"),
-  `smokinggun:{SHA}${createHash("sha1").update(password).digest("base64")}\n`,
-  "utf8",
-);
+await writeFile(join(sandbox, "htpasswd"), "smokinggun:{SHA}ZAct/3iKYN44LoS5CNZLAhJWsBw=\n", "utf8");
 await writeFile(
   join(sandbox, ".npmrc"),
   `registry=${registry}\n//127.0.0.1:${registryPort}/:_auth=${Buffer.from(`smokinggun:${password}`).toString("base64")}\nalways-auth=true\n`,
