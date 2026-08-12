@@ -63,3 +63,28 @@ it("imports raw Perfetto traces through an explicitly supplied trace processor",
   expect(result.query).toContain("SELECT name");
   expect(result.rows[0]).toMatchObject({name: "main", dur: 12.5});
 });
+
+it("accepts one terminated Perfetto statement and semicolons inside SQL strings", async () => {
+  for (const query of ["SELECT name FROM slice;", "SELECT ';' AS separator;"]) {
+    const result = await importPerfettoTrace({
+      sourceArtifact: "trace.pftrace",
+      sourceDigest: "a".repeat(64),
+      tracePath: "trace.pftrace",
+      query,
+      executable: process.execPath,
+      executableArgs: ["-e", "process.stdout.write('name\\nmain\\n')"],
+    });
+    expect("code" in result).toBe(false);
+  }
+});
+
+it("rejects multiple Perfetto statements", async () => {
+  const result = await importPerfettoTrace({
+    sourceArtifact: "trace.pftrace",
+    sourceDigest: "a".repeat(64),
+    tracePath: "trace.pftrace",
+    query: "SELECT 1; SELECT 2",
+    executable: process.execPath,
+  });
+  expect(result).toMatchObject({code: "invalid-perfetto-query"});
+});

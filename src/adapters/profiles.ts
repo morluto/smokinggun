@@ -152,11 +152,11 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
       "The Perfetto query is empty or exceeds the bounded query length.",
       "Provide a bounded SQL query of at most 10,000 characters.",
     );
-  if (options.query.includes(";"))
+  if (!isSingleSqlStatement(options.query))
     return problem(
       "invalid-perfetto-query",
       "The Perfetto query contains multiple statements.",
-      "Provide a single SQL statement without semicolons.",
+      "Provide one SQL statement; a single trailing terminator and semicolons inside quoted values are allowed.",
     );
   const executable = options.executable ?? process.env.SMOKINGGUN_TRACE_PROCESSOR ?? "trace_processor";
   try {
@@ -226,6 +226,65 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
         : "Install trace_processor and set SMOKINGGUN_TRACE_PROCESSOR if it is not on PATH.",
     );
   }
+}
+
+function isSingleSqlStatement(query: string): boolean {
+  let quote: "'" | '"' | "`" | "]" | undefined;
+  let isLineComment = false;
+  let isBlockComment = false;
+  let hasTerminator = false;
+  for (let index = 0; index < query.length; index += 1) {
+    const character = query[index];
+    const next = query[index + 1];
+    if (isLineComment) {
+      if (character === "\n" || character === "\r") isLineComment = false;
+      continue;
+    }
+    if (isBlockComment) {
+      if (character === "*" && next === "/") {
+        isBlockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote !== undefined) {
+      const closing = quote;
+      if (character !== closing) continue;
+      if (next === closing) {
+        index += 1;
+        continue;
+      }
+      quote = undefined;
+      continue;
+    }
+    if (character === "-" && next === "-") {
+      isLineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      isBlockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      if (hasTerminator) return false;
+      quote = character;
+      continue;
+    }
+    if (character === "[") {
+      if (hasTerminator) return false;
+      quote = "]";
+      continue;
+    }
+    if (character === ";") {
+      if (hasTerminator) return false;
+      hasTerminator = true;
+      continue;
+    }
+    if (hasTerminator && !/\s/u.test(character ?? "")) return false;
+  }
+  return true;
 }
 
 const scalar = z.union([z.string(), z.number().finite(), z.boolean(), z.null()]);
