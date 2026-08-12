@@ -12,7 +12,9 @@ import {
   appendInvestigationEvidence,
   appendInvestigationReport,
   loadLatestInvestigation,
+  recordImportedInvestigationMeasurements,
   recordParsedInvestigationSnapshot,
+  type InvestigationMeasurementImport,
 } from "../investigations/store.js";
 import {
   Protocol,
@@ -26,7 +28,6 @@ import {
   buildMultiScalingComparison,
   buildScalingComparison,
   classifyComparableMeasurementArtifacts,
-  type ComparisonArtifactDigests,
 } from "../measurements/compare.js";
 
 export default class Compare extends BaseCommand {
@@ -47,6 +48,10 @@ export default class Compare extends BaseCommand {
       if ("code" in candidate) this.emitProblem(candidate, 2, context);
       const artifacts = classifyComparableMeasurementArtifacts(baseline, candidate);
       if ("code" in artifacts) this.emitProblem(artifacts, 2, context);
+      const inputs: ComparisonInputs = {
+        baseline: {path: parsed.args.baseline, bytes: baselineBytes, digest: digest(baselineBytes)},
+        candidate: {path: parsed.args.candidate, bytes: candidateBytes, digest: digest(candidateBytes)},
+      };
       if (
         artifacts.kind === "measurement" &&
         (artifacts.baseline.statisticalPolicy.kind !== artifacts.candidate.statisticalPolicy.kind ||
@@ -64,25 +69,11 @@ export default class Compare extends BaseCommand {
           context,
         );
       if (artifacts.kind === "single-scaling") {
-        await this.compareScaling(
-          artifacts.baseline,
-          artifacts.candidate,
-          parsed.args.baseline,
-          parsed.args.candidate,
-          [digest(baselineBytes), digest(candidateBytes)],
-          context,
-        );
+        await this.compareScaling(artifacts.baseline, artifacts.candidate, inputs, context);
         return;
       }
       if (artifacts.kind === "multi-scaling") {
-        await this.compareMultiScaling(
-          artifacts.baseline,
-          artifacts.candidate,
-          parsed.args.baseline,
-          parsed.args.candidate,
-          [digest(baselineBytes), digest(candidateBytes)],
-          context,
-        );
+        await this.compareMultiScaling(artifacts.baseline, artifacts.candidate, inputs, context);
         return;
       }
       const {baseline: measurementBaseline, candidate: measurementCandidate} = artifacts;
@@ -103,11 +94,11 @@ export default class Compare extends BaseCommand {
       const result = buildMeasurementComparison(
         measurementBaseline,
         measurementCandidate,
-        parsed.args.baseline,
-        parsed.args.candidate,
-        [digest(baselineBytes), digest(candidateBytes)],
+        inputs.baseline.path,
+        inputs.candidate.path,
+        [inputs.baseline.digest, inputs.candidate.digest],
       );
-      await this.storeComparison(result, context, measurementBaseline, measurementCandidate);
+      await this.storeComparison(result, context, measurementBaseline, measurementCandidate, inputs);
       await this.writeComparison(
         result,
         `Comparison\nBaseline median: ${measurementBaseline.medianMs.toFixed(3)} ms\nCandidate median: ${measurementCandidate.medianMs.toFixed(3)} ms\nChange: ${result.deltaPercent?.toFixed(2) ?? "n/a"}%`,
@@ -143,12 +134,9 @@ export default class Compare extends BaseCommand {
   private async compareScaling(
     baseline: ScalingAnalysisV2,
     candidate: ScalingAnalysisV2,
-    baselinePath: string,
-    candidatePath: string,
-    digests: ComparisonArtifactDigests,
+    inputs: ComparisonInputs,
     context: RuntimeContext,
   ): Promise<void> {
-    const [baselineDigest, candidateDigest] = digests;
     if (
       baseline.parameter !== candidate.parameter ||
       baseline.points.length !== candidate.points.length ||
@@ -199,11 +187,11 @@ export default class Compare extends BaseCommand {
         context,
       );
     }
-    const result = buildScalingComparison(baseline, candidate, baselinePath, candidatePath, [
-      baselineDigest,
-      candidateDigest,
+    const result = buildScalingComparison(baseline, candidate, inputs.baseline.path, inputs.candidate.path, [
+      inputs.baseline.digest,
+      inputs.candidate.digest,
     ]);
-    await this.storeComparison(result, context, baseline, candidate);
+    await this.storeComparison(result, context, baseline, candidate, inputs);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
       result,
@@ -215,12 +203,9 @@ export default class Compare extends BaseCommand {
   private async compareMultiScaling(
     baseline: ScalingAnalysisV3,
     candidate: ScalingAnalysisV3,
-    baselinePath: string,
-    candidatePath: string,
-    digests: ComparisonArtifactDigests,
+    inputs: ComparisonInputs,
     context: RuntimeContext,
   ): Promise<void> {
-    const [baselineDigest, candidateDigest] = digests;
     const baselineCoordinates = baseline.points.map((point) => point.coordinates);
     const candidateCoordinates = candidate.points.map((point) => point.coordinates);
     const computedBaselineCoordinatesDigest = createHash("sha256")
@@ -279,11 +264,11 @@ export default class Compare extends BaseCommand {
         },
         context,
       );
-    const result = buildMultiScalingComparison(baseline, candidate, baselinePath, candidatePath, [
-      baselineDigest,
-      candidateDigest,
+    const result = buildMultiScalingComparison(baseline, candidate, inputs.baseline.path, inputs.candidate.path, [
+      inputs.baseline.digest,
+      inputs.candidate.digest,
     ]);
-    await this.storeComparison(result, context, baseline, candidate);
+    await this.storeComparison(result, context, baseline, candidate, inputs);
     const improved = result.points?.filter((point) => point.improvement).length ?? 0;
     await this.writeComparison(
       result,
@@ -297,8 +282,10 @@ export default class Compare extends BaseCommand {
     context: RuntimeContext,
     baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
     candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    inputs: ComparisonInputs,
   ): Promise<void> {
     const comparison = Protocol.comparison.parse(result);
+    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
     const artifact = `${comparison.id}.json`;
     const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
     const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
@@ -390,6 +377,42 @@ export default class Compare extends BaseCommand {
     }
   }
 
+  private async importInvestigationMeasurements(
+    context: RuntimeContext,
+    baseline: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    candidate: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+    inputs: ComparisonInputs,
+  ): Promise<void> {
+    const investigationIds = [
+      ...new Set(
+        [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
+      ),
+    ];
+    for (const investigationId of investigationIds) {
+      if ((await loadLatestInvestigation(context.artifacts, investigationId)) === undefined) continue;
+      const imports: InvestigationMeasurementImport[] = [];
+      const storedBaseline = await context.artifactStore.putBytes(inputs.baseline.path, inputs.baseline.bytes);
+      if (storedBaseline.digest !== inputs.baseline.digest)
+        throw new Error("The artifact store changed baseline measurement bytes.");
+      imports.push({
+        role: "baseline",
+        artifact: storedBaseline.reference,
+        digest: storedBaseline.digest,
+        claimClass: measurementClaimClass(baseline),
+      });
+      const storedCandidate = await context.artifactStore.putBytes(inputs.candidate.path, inputs.candidate.bytes);
+      if (storedCandidate.digest !== inputs.candidate.digest)
+        throw new Error("The artifact store changed candidate measurement bytes.");
+      imports.push({
+        role: "candidate",
+        artifact: storedCandidate.reference,
+        digest: storedCandidate.digest,
+        claimClass: measurementClaimClass(candidate),
+      });
+      await recordImportedInvestigationMeasurements(context.artifacts, investigationId, imports);
+    }
+  }
+
   private async writeComparison(result: ComparisonV2, human: string, context: RuntimeContext): Promise<void> {
     const rendered = renderCommandResult(result, human, context.config.format);
     await writeResult(rendered, context);
@@ -399,4 +422,21 @@ export default class Compare extends BaseCommand {
 
 function digest(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+type ComparisonInput = {
+  readonly path: string;
+  readonly bytes: Uint8Array;
+  readonly digest: string;
+};
+
+type ComparisonInputs = {
+  readonly baseline: ComparisonInput;
+  readonly candidate: ComparisonInput;
+};
+
+function measurementClaimClass(
+  measurement: MeasurementV1 | ScalingAnalysisV2 | ScalingAnalysisV3,
+): "constant-factor" | "empirical-scaling" {
+  return measurement.schemaVersion === "smokinggun.measurement.v1" ? "constant-factor" : "empirical-scaling";
 }

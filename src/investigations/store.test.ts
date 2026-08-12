@@ -7,6 +7,7 @@ import {
   appendInvestigationEvidence,
   appendInvestigationReport,
   loadLatestInvestigation,
+  recordImportedInvestigationMeasurements,
   recordInvestigationSnapshot,
   requireLatestInvestigation,
 } from "./store.js";
@@ -65,6 +66,79 @@ describe("investigation snapshots", () => {
     expect(
       await readFile(join(root, "investigations", initial.id, "snapshots", `${secondDigest}.json`), "utf8"),
     ).toContain("baseline-measured");
+  });
+
+  it("advances a scanned investigation when immutable measurements are imported", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
+    const id = "inv_abcdef0123456789";
+    await recordInvestigationSnapshot(
+      root,
+      {
+        schemaVersion: "smokinggun.investigation-bundle.v2",
+        id,
+        state: "scanned",
+        root: ".",
+        createdAt: new Date().toISOString(),
+        reports: ["scan-report.json"],
+        evidence: [scanEvidence(id)],
+        diagnostics: [],
+      },
+      null,
+    );
+    await recordImportedInvestigationMeasurements(root, id, [
+      {
+        role: "baseline",
+        artifact: `artifact://sha256/${"a".repeat(64)}`,
+        digest: "a".repeat(64),
+        claimClass: "constant-factor",
+      },
+      {
+        role: "candidate",
+        artifact: `artifact://sha256/${"b".repeat(64)}`,
+        digest: "b".repeat(64),
+        claimClass: "constant-factor",
+      },
+    ]);
+
+    const latest = await requireLatestInvestigation(root, id);
+    expect(latest.bundle.state).toBe("baseline-measured");
+    expect(latest.bundle.reports).toContain(`artifact://sha256/${"a".repeat(64)}`);
+    expect(latest.bundle.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({kind: "measurement", digest: "a".repeat(64)}),
+        expect.objectContaining({kind: "measurement", digest: "b".repeat(64)}),
+      ]),
+    );
+  });
+
+  it("does not label candidate-only evidence as a measured baseline", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
+    const id = "inv_9876543210abcdef";
+    await recordInvestigationSnapshot(
+      root,
+      {
+        schemaVersion: "smokinggun.investigation-bundle.v2",
+        id,
+        state: "scanned",
+        root: ".",
+        createdAt: new Date().toISOString(),
+        reports: ["scan-report.json"],
+        evidence: [scanEvidence(id)],
+        diagnostics: [],
+      },
+      null,
+    );
+    await expect(
+      recordImportedInvestigationMeasurements(root, id, [
+        {
+          role: "candidate",
+          artifact: `artifact://sha256/${"b".repeat(64)}`,
+          digest: "b".repeat(64),
+          claimClass: "constant-factor",
+        },
+      ]),
+    ).rejects.toThrow(/without baseline measurement evidence/);
+    expect((await requireLatestInvestigation(root, id)).bundle.state).toBe("scanned");
   });
 
   it("materializes a legacy bundle as an addressable parent before migration", async () => {

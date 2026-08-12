@@ -19,6 +19,14 @@ type StoredInvestigation = {
   readonly storageFormat: "commit" | "legacy-snapshot" | "legacy-bundle";
 };
 
+/** One immutable measurement artifact being attached to an investigation. */
+export type InvestigationMeasurementImport = {
+  readonly role: "baseline" | "candidate";
+  readonly artifact: string;
+  readonly digest: string;
+  readonly claimClass: "constant-factor" | "empirical-scaling";
+};
+
 type InvestigationCommitV1 = {
   readonly schemaVersion: "smokinggun.investigation-commit.v1";
   readonly parentDigest: string | null;
@@ -38,6 +46,14 @@ const contextSourceStates = new Set<InvestigationBundleV2["state"]>([
   "scanned",
   "context-resolved",
   "measurement-planned",
+]);
+
+const measurementImportableStates = new Set<InvestigationBundleV2["state"]>([
+  "scanned",
+  "context-resolved",
+  "measurement-planned",
+  "baseline-measured",
+  "candidate-compared",
 ]);
 
 export function canAttachReport(bundle: InvestigationBundleV2): boolean {
@@ -105,6 +121,69 @@ export async function requireLatestInvestigation(dataRoot: string, id: string): 
   const investigation = await loadLatestInvestigation(dataRoot, id);
   if (investigation === undefined) throw new Error(`Investigation ${id} does not exist.`);
   return investigation;
+}
+
+/** Retain imported measurement evidence and advance the investigation before comparison. */
+export async function recordImportedInvestigationMeasurements(
+  dataRoot: string,
+  id: string,
+  measurements: ReadonlyArray<InvestigationMeasurementImport>,
+): Promise<void> {
+  const stored = await loadLatestInvestigation(dataRoot, id);
+  if (stored === undefined) return;
+  const existingDigests = new Set(
+    stored.bundle.evidence.flatMap((evidence) =>
+      evidence.kind === "measurement" && evidence.digest !== undefined ? [evidence.digest] : [],
+    ),
+  );
+  if (stored.bundle.state === "behavior-validated") {
+    const missing = measurements.find((measurement) => !existingDigests.has(measurement.digest));
+    if (missing !== undefined)
+      throw new Error(`Investigation ${id} is behavior-validated and cannot import measurement ${missing.digest}.`);
+    return;
+  }
+  if (!measurementImportableStates.has(stored.bundle.state))
+    throw new Error(`Investigation ${id} cannot import measurements while in ${stored.bundle.state} state.`);
+  const hasBaseline =
+    stored.bundle.evidence.some(
+      (evidence) => evidence.kind === "measurement" && evidence.id.startsWith(`${id}:measurement:baseline:`),
+    ) || measurements.some((measurement) => measurement.role === "baseline");
+  if (!hasBaseline)
+    throw new Error(`Investigation ${id} cannot become baseline-measured without baseline measurement evidence.`);
+  const reports = measurements.reduce(
+    (current, measurement) => appendInvestigationReport(current, measurement.artifact),
+    [...stored.bundle.reports],
+  );
+  const evidence = measurements.reduce(
+    (current, measurement) =>
+      appendInvestigationEvidence(current, {
+        schemaVersion: "smokinggun.evidence.v2",
+        id: `${id}:measurement:${measurement.role}:${measurement.digest}`,
+        kind: "measurement",
+        claimClass: measurement.claimClass,
+        summary: `Imported ${measurement.role} measurement artifact`,
+        artifact: measurement.artifact,
+        digest: measurement.digest,
+      }),
+    [...stored.bundle.evidence],
+  );
+  const nextState = stored.bundle.state === "candidate-compared" ? "candidate-compared" : "baseline-measured";
+  if (
+    stored.bundle.state === nextState &&
+    stableJson(stored.bundle.reports) === stableJson(reports) &&
+    stableJson(stored.bundle.evidence) === stableJson(evidence)
+  )
+    return;
+  await recordParsedInvestigationSnapshot(
+    dataRoot,
+    {
+      ...stored.bundle,
+      state: nextState,
+      reports,
+      evidence,
+    },
+    stored.digest,
+  );
 }
 
 /** Validate untrusted bundle input before storing an immutable snapshot. */
