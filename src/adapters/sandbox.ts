@@ -1,13 +1,16 @@
 import {constants, existsSync} from "node:fs";
 import {access, realpath} from "node:fs/promises";
-import {dirname, parse, resolve} from "node:path";
+import {delimiter, dirname, isAbsolute, parse, resolve} from "node:path";
 import type {ProblemV1} from "../protocol/index.js";
+import {isWithinRoot} from "../paths.js";
 
 const bubblewrapPath = "/usr/bin/bwrap";
+const systemMountPaths = ["/usr", "/lib", "/lib64", "/bin", "/sbin"] as const;
 
 export type SandboxedCommand = {
   readonly executable: string;
   readonly arguments: ReadonlyArray<string>;
+  readonly resolvedExecutable: string;
 };
 
 /**
@@ -18,6 +21,7 @@ export type SandboxedCommand = {
 export async function sandboxAdapterCommand(
   command: ReadonlyArray<string>,
   root: string,
+  declaredRuntimeRoots: ReadonlyArray<string> = [],
 ): Promise<SandboxedCommand | ProblemV1> {
   if (process.platform !== "linux" || !(await isExecutable(bubblewrapPath)))
     return problem(
@@ -35,6 +39,15 @@ export async function sandboxAdapterCommand(
     );
 
   const realRoot = await realpath(root).catch(() => resolve(root));
+  const resolvedExecutable = await resolveExecutable(executable, realRoot);
+  if (resolvedExecutable === undefined)
+    return problem(
+      "adapter-executable-unavailable",
+      "The declared adapter executable could not be resolved to an executable host file.",
+      "Install the executable or declare an absolute executable path in the adapter manifest.",
+    );
+  const runtimeRoots = await resolveRuntimeRoots(declaredRuntimeRoots, realRoot);
+  if ("schemaVersion" in runtimeRoots) return runtimeRoots;
   const sandboxArguments = [
     "--unshare-user",
     "--unshare-pid",
@@ -53,6 +66,7 @@ export async function sandboxAdapterCommand(
     "/proc",
     "--tmpfs",
     "/tmp",
+    ...runtimeMountArguments(resolvedExecutable, runtimeRoots),
     ...directoryArguments(realRoot),
     "--ro-bind",
     realRoot,
@@ -60,10 +74,64 @@ export async function sandboxAdapterCommand(
     "--chdir",
     realRoot,
     "--",
-    executable,
+    resolvedExecutable,
     ...command.slice(1),
   ];
-  return {executable: bubblewrapPath, arguments: sandboxArguments};
+  return {executable: bubblewrapPath, arguments: sandboxArguments, resolvedExecutable};
+}
+
+async function resolveExecutable(executable: string, root: string): Promise<string | undefined> {
+  const candidates = isAbsolute(executable)
+    ? [executable]
+    : executable.includes("/") || executable.includes("\\")
+      ? [resolve(root, executable)]
+      : (process.env.PATH ?? "")
+          .split(delimiter)
+          .filter((entry) => entry.length > 0)
+          .map((entry) => resolve(entry, executable));
+  for (const candidate of candidates) {
+    const canonical = await realpath(candidate).catch(() => undefined);
+    if (canonical !== undefined && (await isExecutable(canonical))) return canonical;
+  }
+  return undefined;
+}
+
+async function resolveRuntimeRoots(
+  declaredRoots: ReadonlyArray<string>,
+  sourceRoot: string,
+): Promise<ReadonlyArray<string> | ProblemV1> {
+  const roots = new Set<string>();
+  for (const declared of declaredRoots) {
+    const canonical = await realpath(declared).catch(() => undefined);
+    if (
+      canonical === undefined ||
+      canonical === parse(canonical).root ||
+      isWithinRoot(sourceRoot, canonical) ||
+      isWithinRoot(canonical, sourceRoot)
+    )
+      return problem(
+        "adapter-runtime-root-invalid",
+        "A declared adapter runtime root is unavailable, overly broad, or overlaps the source snapshot.",
+        "Declare the narrow installed package or runtime directory required by the adapter.",
+      );
+    roots.add(canonical);
+  }
+  return [...roots];
+}
+
+function runtimeMountArguments(executable: string, runtimeRoots: ReadonlyArray<string>): string[] {
+  const executableMount = systemMountPaths.some((path) => isWithinRoot(path, executable))
+    ? []
+    : [...directoryArguments(dirname(executable)), "--ro-bind", executable, executable];
+  return [
+    ...executableMount,
+    ...runtimeRoots.flatMap((runtimeRoot) => [
+      ...directoryArguments(runtimeRoot),
+      "--ro-bind",
+      runtimeRoot,
+      runtimeRoot,
+    ]),
+  ];
 }
 
 function directoryArguments(path: string): string[] {
@@ -74,9 +142,7 @@ function directoryArguments(path: string): string[] {
 }
 
 function readOnlySystemMounts(): string[] {
-  return ["/usr", "/lib", "/lib64", "/bin", "/sbin"].flatMap((path) =>
-    existsSync(path) ? ["--ro-bind", path, path] : [],
-  );
+  return systemMountPaths.flatMap((path) => (existsSync(path) ? ["--ro-bind", path, path] : []));
 }
 
 async function isExecutable(path: string): Promise<boolean> {

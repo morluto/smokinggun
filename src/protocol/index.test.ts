@@ -496,7 +496,7 @@ describe("protocol contracts", () => {
 
   it("rejects adapter artifact digests that are detached from declared artifacts", () => {
     const result = {
-      schemaVersion: "smokinggun.adapter-result.v2",
+      schemaVersion: "smokinggun.adapter-result.v3",
       requestId: "request",
       state: "complete",
       findings: [],
@@ -507,11 +507,18 @@ describe("protocol contracts", () => {
     };
 
     expect(Protocol.adapterResult.safeParse(result).success).toBe(false);
-    expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: ["result.json"]}).success).toBe(true);
+    expect(
+      Protocol.adapterResult.safeParse({
+        ...result,
+        rawArtifacts: ["result.json"],
+        rawArtifactContents: {"result.json": "e30="},
+      }).success,
+    ).toBe(true);
     expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: ["result.json", "result.json"]}).success).toBe(
       false,
     );
     expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: [""]}).success).toBe(false);
+    expect(Protocol.adapterResult.safeParse({...result, rawArtifacts: ["../result.json"]}).success).toBe(false);
     const validResult = {...result, rawArtifacts: ["result.json"]};
     expect(Protocol.adapterResult.safeParse({...validResult, state: "failed"}).success).toBe(false);
     expect(Protocol.adapterResult.safeParse({...validResult, state: "partial"}).success).toBe(false);
@@ -564,6 +571,27 @@ describe("protocol contracts", () => {
             skippedFiles: [],
           },
         ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts artifact-free AdapterResultV2 while requiring V3 for inline artifacts", () => {
+    const result = {
+      schemaVersion: "smokinggun.adapter-result.v2",
+      requestId: "request",
+      state: "complete",
+      findings: [],
+      coverage: [],
+      diagnostics: [],
+      rawArtifacts: [],
+      rawArtifactDigests: {},
+    };
+    expect(Protocol.adapterResultV2.safeParse(result).success).toBe(true);
+    expect(
+      Protocol.adapterResultV2.safeParse({
+        ...result,
+        rawArtifacts: ["result.json"],
+        rawArtifactDigests: {"result.json": "0".repeat(64)},
       }).success,
     ).toBe(false);
   });

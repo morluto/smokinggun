@@ -62,7 +62,7 @@ SmokingGun is the product, executable, protocol namespace, scanner namespace, an
 
 Until these invariants are implemented end to end, new scanners, adapters, measurement models, and investigation states are out of scope. Existing features that cannot establish their claimed boundary are removed or explicitly reported as unavailable rather than preserved through compatibility logic.
 
-The authoritative scan path ends at content-addressed reports. Structural, TypeScript, and Python scanners consume captured text; explicitly authorized adapters receive a private read-only materialization of those same bytes. SmokingGun owns no workload runner or execution backend. Measurements and scaling analyses enter only as external artifacts; unverifiable provenance remains visible and blocks promotion.
+The authoritative scan path ends at content-addressed reports. Structural, TypeScript, and Python scanners consume captured text; explicitly authorized adapters receive a private read-only materialization of those same bytes plus narrow runtime roots explicitly selected by the host. Adapter manifests cannot widen host filesystem visibility. Adapter artifacts cross the bounded AdapterResultV3 JSON channel as base64 bytes and are retained by exact digest; artifact-free AdapterResultV2 remains accepted, and adapters receive no writable host mount. SmokingGun owns no workload runner or execution backend. Measurements and scaling analyses enter only as external artifacts; unverifiable provenance remains visible and blocks promotion.
 
 ## External precedents
 

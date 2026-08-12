@@ -153,7 +153,11 @@ export async function parseExternalAdapters(
 export async function resolveExternalAdapters(
   parsed: ParsedExternalAdapters,
   root: string,
-  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly authorization: AdapterExecutionAuthorization;
+    readonly runtimeRoots?: ReadonlyArray<string>;
+  },
 ): Promise<LoadedExternalAdapters> {
   const {signal} = options;
   const executionAuthorized = options.authorization._tag === "AdapterExecutionAuthorized";
@@ -208,7 +212,7 @@ export async function resolveExternalAdapters(
       adapters.push({manifest, path, descriptor});
       continue;
     }
-    const probe = await probeExternalAdapter(manifest, root, signal);
+    const probe = await probeExternalAdapter(manifest, root, options.runtimeRoots, signal);
     const descriptor: ExternalScannerDescriptor = probe.available
       ? {
           id: manifest.id,
@@ -243,7 +247,11 @@ export async function resolveExternalAdapters(
 export async function loadExternalAdapters(
   paths: ReadonlyArray<string>,
   root: string,
-  options: {readonly signal?: AbortSignal; readonly authorization: AdapterExecutionAuthorization},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly authorization: AdapterExecutionAuthorization;
+    readonly runtimeRoots?: ReadonlyArray<string>;
+  },
 ): Promise<LoadedExternalAdapters> {
   const parsed = await parseExternalAdapters(paths, root, options.signal);
   return resolveExternalAdapters(parsed, root, options);
@@ -252,10 +260,11 @@ export async function loadExternalAdapters(
 async function probeExternalAdapter(
   manifest: AdapterManifestV1,
   root: string,
+  runtimeRoots?: ReadonlyArray<string>,
   signal?: AbortSignal,
 ): Promise<ExternalAdapterProbe> {
   const command = manifest.probeCommand ?? [manifest.command[0] ?? "", "--version"];
-  const sandboxed = await sandboxAdapterCommand(command, root);
+  const sandboxed = await sandboxAdapterCommand(command, root, runtimeRoots);
   if ("schemaVersion" in sandboxed) return {available: false, reason: sandboxed.message};
   try {
     const result = await execa(sandboxed.executable, sandboxed.arguments, {

@@ -2,7 +2,7 @@ import {lstat, readdir, stat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
-import type {CoverageRecordV1, FindingV2, ProblemV1, ScanReportV2} from "../protocol/index.js";
+import {type CoverageRecordV1, type FindingV2, type ProblemV1, type ScanReportV2} from "../protocol/index.js";
 import {grammarLanguageForPath, parseWithTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {scanWithTreeSitter} from "../scanners/tree-sitter-structural.js";
 import {
@@ -80,6 +80,7 @@ export type ScanOptions = {
   readonly signal?: AbortSignal;
   readonly adapters: ParsedExternalAdapters;
   readonly adapterAuthorization: AdapterExecutionAuthorization;
+  readonly adapterRuntimeRoots?: ReadonlyArray<string>;
   readonly sourceCaptureLimits?: SourceCaptureLimits;
   readonly retainAdapterArtifact?: (
     path: string,
@@ -594,6 +595,7 @@ async function runConfiguredAdapters(
       };
       const result = await runParsedSubprocessAdapter(adapter.manifest, request, {
         root: snapshotRoot,
+        ...(options.adapterRuntimeRoots === undefined ? {} : {runtimeRoots: options.adapterRuntimeRoots}),
         ...(options.signal === undefined ? {} : {signal: options.signal}),
         ...(options.retainAdapterArtifact === undefined ? {} : {retainArtifact: options.retainAdapterArtifact}),
       });

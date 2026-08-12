@@ -201,7 +201,7 @@ describe("repository scan seam", () => {
       const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-colliding-coverage-"));
       try {
         await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
-        const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]}));});`;
+        const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]}));});`;
         const manifest = join(root, "adapter.json");
         await writeFile(
           manifest,
@@ -243,7 +243,7 @@ describe("repository scan seam", () => {
       try {
         await writeFile(join(root, "fixture.ts"), "for (const item of items) work(item);\n", "utf8");
         const script =
-          "if (process.argv.includes('--version')) { console.log('fixture-adapter 1.0.0'); process.exit(0); } let input=''; process.stdin.on('data', chunk => input += chunk).on('end', () => { const request = JSON.parse(input); process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:request.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'fixture-adapter',scannerVersion:'1.0.0',ruleId:'fixture-rule',language:'typescript',kind:'fixture',claimClass:'static-fact',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'Configured adapter evidence',suggestion:'Inspect the fixture evidence.',location:{path:'fixture.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:['fixture-adapter:fixture-rule'],complexity:{}}],coverage:[],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]})); });";
+          "if (process.argv.includes('--version')) { console.log('fixture-adapter 1.0.0'); process.exit(0); } let input=''; process.stdin.on('data', chunk => input += chunk).on('end', () => { const request = JSON.parse(input); process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'fixture-adapter',scannerVersion:'1.0.0',ruleId:'fixture-rule',language:'typescript',kind:'fixture',claimClass:'static-fact',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'Configured adapter evidence',suggestion:'Inspect the fixture evidence.',location:{path:'fixture.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:['fixture-adapter:fixture-rule'],complexity:{}}],coverage:[],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]})); });";
         const manifest = join(root, "adapter.json");
         await writeFile(
           manifest,

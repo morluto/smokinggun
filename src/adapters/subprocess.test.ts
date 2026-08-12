@@ -1,7 +1,7 @@
 import {execPath} from "node:process";
 import {createHash} from "node:crypto";
 import {existsSync} from "node:fs";
-import {mkdtemp, rm, writeFile} from "node:fs/promises";
+import {chmod, copyFile, mkdtemp, rm, writeFile} from "node:fs/promises";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {describe, expect, it} from "vitest";
@@ -10,7 +10,7 @@ import {runSubprocessAdapter} from "./subprocess.js";
 describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("subprocess adapter seam", () => {
   it("round-trips one bounded versioned JSON request through a real process", async () => {
     const script =
-      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stderr.write('adapter diagnostic token=secret-value');process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
+      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stderr.write('adapter diagnostic token=secret-value');process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
     const result = await runSubprocessAdapter(
       {
         schemaVersion: "smokinggun.adapter-manifest.v1",
@@ -37,11 +37,19 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
         state === "complete"
           ? "[]"
           : "[{schemaVersion:'smokinggun.problem.v1',code:'fixture',message:'Fixture adapter state.'}]";
-      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:${diagnostics},rawArtifacts:[]})));`;
+      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'${state}',findings:[],coverage:[],diagnostics:${diagnostics},rawArtifacts:[]})));`;
       const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {root: process.cwd()});
       expect("_tag" in result).toBe(false);
       if (!("_tag" in result)) expect(result.state).toBe(state);
     }
+  });
+
+  it("accepts artifact-free AdapterResultV2 and normalizes it to V3", async () => {
+    const script =
+      "process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[],rawArtifactDigests:{}})));";
+    const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {root: process.cwd()});
+    expect("code" in result).toBe(false);
+    if (!("code" in result)) expect(result.schemaVersion).toBe("smokinggun.adapter-result.v3");
   });
 
   it("returns bounded typed failures for malformed JSON, output overflow, and timeout", async () => {
@@ -74,7 +82,7 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
 
   it("binds findings and coverage to the host-owned producer and requested targets", async () => {
     const script =
-      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:r.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'smokinggun.structural',scannerVersion:'99.0.0',ruleId:'fixture',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'fixture',suggestion:'inspect',location:{path:'allowed.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:[],complexity:{}}],coverage:[{scanner:'smokinggun.structural',version:'99.0.0',language:'mixed',filesDiscovered:999,filesAnalyzed:999,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:r.targets,diagnostics:[],rawArtifacts:[]}));});";
+      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:r.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'smokinggun.structural',scannerVersion:'99.0.0',ruleId:'fixture',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'fixture',suggestion:'inspect',location:{path:'allowed.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:[],complexity:{}}],coverage:[{scanner:'smokinggun.structural',version:'99.0.0',language:'mixed',filesDiscovered:999,filesAnalyzed:999,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:r.targets,diagnostics:[],rawArtifacts:[]}));});";
     const result = await runSubprocessAdapter(
       manifest([execPath, "-e", script]),
       {...request(), targets: ["allowed.ts"]},
@@ -104,7 +112,7 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
 
   it("rejects complete coverage without exact per-target receipts", async () => {
     const script =
-      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
+      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:r.requestId,state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
     const result = await runSubprocessAdapter(
       manifest([execPath, "-e", script]),
       {...request(), targets: ["allowed.ts"]},
@@ -115,7 +123,7 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
 
   it("rejects findings outside the exact requested target set", async () => {
     const script =
-      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:r.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'fixture',scannerVersion:'1.0.0',ruleId:'fixture',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'fixture',suggestion:'inspect',location:{path:'excluded.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:[],complexity:{}}],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
+      "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const r=JSON.parse(s);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:r.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'fixture',scannerVersion:'1.0.0',ruleId:'fixture',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'fixture',suggestion:'inspect',location:{path:'excluded.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:[],complexity:{}}],coverage:[],diagnostics:[],rawArtifacts:[]}));});";
     const result = await runSubprocessAdapter(
       manifest([execPath, "-e", script]),
       {...request(), targets: ["allowed.ts"]},
@@ -128,7 +136,7 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
     const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-sandbox-"));
     try {
       const script =
-        "const fs=require('node:fs');const net=require('node:net');let writeBlocked=false;try{fs.writeFileSync('forbidden.txt','x')}catch{writeBlocked=true}const socket=net.createConnection({host:'1.1.1.1',port:80});socket.on('error',()=>finish(true));socket.on('connect',()=>finish(false));setTimeout(()=>finish(false),500);let done=false;function finish(networkBlocked){if(done)return;done=true;socket.destroy();process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[{schemaVersion:'smokinggun.problem.v1',code:'sandbox-observation',message:`write=${writeBlocked};network=${networkBlocked}`}],rawArtifacts:[]}));}";
+        "const fs=require('node:fs');const net=require('node:net');let writeBlocked=false;try{fs.writeFileSync('forbidden.txt','x')}catch{writeBlocked=true}const socket=net.createConnection({host:'1.1.1.1',port:80});socket.on('error',()=>finish(true));socket.on('connect',()=>finish(false));setTimeout(()=>finish(false),500);let done=false;function finish(networkBlocked){if(done)return;done=true;socket.destroy();process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[{schemaVersion:'smokinggun.problem.v1',code:'sandbox-observation',message:`write=${writeBlocked};network=${networkBlocked}`}],rawArtifacts:[]}));}";
       const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {root});
       expect("code" in result).toBe(false);
       if (!("code" in result))
@@ -140,12 +148,36 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
     }
   });
 
+  it("mounts an adapter executable installed outside the system runtime paths", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-root-"));
+    const runtimeDirectory = await mkdtemp(join(tmpdir(), "smokinggun-adapter-runtime-"));
+    const runtime = join(runtimeDirectory, "node");
+    try {
+      await copyFile(execPath, runtime);
+      await chmod(runtime, 0o755);
+      const modulePath = join(runtimeDirectory, "adapter.cjs");
+      await writeFile(
+        modulePath,
+        "process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:[]})));",
+        "utf8",
+      );
+      const result = await runSubprocessAdapter(manifest([runtime, modulePath]), request(), {
+        root,
+        runtimeRoots: [runtimeDirectory],
+      });
+      expect("code" in result).toBe(false);
+      if (!("code" in result)) expect(result.state).toBe("complete");
+    } finally {
+      await rm(root, {recursive: true, force: true});
+      await rm(runtimeDirectory, {recursive: true, force: true});
+    }
+  });
+
   it("retains adapter artifacts as exact content-addressed bytes", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-artifact-"));
     try {
-      await writeFile(join(root, "evidence.json"), "evidence", "utf8");
       const digest = createHash("sha256").update("evidence").digest("hex");
-      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v2',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:['evidence.json'],rawArtifactDigests:{'evidence.json':'${digest}'}})));`;
+      const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:['evidence.json'],rawArtifactDigests:{'evidence.json':'${digest}'},rawArtifactContents:{'evidence.json':'${Buffer.from("evidence").toString("base64")}'}})));`;
       const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {
         root,
         retainArtifact: async (_path, bytes) => ({
@@ -161,6 +193,27 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
     } finally {
       await rm(root, {recursive: true, force: true});
     }
+  });
+
+  it("enforces the manifest artifact limit across all inline artifacts", async () => {
+    const first = Buffer.from("first").toString("base64");
+    const second = Buffer.from("second").toString("base64");
+    const firstDigest = createHash("sha256").update("first").digest("hex");
+    const secondDigest = createHash("sha256").update("second").digest("hex");
+    const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:['first.txt','second.txt'],rawArtifactDigests:{'first.txt':'${firstDigest}','second.txt':'${secondDigest}'},rawArtifactContents:{'first.txt':'${first}','second.txt':'${second}'}})));`;
+    const limitedManifest = manifest([execPath, "-e", script]);
+    const result = await runSubprocessAdapter(
+      {...limitedManifest, limits: {...limitedManifest.limits, maxArtifactBytes: 8}},
+      request(),
+      {
+        root: process.cwd(),
+        retainArtifact: async (path, bytes) => ({
+          reference: path,
+          digest: createHash("sha256").update(bytes).digest("hex"),
+        }),
+      },
+    );
+    expect(result).toMatchObject({code: "artifact-too-large"});
   });
 
   function manifest(command: ReadonlyArray<string>, timeoutMs = 2_000, maxOutputBytes = 10_000) {

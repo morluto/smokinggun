@@ -29,6 +29,10 @@ export default class Scan extends BaseCommand {
       description: "Authorize execution of explicitly configured external adapters.",
       default: false,
     }),
+    "adapter-runtime-root": Flags.string({
+      description: "Host directory to expose read-only to authorized adapters; repeat for package dependencies.",
+      multiple: true,
+    }),
   };
   static override args = {path: Args.string({description: "Repository or directory to scan.", default: "."})};
 
@@ -40,6 +44,10 @@ export default class Scan extends BaseCommand {
       const scanner = parseOptionalStringArrayFlag(parsed.flags.scanner, "scanner");
       const only = parseOptionalStringArrayFlag(parsed.flags.only, "only");
       const adapter = parseOptionalStringArrayFlag(parsed.flags.adapter, "adapter");
+      const adapterRuntimeRoots = parseOptionalStringArrayFlag(
+        parsed.flags["adapter-runtime-root"],
+        "adapter-runtime-root",
+      )?.map((path) => resolveConfiguredPath(context.config.cwd, path));
       const adapterManifests = [
         ...context.config.adapters,
         ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
@@ -60,6 +68,7 @@ export default class Scan extends BaseCommand {
         maxFindings: context.config.maxFindings,
         signal: context.signal,
         adapters,
+        ...(adapterRuntimeRoots === undefined ? {} : {adapterRuntimeRoots}),
         adapterAuthorization: parsed.flags["allow-adapter-execution"]
           ? adapterExecutionAuthorized
           : adapterExecutionNotAuthorized,

@@ -1,12 +1,11 @@
-import {isAbsolute, relative, resolve} from "node:path";
-import {constants} from "node:fs";
-import {lstat, open, realpath} from "node:fs/promises";
+import {isAbsolute, resolve} from "node:path";
 import {createHash} from "node:crypto";
 import {execa} from "execa";
 import {
   Protocol,
   type AdapterManifestV1,
   type AdapterRequestV1,
+  type AdapterResultV3,
   type AdapterResultV2,
   type ProblemV1,
 } from "../protocol/index.js";
@@ -17,6 +16,7 @@ import {sandboxAdapterCommand} from "./sandbox.js";
 
 export type AdapterRunOptions = {
   readonly root: string;
+  readonly runtimeRoots?: ReadonlyArray<string>;
   readonly signal?: AbortSignal;
   readonly retainArtifact?: (
     path: string,
@@ -33,7 +33,7 @@ export async function runSubprocessAdapter(
   manifestInput: unknown,
   requestInput: unknown,
   options: AdapterRunOptions,
-): Promise<AdapterResultV2 | ProblemV1> {
+): Promise<AdapterResultV3 | ProblemV1> {
   const manifest = Protocol.adapterManifest.safeParse(manifestInput);
   if (!manifest.success)
     return problem("invalid-adapter-manifest", "The adapter manifest is invalid.", "Fix the manifest and retry.");
@@ -52,17 +52,17 @@ export async function runParsedSubprocessAdapter(
   manifest: AdapterManifestV1,
   request: AdapterRequestV1,
   options: AdapterRunOptions,
-): Promise<AdapterResultV2 | ProblemV1> {
+): Promise<AdapterResultV3 | ProblemV1> {
   const command = manifest.command;
-  const sandboxed = await sandboxAdapterCommand(command, options.root);
+  const requestDigest = createHash("sha256").update(stableJson(request)).digest("hex");
+  const sandboxed = await sandboxAdapterCommand(command, options.root, options.runtimeRoots);
   if ("schemaVersion" in sandboxed) return sandboxed;
   const identity = {
     id: manifest.id,
     version: manifest.version,
-    command: redactCommand(manifest.command, options.root),
+    command: redactCommand([sandboxed.resolvedExecutable, ...manifest.command.slice(1)], options.root),
   };
-  const requestDigest = createHash("sha256").update(stableJson(request)).digest("hex");
-  const failure = (state: AdapterResultV2["state"], message: string): AdapterResultV2 => ({
+  const failure = (state: AdapterResultV3["state"], message: string): AdapterResultV3 => ({
     ...failedAdapter(request.requestId, state, message, requestDigest),
     adapter: identity,
     ...(request.configDigest === undefined ? {} : {configDigest: request.configDigest}),
@@ -91,31 +91,45 @@ export async function runParsedSubprocessAdapter(
     } catch {
       return failure("failed", "The adapter did not return one valid JSON document on stdout.");
     }
-    const parsed = Protocol.adapterResult.safeParse(output);
-    if (!parsed.success)
+    const parsedV3 = Protocol.adapterResult.safeParse(output);
+    const parsedV2 = parsedV3.success ? undefined : Protocol.adapterResultV2.safeParse(output);
+    if (!parsedV3.success && (parsedV2 === undefined || !parsedV2.success))
       return problem(
         "invalid-adapter-result",
-        "The adapter result does not satisfy AdapterResultV2.",
+        "The adapter result does not satisfy AdapterResultV3.",
         "Update the adapter to the supported protocol version.",
       );
-    if (parsed.data.requestId !== request.requestId)
+    const adapterResult = parsedV3.success ? parsedV3.data : parsedV2?.data;
+    if (adapterResult === undefined)
+      return problem(
+        "invalid-adapter-result",
+        "The adapter result could not be parsed.",
+        "Update the adapter to the supported protocol version.",
+      );
+    if (adapterResult.requestId !== request.requestId)
       return problem(
         "adapter-request-mismatch",
         "The adapter result requestId does not match the request.",
         "Run the adapter once per request and preserve requestId.",
       );
-    const artifacts = await captureArtifacts(parsed.data, options.root, manifest.limits.maxArtifactBytes, options);
+    const artifacts = await captureArtifacts(adapterResult, manifest.limits.maxArtifactBytes, options);
     if ("schemaVersion" in artifacts) return artifacts;
-    const findingBoundaryProblem = checkFindingLocations(parsed.data, options.root, request.targets);
+    const findingBoundaryProblem = checkFindingLocations(adapterResult, options.root, request.targets);
     if (findingBoundaryProblem !== undefined) return findingBoundaryProblem;
-    const coverageBoundaryProblem = checkCoverageScope(parsed.data, request.targets);
+    const coverageBoundaryProblem = checkCoverageScope(adapterResult, request.targets);
     if (coverageBoundaryProblem !== undefined) return coverageBoundaryProblem;
-    if (result.exitCode !== 0 && parsed.data.state === "complete")
+    if (result.exitCode !== 0 && adapterResult.state === "complete")
       return failure("failed", "The adapter exited nonzero while claiming complete output.");
     const stderr = redactSensitive(result.stderr.trim()).slice(0, 8_192);
     return {
       ...normalizeAdapterEvidence(
-        {...parsed.data, rawArtifacts: [...artifacts.references], rawArtifactDigests: artifacts.digests},
+        {
+          ...adapterResult,
+          schemaVersion: "smokinggun.adapter-result.v3",
+          rawArtifacts: [...artifacts.references],
+          rawArtifactDigests: artifacts.digests,
+          rawArtifactContents: {},
+        },
         manifest,
         request.targets,
       ),
@@ -126,7 +140,7 @@ export async function runParsedSubprocessAdapter(
         ? {}
         : {
             diagnostics: [
-              ...parsed.data.diagnostics,
+              ...adapterResult.diagnostics,
               {
                 schemaVersion: "smokinggun.problem.v1" as const,
                 code: "adapter-stderr",
@@ -150,8 +164,7 @@ export async function runParsedSubprocessAdapter(
 }
 
 async function captureArtifacts(
-  result: AdapterResultV2,
-  root: string,
+  result: AdapterResultV2 | AdapterResultV3,
   maxArtifactBytes: number,
   options: AdapterRunOptions,
 ): Promise<
@@ -163,104 +176,60 @@ async function captureArtifacts(
       "The adapter returned artifacts but no content-addressed retention boundary was provided.",
       "Run through a host that can retain exact artifact bytes, or return no raw artifacts.",
     );
-  const realRoot = await realpath(root).catch(() => resolve(root));
   const references: string[] = [];
   const digests: Record<string, string> = {};
+  let totalBytes = 0;
   for (const artifact of result.rawArtifacts) {
-    if (isAbsolute(artifact))
+    if (isAbsolute(artifact) || artifact.split(/[\\/]/u).some((segment) => segment === ".." || segment === "."))
       return problem(
         "artifact-boundary-violation",
         "An adapter artifact path is absolute and outside the portable artifact contract.",
-        "Return repository-relative artifact references.",
+        "Return normalized portable child paths without dot segments.",
       );
-    const resolved = resolve(root, artifact);
-    if (relative(root, resolved).startsWith(".."))
+    const encoded = "rawArtifactContents" in result ? result.rawArtifactContents?.[artifact] : undefined;
+    if (encoded === undefined)
       return problem(
-        "artifact-boundary-violation",
-        "An adapter artifact escapes the repository boundary.",
-        "Keep artifacts inside the declared repository/artifact root.",
+        "artifact-content-required",
+        "An adapter artifact has no inline bytes in the bounded result document.",
+        "Base64-encode every declared artifact in rawArtifactContents.",
       );
-    const actual = await realpath(resolved).catch(() => undefined);
-    const relativeActual = actual === undefined ? undefined : relative(realRoot, actual);
-    if (
-      actual === undefined ||
-      relativeActual === undefined ||
-      relativeActual.startsWith("..") ||
-      isAbsolute(relativeActual)
-    )
+    const bytes = Buffer.from(encoded, "base64");
+    totalBytes += bytes.byteLength;
+    if (bytes.byteLength > maxArtifactBytes || totalBytes > maxArtifactBytes)
       return problem(
-        "artifact-boundary-violation",
-        "An adapter artifact resolves outside the repository boundary or does not exist.",
-        "Keep artifacts inside the declared repository/artifact root.",
+        "artifact-too-large",
+        "Adapter artifacts exceed the declared total size limit.",
+        "Reduce the artifacts or increase the manifest limit deliberately.",
       );
-    const handle = await open(resolved, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(
-      () => undefined,
-    );
-    if (handle === undefined)
+    const declaredDigest = result.rawArtifactDigests[artifact];
+    if (declaredDigest === undefined)
       return problem(
-        "artifact-invalid",
-        "An adapter artifact is not a regular file or is a symlink.",
-        "Return regular files below the repository artifact boundary.",
+        "artifact-digest-required",
+        "An adapter artifact has no exact SHA-256 digest.",
+        "Hash every artifact's exact bytes before returning the result.",
       );
-    try {
-      if ((await lstat(resolved)).isSymbolicLink())
-        return problem(
-          "artifact-invalid",
-          "An adapter artifact is not a regular file or is a symlink.",
-          "Return regular files below the repository artifact boundary.",
-        );
-      const info = await handle.stat();
-      if (!info.isFile())
-        return problem(
-          "artifact-invalid",
-          "An adapter artifact is not a regular file or is a symlink.",
-          "Return regular files below the repository artifact boundary.",
-        );
-      if (info.size > maxArtifactBytes)
-        return problem(
-          "artifact-too-large",
-          "An adapter artifact exceeds its declared size limit.",
-          "Reduce the artifact or increase the manifest limit deliberately.",
-        );
-      const declaredDigest = result.rawArtifactDigests[artifact];
-      if (declaredDigest === undefined)
-        return problem(
-          "artifact-digest-required",
-          "An adapter artifact has no exact SHA-256 digest.",
-          "Hash every artifact's exact bytes before returning the result.",
-        );
-      const bytes = await handle.readFile();
-      if (bytes.byteLength > maxArtifactBytes)
-        return problem(
-          "artifact-too-large",
-          "An adapter artifact exceeds its declared size limit.",
-          "Reduce the artifact or increase the manifest limit deliberately.",
-        );
-      const actualDigest = createHash("sha256").update(bytes).digest("hex");
-      if (actualDigest !== declaredDigest)
-        return problem(
-          "artifact-digest-mismatch",
-          "An adapter artifact does not match its declared SHA-256 digest.",
-          "Regenerate the artifact and return its exact digest.",
-        );
-      const stored = await options.retainArtifact?.(artifact, bytes);
-      if (stored === undefined || stored.digest !== actualDigest)
-        return problem(
-          "artifact-retention-failed",
-          "The host artifact store did not preserve the adapter's exact bytes.",
-          "Repair the content-addressed artifact store before accepting adapter evidence.",
-        );
-      references.push(stored.reference);
-      digests[stored.reference] = stored.digest;
-    } finally {
-      await handle.close();
-    }
+    const actualDigest = createHash("sha256").update(bytes).digest("hex");
+    if (actualDigest !== declaredDigest)
+      return problem(
+        "artifact-digest-mismatch",
+        "An adapter artifact does not match its declared SHA-256 digest.",
+        "Regenerate the artifact and return its exact digest.",
+      );
+    const stored = await options.retainArtifact?.(artifact, bytes);
+    if (stored === undefined || stored.digest !== actualDigest)
+      return problem(
+        "artifact-retention-failed",
+        "The host artifact store did not preserve the adapter's exact bytes.",
+        "Repair the content-addressed artifact store before accepting adapter evidence.",
+      );
+    references.push(stored.reference);
+    digests[stored.reference] = stored.digest;
   }
   return {references: [...new Set(references)].sort(), digests};
 }
 
 function checkFindingLocations(
-  result: AdapterResultV2,
+  result: AdapterResultV2 | AdapterResultV3,
   root: string,
   targets: ReadonlyArray<string>,
 ): ProblemV1 | undefined {
@@ -289,7 +258,10 @@ function checkFindingLocations(
   return undefined;
 }
 
-function checkCoverageScope(result: AdapterResultV2, targets: ReadonlyArray<string>): ProblemV1 | undefined {
+function checkCoverageScope(
+  result: AdapterResultV2 | AdapterResultV3,
+  targets: ReadonlyArray<string>,
+): ProblemV1 | undefined {
   const targetSet = new Set(targets.map(portablePath));
   const analyzedTargets = new Set(result.analyzedTargets.map(portablePath));
   for (const analyzed of analyzedTargets)
@@ -320,10 +292,10 @@ function checkCoverageScope(result: AdapterResultV2, targets: ReadonlyArray<stri
 }
 
 function normalizeAdapterEvidence(
-  result: AdapterResultV2,
+  result: AdapterResultV2 | AdapterResultV3,
   manifest: AdapterManifestV1,
   targets: ReadonlyArray<string>,
-): AdapterResultV2 {
+): AdapterResultV3 {
   const scanner = `smokinggun.adapter:${manifest.id}`;
   const acceptedFindings = result.state === "complete" || result.state === "partial" ? result.findings : [];
   const ids = new Map(
@@ -363,6 +335,8 @@ function normalizeAdapterEvidence(
   if (result.state === "complete")
     return {
       ...result,
+      schemaVersion: "smokinggun.adapter-result.v3",
+      rawArtifactContents: {},
       findings,
       coverage: [
         {
@@ -381,6 +355,8 @@ function normalizeAdapterEvidence(
     const skippedFiles = normalizedTargets.filter((target) => !analyzedSet.has(target));
     return {
       ...result,
+      schemaVersion: "smokinggun.adapter-result.v3",
+      rawArtifactContents: {},
       findings,
       coverage: [
         {
@@ -398,6 +374,8 @@ function normalizeAdapterEvidence(
   }
   return {
     ...result,
+    schemaVersion: "smokinggun.adapter-result.v3",
+    rawArtifactContents: {},
     findings: [],
     coverage: [
       {
@@ -416,12 +394,12 @@ function normalizeAdapterEvidence(
 
 function failedAdapter(
   requestId: string,
-  state: AdapterResultV2["state"],
+  state: AdapterResultV3["state"],
   message: string,
   requestDigest?: string,
-): AdapterResultV2 {
+): AdapterResultV3 {
   return {
-    schemaVersion: "smokinggun.adapter-result.v2",
+    schemaVersion: "smokinggun.adapter-result.v3",
     requestId,
     state,
     findings: [],
@@ -437,6 +415,7 @@ function failedAdapter(
     ],
     rawArtifacts: [],
     rawArtifactDigests: {},
+    rawArtifactContents: {},
     ...(requestDigest === undefined ? {} : {requestDigest}),
   };
 }
