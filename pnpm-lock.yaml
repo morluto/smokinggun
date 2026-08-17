@@ -30,8 +30,8 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
       web-tree-sitter:
-        specifier: 0.26.11
-        version: 0.26.11
+        specifier: 0.26.12
+        version: 0.26.12
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -3724,8 +3724,8 @@ packages:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
 
-  web-tree-sitter@0.26.11:
-    resolution: {integrity: sha512-Q5Dm3YTIXSXuH6FxX6RuzX2Qwpc4DPGiYMU87Wg5Z8OIStiQFiUex4zMDc0vBTw78EphaYJacncJghCHzbZptg==}
+  web-tree-sitter@0.26.12:
+    resolution: {integrity: sha512-fvqTNZQBGUgUgfP0mHw+iHf9Yf6bRQrp0A3pSf2v/hSKxkT1beCoIWoLVmlPL7O6dmySfSb/t1aJoJvrgTRStw==}
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
@@ -7209,7 +7209,7 @@ snapshots:
 
   walk-up-path@4.0.0: {}
 
-  web-tree-sitter@0.26.11: {}
+  web-tree-sitter@0.26.12: {}
 
   webidl-conversions@3.0.1: {}
 
