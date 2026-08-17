@@ -86,7 +86,7 @@
     "version:packages": "changeset version"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "2.13.0",
+    "@bufbuild/protobuf": "2.14.0",
     "@oclif/core": "4.13.3",
     "@scip-code/scip": "0.9.0",
     "csv-parse": "7.0.2",
