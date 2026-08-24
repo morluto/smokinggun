@@ -105,7 +105,7 @@
     "oxfmt": "0.62.0",
     "oxlint": "1.77.0",
     "simple-git-hooks": "2.13.1",
-    "verdaccio": "6.9.2",
+    "verdaccio": "6.10.0",
     "vite-plus": "0.2.8",
     "vitest": "3.2.7"
   },
