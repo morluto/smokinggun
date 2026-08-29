@@ -1,6 +1,6 @@
 {
   "name": "smokinggun",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "Evidence-bearing local complexity scanner and investigation tool for software-engineering agents.",
   "license": "MIT",
   "type": "module",
