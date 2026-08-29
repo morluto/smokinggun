@@ -38,4 +38,41 @@ describe("report renderers", () => {
   it("keeps assumptions visible in human output", () => {
     expect(renderScanReport(report, "human")).toContain("static only");
   });
+
+  it("reports a completed scan invocation as successful when diagnostics are present", () => {
+    const sarif = toSarif({
+      ...report,
+      diagnostics: [
+        {
+          schemaVersion: "smokinggun.problem.v1",
+          code: "findings-truncated",
+          message: "Finding output was truncated.",
+          recovery: "Increase the finding limit.",
+        },
+      ],
+    });
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: true}]}]});
+  });
+
+  it("reports unavailable scan coverage as an unsuccessful invocation", () => {
+    const sarif = toSarif({
+      ...report,
+      coverage: [
+        {
+          ...report.coverage[0],
+          parseStatus: "unavailable",
+          reason: "The scanner could not run.",
+        },
+      ],
+    });
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: false}]}]});
+  });
+
+  it("reports empty scan coverage as an unsuccessful invocation", () => {
+    const sarif = toSarif({...report, coverage: []});
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: false}]}]});
+  });
 });
