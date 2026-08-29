@@ -34,6 +34,7 @@ import {
 } from "./source-snapshot.js";
 import {withSourceSnapshotView} from "./snapshot-view.js";
 import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
+import {isAuxiliarySourcePath, type ScanProfile} from "./profile.js";
 
 type CoverageDetails = Pick<
   CoverageRecordV1,
@@ -76,6 +77,7 @@ export type ScanOptions = {
   readonly selection: ScannerSelection;
   readonly scope: ScanScope;
   readonly excludes?: ReadonlyArray<string>;
+  readonly profile?: ScanProfile;
   readonly maxFindings?: number;
   readonly signal?: AbortSignal;
   readonly adapters: ParsedExternalAdapters;
@@ -105,7 +107,14 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const sourceCaptureLimits = options.sourceCaptureLimits ?? defaultSourceCaptureLimits;
   const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
-  const files = discovered.files.filter(inScope);
+  const scopedFiles = discovered.files.filter(inScope);
+  const appliesRuntimeProfile =
+    rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime" && options.scope._tag === "EntireScanRoot";
+  const auxiliaryFiles = appliesRuntimeProfile
+    ? scopedFiles.filter((path) => isAuxiliarySourcePath(portablePath(relative(pathRoot, path))))
+    : [];
+  const auxiliaryFileSet = new Set(auxiliaryFiles);
+  const files = auxiliaryFiles.length === 0 ? scopedFiles : scopedFiles.filter((path) => !auxiliaryFileSet.has(path));
   const sourceSnapshot = await captureSourceSnapshot(
     pathRoot,
     files,
@@ -259,7 +268,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       : ["One or more selected TypeScript source files could not be read."]),
   ];
   const repository = await repositoryIdentity(root, files, options.signal);
-  const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
+  const inventory = await buildRepositoryInventory(pathRoot, scopedFiles, [...excludes]);
   const sourceDigest = sourceSnapshot.digest;
   const adapterRun = await runConfiguredAdapters(options.adapters, sourceSnapshot, options);
   findings.push(...adapterRun.findings);
@@ -346,6 +355,18 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       path: portablePath(relative(pathRoot, path)),
       recovery: "Replace the symlink with content inside the scan root before scanning.",
     })),
+    ...(auxiliaryFiles.length === 0
+      ? []
+      : [
+          {
+            schemaVersion: "smokinggun.problem.v1" as const,
+            code: "auxiliary-source-suppressed",
+            message: `Suppressed ${auxiliaryFiles.length} auxiliary source file${auxiliaryFiles.length === 1 ? "" : "s"} from the runtime scan profile.`,
+            detail:
+              "Tests, documentation, examples, and fixtures remain visible in repository inventory but do not produce runtime candidates by default.",
+            recovery: "Rerun with --source-profile all, or use --only with an explicit path to scan auxiliary source.",
+          },
+        ]),
     ...(allFindings.length === policyFindings.length
       ? []
       : [

@@ -92,6 +92,84 @@ describe("repository scan seam", () => {
     }
   });
 
+  it("suppresses auxiliary source from runtime findings without hiding it from inventory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-"));
+    try {
+      await mkdir(join(root, "docs"));
+      await mkdir(join(root, "src"));
+      await mkdir(join(root, "tests"));
+      const candidate = "for (const value of values) values.includes(value);\n";
+      await writeFile(join(root, "docs", "conf.py"), "for value in values:\n    value in values\n", "utf8");
+      await writeFile(join(root, "src", "product.ts"), candidate, "utf8");
+      await writeFile(join(root, "src", "product.test.ts"), candidate, "utf8");
+      await writeFile(join(root, "tests", "product.ts"), candidate, "utf8");
+
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64)});
+
+      expect(result.report.findings.map((finding) => finding.location.path)).toEqual([
+        "src/product.ts",
+        "src/product.ts",
+      ]);
+      expect(result.report.inventory?.tests).toEqual(["src/product.test.ts", "tests/product.ts"]);
+      expect(result.report.diagnostics).toContainEqual(
+        expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("3")}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("scans auxiliary source with the all profile or an explicit path scope", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-"));
+    try {
+      await mkdir(join(root, "tests"));
+      await writeFile(
+        join(root, "tests", "product.ts"),
+        "for (const value of values) values.includes(value);\n",
+        "utf8",
+      );
+
+      const all = await scanRepository(root, {
+        ...defaultScanOptions,
+        configDigest: "e".repeat(64),
+        profile: "all",
+      });
+      const explicitScope = parseScanScope(["tests"]);
+      if ("schemaVersion" in explicitScope) throw new Error(explicitScope.message);
+      const explicit = await scanRepository(root, {
+        ...defaultScanOptions,
+        configDigest: "e".repeat(64),
+        scope: explicitScope,
+      });
+
+      expect(all.report.findings.length).toBeGreaterThan(0);
+      expect(explicit.report.findings.length).toBeGreaterThan(0);
+      expect(all.report.diagnostics).not.toContainEqual(expect.objectContaining({code: "auxiliary-source-suppressed"}));
+      expect(explicit.report.diagnostics).not.toContainEqual(
+        expect.objectContaining({code: "auxiliary-source-suppressed"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("honors an explicitly selected auxiliary source file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-"));
+    try {
+      const path = join(root, "product.test.ts");
+      await writeFile(path, "for (const value of values) values.includes(value);\n", "utf8");
+
+      const result = await scanRepository(path, {...defaultScanOptions, configDigest: "e".repeat(64)});
+
+      expect(result.report.findings.length).toBeGreaterThan(0);
+      expect(result.report.diagnostics).not.toContainEqual(
+        expect.objectContaining({code: "auxiliary-source-suppressed"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it.skipIf(process.platform === "win32")("marks unreadable source files as incomplete coverage", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-unreadable-"));
     const unreadable = join(root, "unreadable.ts");

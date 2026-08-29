@@ -4,6 +4,7 @@ import type {OutputFormat} from "../config.js";
 import type {ActionRequiredV1, ProblemV1} from "../protocol/index.js";
 import {redactSensitive} from "../adapters/environment.js";
 import {toolIdentity} from "../tool-identity.js";
+import {scanProfiles} from "../scan/profile.js";
 
 export const globalFlags = {
   cwd: Flags.string({description: "Repository working directory."}),
@@ -16,6 +17,10 @@ export const globalFlags = {
   "non-interactive": Flags.boolean({description: "Never prompt for missing choices."}),
   strict: Flags.boolean({description: "Fail when requested coverage is incomplete."}),
   "fail-on": Flags.string({description: "Exit 4 when a finding matches a severity, rule ID, or finding."}),
+  "source-profile": Flags.string({
+    description: "Source profile to scan; runtime suppresses tests, docs, examples, and fixtures.",
+    options: [...scanProfiles],
+  }),
   exclude: Flags.string({description: "Directory name to exclude.", multiple: true}),
   "max-findings": Flags.integer({description: "Maximum findings to emit.", min: 1}),
 } as const;
@@ -162,6 +167,8 @@ function parseGlobalFlags(flags: unknown): GlobalFlags {
   if (strict !== undefined) normalized.strict = strict;
   const failOn = stringValue("fail-on") ?? stringValue("failOn");
   if (failOn !== undefined) normalized.failOn = failOn;
+  const sourceProfile = stringValue("source-profile") ?? stringValue("sourceProfile");
+  if (sourceProfile === "runtime" || sourceProfile === "all") normalized.sourceProfile = sourceProfile;
   const exclude = input.exclude;
   if (Array.isArray(exclude) && exclude.every((value): value is string => typeof value === "string"))
     normalized.exclude = exclude;

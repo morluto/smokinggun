@@ -51,6 +51,7 @@ export default class Investigate extends BaseCommand {
             selection: automaticScannerSelection(),
             scope: entireScanRoot(),
             excludes: context.config.exclude,
+            profile: context.config.sourceProfile,
             maxFindings: Number.MAX_SAFE_INTEGER,
             adapters,
             adapterAuthorization: adapterExecutionNotAuthorized,

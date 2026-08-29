@@ -23,8 +23,25 @@ describe("configuration", () => {
       expect(result.format).toBe("json");
       expect(result.maxFindings).toBe(12);
       expect(result.failOn).toBeUndefined();
+      expect(result.sourceProfile).toBe("runtime");
       expect(result.digest).toMatch(/^[a-f0-9]{64}$/);
     }
+  });
+
+  it("accepts scan profiles from configuration and the environment", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const config = join(directory, "smokinggun.config.json");
+    await writeFile(config, JSON.stringify({sourceProfile: "all"}), "utf8");
+    const fromFile = await loadConfig({config, cwd: directory});
+    const fromEnvironment = await loadConfig({cwd: directory}, {SMOKINGGUN_PROFILE: "all"});
+    expect(isConfigFailure(fromFile)).toBe(false);
+    expect(isConfigFailure(fromEnvironment)).toBe(false);
+    if (!isConfigFailure(fromFile)) expect(fromFile.sourceProfile).toBe("all");
+    if (!isConfigFailure(fromEnvironment)) expect(fromEnvironment.sourceProfile).toBe("all");
+    expect(await loadConfig({cwd: directory}, {SMOKINGGUN_PROFILE: "everything"})).toMatchObject({
+      _tag: "ConfigFailure",
+      code: "invalid-environment",
+    });
   });
 
   it("accepts the fail-on policy from the environment", async () => {
