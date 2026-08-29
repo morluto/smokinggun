@@ -91,7 +91,7 @@
     "@scip-code/scip": "0.9.0",
     "csv-parse": "7.0.2",
     "execa": "10.0.1",
-    "pprof-format": "2.3.0",
+    "pprof-format": "2.3.1",
     "typescript": "5.9.3",
     "web-tree-sitter": "0.26.12",
     "zod": "4.4.3"
