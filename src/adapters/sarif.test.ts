@@ -98,6 +98,26 @@ describe("SARIF import boundary", () => {
     expect(result.diagnostics.filter((diagnostic) => diagnostic.code === "sarif-path-outside-root")).toHaveLength(3);
   });
 
+  it("does not mistake Windows drive paths for URI schemes", () => {
+    const result = importSarif(
+      {
+        version: "2.1.0",
+        runs: [
+          {
+            tool: {driver: {name: "tool"}},
+            results: [{locations: [{physicalLocation: {artifactLocation: {uri: "C:\\repo\\src\\file.ts"}}}]}],
+          },
+        ],
+      },
+      "C:\\repo",
+      "a".repeat(64),
+    );
+
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    if (process.platform === "win32") expect(result.findings[0]?.location.path).toBe("src/file.ts");
+  });
+
   it("keeps result locations distinct from analyzed-file coverage", () => {
     const result = importSarif(
       {

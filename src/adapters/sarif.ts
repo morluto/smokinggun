@@ -195,10 +195,11 @@ export function importSarif(
 
 function normalizeSarifPath(path: string, root: string): string | undefined {
   const scheme = /^[a-z][a-z0-9+.-]*:/iu.exec(path)?.[0];
-  if (scheme !== undefined && scheme.toLowerCase() !== "file:") return undefined;
+  const isWindowsAbsolute = /^[a-z]:[\\/]/iu.test(path);
+  if (scheme !== undefined && !isWindowsAbsolute && scheme.toLowerCase() !== "file:") return undefined;
   let candidate: string;
   try {
-    candidate = (scheme === undefined ? path : fileURLToPath(path)).replace(/\\/g, "/");
+    candidate = (scheme === undefined || isWindowsAbsolute ? path : fileURLToPath(path)).replace(/\\/g, "/");
   } catch {
     return undefined;
   }
