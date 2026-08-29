@@ -10,7 +10,7 @@ import {
 } from "../protocol/index.js";
 import {comparePortable} from "../paths.js";
 import {stableJson} from "../serialization.js";
-import {writeFileAtomically} from "../files.js";
+import {decodeUtf8Bytes, writeFileAtomically} from "../files.js";
 
 type StoredInvestigation = {
   readonly bundle: InvestigationBundleV2;
@@ -429,7 +429,7 @@ async function readOptional(path: string): Promise<string | undefined> {
     const info = await handle.stat();
     if (!info.isFile() || info.size > 16 * 1024 * 1024)
       throw new Error(`Investigation store entry ${path} is not a bounded regular file.`);
-    return (await handle.readFile()).toString("utf8");
+    return decodeUtf8Bytes(await handle.readFile());
   } finally {
     await handle.close();
   }
