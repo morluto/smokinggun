@@ -1,3 +1,4 @@
+import {existsSync} from "node:fs";
 import {access, mkdtemp, rm, truncate, writeFile} from "node:fs/promises";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
@@ -10,6 +11,8 @@ import {
   loadExternalAdapters,
   parseExternalAdapters,
 } from "./external.js";
+
+const sandboxIt = it.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"));
 
 it("blocks network-capable adapters before capability probing", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
@@ -61,6 +64,57 @@ it("does not execute adapter probes without explicit authorization", async () =>
     if (descriptor?.availability === "unavailable") expect(descriptor.reason).toContain("explicit authorization");
     expect(result.diagnostics[0]?.code).toBe("adapter-execution-required");
     await expect(access(marker)).rejects.toMatchObject({code: "ENOENT"});
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+sandboxIt("probes the complete adapter command when no probe command is declared", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
+  try {
+    const manifest = join(root, "adapter.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        schemaVersion: "smokinggun.adapter-manifest.v1",
+        id: "missing-entrypoint-adapter",
+        version: "1.0.0",
+        command: [execPath, "missing-adapter.js"],
+        capabilities: ["static-scan"],
+        limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+      }),
+      "utf8",
+    );
+
+    const result = await loadExternalAdapters([manifest], root, {authorization: adapterExecutionAuthorized});
+
+    expect(result.descriptors[0]?.availability).toBe("unavailable");
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+sandboxIt("uses an explicit probe command instead of the adapter command", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
+  try {
+    const manifest = join(root, "adapter.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        schemaVersion: "smokinggun.adapter-manifest.v1",
+        id: "explicit-probe-adapter",
+        version: "1.0.0",
+        command: [execPath, "missing-adapter.js"],
+        probeCommand: [execPath, "--version"],
+        capabilities: ["static-scan"],
+        limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+      }),
+      "utf8",
+    );
+
+    const result = await loadExternalAdapters([manifest], root, {authorization: adapterExecutionAuthorized});
+
+    expect(result.descriptors[0]?.availability).toBe("available");
   } finally {
     await rm(root, {recursive: true, force: true});
   }

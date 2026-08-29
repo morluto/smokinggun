@@ -265,7 +265,7 @@ async function probeExternalAdapter(
   runtimeRoots?: ReadonlyArray<string>,
   signal?: AbortSignal,
 ): Promise<ExternalAdapterProbe> {
-  const command = manifest.probeCommand ?? [manifest.command[0] ?? "", "--version"];
+  const command = manifest.probeCommand ?? [...manifest.command, "--version"];
   const sandboxed = await sandboxAdapterCommand(command, root, runtimeRoots);
   if ("schemaVersion" in sandboxed) return {available: false, reason: sandboxed.message};
   try {
