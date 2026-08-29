@@ -669,6 +669,24 @@ try {
   )
     throw new Error("a missing investigation must fail before importing context");
 
+  const invalidContextInvestigation = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    "invalid-id",
+    "--format",
+    "json",
+  ]);
+  const invalidContextInvestigationValue = JSON.parse(invalidContextInvestigation.stdout);
+  if (
+    invalidContextInvestigation.code !== 2 ||
+    invalidContextInvestigationValue.schemaVersion !== "smokinggun.problem.v1" ||
+    invalidContextInvestigationValue.code !== "investigation-unavailable"
+  )
+    throw new Error("an invalid investigation ID must produce a structured unavailable problem");
+
   const missingContext = await run([
     entry,
     "context",

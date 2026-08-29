@@ -25,13 +25,24 @@ export default class ContextImport extends BaseCommand {
     const investigation =
       parsed.flags.investigation === undefined
         ? undefined
-        : await loadLatestInvestigation(context.artifacts, parsed.flags.investigation);
+        : await loadLatestInvestigation(context.artifacts, parsed.flags.investigation).catch(() =>
+            this.emitProblem(
+              {
+                schemaVersion: "smokinggun.problem.v1",
+                code: "investigation-unavailable",
+                message: "The requested investigation is invalid or does not exist.",
+                recovery: "Create or select an existing investigation before importing context.",
+              },
+              2,
+              context,
+            ),
+          );
     if (parsed.flags.investigation !== undefined && investigation === undefined)
       this.emitProblem(
         {
           schemaVersion: "smokinggun.problem.v1",
           code: "investigation-unavailable",
-          message: "The requested investigation does not exist.",
+          message: "The requested investigation is invalid or does not exist.",
           recovery: "Create or select an existing investigation before importing context.",
         },
         2,
