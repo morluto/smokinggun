@@ -10,7 +10,6 @@ import {resolveConfiguredPath} from "../config.js";
 import {loadLatestInvestigation, recordParsedInvestigationSnapshot} from "../investigations/store.js";
 import {stableJson} from "../serialization.js";
 import {automaticScannerSelection, entireScanRoot} from "../scan/selection.js";
-import {adapterExecutionNotAuthorized, parseExternalAdapters} from "../scanners/external.js";
 import {encodeScanArtifact} from "../reports/scan-artifact.js";
 
 export default class Investigate extends BaseCommand {
@@ -44,7 +43,6 @@ export default class Investigate extends BaseCommand {
         );
       let report: ScanReportV2 | undefined;
       if (!parsed.flags["plan-only"]) {
-        const adapters = await parseExternalAdapters(context.config.adapters, context.config.cwd, context.signal);
         report = (
           await scanRepository(target, {
             configDigest: context.config.digest,
@@ -53,8 +51,6 @@ export default class Investigate extends BaseCommand {
             excludes: context.config.exclude,
             profile: context.config.sourceProfile,
             maxFindings: Number.MAX_SAFE_INTEGER,
-            adapters,
-            adapterAuthorization: adapterExecutionNotAuthorized,
             signal: context.signal,
           })
         ).report;

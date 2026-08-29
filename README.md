@@ -47,11 +47,11 @@ focus explicitly on an auxiliary area.
 
 Static scans are read-only, offline, and do not execute repository code or modify source files. Findings are candidates, not proof. SmokingGun imports measurement evidence from existing benchmark tools; it does not launch workloads or rewrite code.
 
-Semantic scanners consume the captured source snapshot directly. External adapters run only with explicit authorization and an enforcing read-only sandbox; they receive captured source bytes rather than the live checkout. Benchmark, profile, and measurement artifacts cross an import boundary without granting workload-execution authority. See [the authority architecture](docs/architecture.md) for the ownership rules behind these choices.
+Semantic scanners consume the captured source snapshot directly. Benchmark, profile, and measurement artifacts cross an import boundary without granting workload-execution authority. See [the authority architecture](docs/architecture.md) for the ownership rules behind these choices.
 
 ## Input requirements
 
-Textual inputs—including configuration, adapter manifests, reports, and JSON evidence artifacts—must be valid UTF-8. SmokingGun rejects malformed byte sequences instead of silently replacing them, because replacement text would no longer represent the captured evidence. Binary formats such as gzip-compressed pprof profiles remain binary until their format decoder handles them.
+Textual inputs—including configuration, reports, and JSON evidence artifacts—must be valid UTF-8. SmokingGun rejects malformed byte sequences instead of silently replacing them, because replacement text would no longer represent the captured evidence. Binary formats such as gzip-compressed pprof profiles remain binary until their format decoder handles them.
 
 Numeric pprof fields must fit JavaScript's exact integer range (`Number.MIN_SAFE_INTEGER` through `Number.MAX_SAFE_INTEGER`). SmokingGun rejects values outside that range instead of rounding identifiers or measurements.
 

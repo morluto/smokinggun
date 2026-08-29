@@ -6,7 +6,6 @@ import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import {printResult} from "../cli/command-output.js";
 import {probeTreeSitter} from "../parsers/tree-sitter-runtime.js";
 import {toolIdentity} from "../tool-identity.js";
-import {adapterExecutionNotAuthorized, loadExternalAdapters} from "../scanners/external.js";
 import {listScanners} from "../scanners/registry.js";
 
 export default class Doctor extends BaseCommand {
@@ -24,11 +23,7 @@ export default class Doctor extends BaseCommand {
     const registry = parsed.flags["check-updates"]
       ? await checkRegistry(context.config.cwd, context.signal)
       : {state: "not-requested" as const};
-    const external = await loadExternalAdapters(context.config.adapters, context.config.cwd, {
-      signal: context.signal,
-      authorization: adapterExecutionNotAuthorized,
-    });
-    const scanners = listScanners(external.descriptors);
+    const scanners = listScanners();
     const result = {
       schemaVersion: "smokinggun.doctor.v1",
       version: toolIdentity.version,

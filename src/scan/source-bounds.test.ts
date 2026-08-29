@@ -2,7 +2,6 @@ import {mkdtemp, mkdir, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {expect, it} from "vitest";
-import {adapterExecutionNotAuthorized, noExternalAdapters} from "../scanners/external.js";
 import {scanRepository} from "./repository.js";
 import {automaticScannerSelection, entireScanRoot} from "./selection.js";
 
@@ -16,8 +15,6 @@ it("makes bounded traversal visible in every applicable coverage claim", async (
       configDigest: "d".repeat(64),
       selection: automaticScannerSelection(),
       scope: entireScanRoot(),
-      adapters: noExternalAdapters(),
-      adapterAuthorization: adapterExecutionNotAuthorized,
       sourceCaptureLimits: {
         maxFiles: 1,
         maxDirectories: 10,
@@ -45,8 +42,6 @@ it("makes depth-bounded traversal visible instead of reporting an unmatched clea
       configDigest: "d".repeat(64),
       selection: automaticScannerSelection(),
       scope: entireScanRoot(),
-      adapters: noExternalAdapters(),
-      adapterAuthorization: adapterExecutionNotAuthorized,
       sourceCaptureLimits: {
         maxFiles: 10,
         maxDirectories: 10,
@@ -77,8 +72,6 @@ it("reserves the source-file bound for runtime files", async () => {
       configDigest: "d".repeat(64),
       selection: automaticScannerSelection(),
       scope: entireScanRoot(),
-      adapters: noExternalAdapters(),
-      adapterAuthorization: adapterExecutionNotAuthorized,
       sourceCaptureLimits: {
         maxFiles: 1,
         maxDirectories: 10,
@@ -107,8 +100,6 @@ it("reserves the directory bound for runtime directories", async () => {
       configDigest: "d".repeat(64),
       selection: automaticScannerSelection(),
       scope: entireScanRoot(),
-      adapters: noExternalAdapters(),
-      adapterAuthorization: adapterExecutionNotAuthorized,
       sourceCaptureLimits: {
         maxFiles: 10,
         maxDirectories: 2,
@@ -137,8 +128,6 @@ it("keeps depth bounds local to an auxiliary branch", async () => {
       configDigest: "d".repeat(64),
       selection: automaticScannerSelection(),
       scope: entireScanRoot(),
-      adapters: noExternalAdapters(),
-      adapterAuthorization: adapterExecutionNotAuthorized,
       sourceCaptureLimits: {
         maxFiles: 10,
         maxDirectories: 10,

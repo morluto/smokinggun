@@ -83,7 +83,6 @@ export type ScannerSelection =
   | {
       readonly _tag: "ExplicitScannerSelection";
       readonly backends: ReadonlySet<BuiltInScanBackend>;
-      readonly adapters: ReadonlySet<string>;
     };
 
 export type ScanScope =
@@ -111,10 +110,7 @@ export function entireScanRoot(): ScanScope {
 }
 
 /** Parse command-line scanner values before they reach repository scanning. */
-export function parseScannerSelection(
-  values: ReadonlyArray<string> | undefined,
-  configuredAdapterIds: ReadonlyArray<string>,
-): ScannerSelection | ProblemV1 {
+export function parseScannerSelection(values: ReadonlyArray<string> | undefined): ScannerSelection | ProblemV1 {
   const requested =
     values?.flatMap((value) =>
       value
@@ -128,17 +124,11 @@ export function parseScannerSelection(
     return invalidSelection("auto cannot be combined with explicit scanner IDs.");
   }
   const backends = new Set<BuiltInScanBackend>();
-  const adapters = new Set<string>();
-  const configured = new Set(configuredAdapterIds);
   const unknown: string[] = [];
   for (const id of requested) {
     const definition = scannerDefinitions.find((candidate) => candidate.id === id || candidate.aliases.includes(id));
     if (definition !== undefined) {
       backends.add(definition.backend);
-      continue;
-    }
-    if (configured.has(id)) {
-      adapters.add(id);
       continue;
     }
     unknown.push(id);
@@ -147,7 +137,7 @@ export function parseScannerSelection(
     return invalidSelection(
       `Unknown scanner ID${unknown.length === 1 ? "" : "s"}: ${[...new Set(unknown)].join(", ")}.`,
     );
-  return {_tag: "ExplicitScannerSelection", backends, adapters};
+  return {_tag: "ExplicitScannerSelection", backends};
 }
 
 /** Parse `--only` values into root-relative, supported source filters. */
@@ -188,11 +178,6 @@ export function parseScanScope(values: ReadonlyArray<string> | undefined): ScanS
 /** Whether the parsed selection requires a built-in backend. */
 export function runsBuiltInScanner(selection: ScannerSelection, backend: BuiltInScanBackend): boolean {
   return selection._tag === "AutomaticScannerSelection" || selection.backends.has(backend);
-}
-
-/** Whether the parsed selection requires an external adapter. */
-export function runsAdapter(selection: ScannerSelection, adapterId: string): boolean {
-  return selection._tag === "AutomaticScannerSelection" || selection.adapters.has(adapterId);
 }
 
 /** Whether the selection explicitly required a backend even when no compatible source files exist. */

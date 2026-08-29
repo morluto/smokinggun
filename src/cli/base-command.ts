@@ -2,7 +2,7 @@ import {Command, Flags} from "@oclif/core";
 import {createRuntimeContext, isContextFailure, type GlobalFlags, type RuntimeContext} from "./context.js";
 import type {OutputFormat} from "../config.js";
 import type {ActionRequiredV1, ProblemV1} from "../protocol/index.js";
-import {redactSensitive} from "../adapters/environment.js";
+import {redactSensitive} from "../redaction.js";
 import {toolIdentity} from "../tool-identity.js";
 import {scanProfiles} from "../scan/profile.js";
 

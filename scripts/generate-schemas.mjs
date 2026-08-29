@@ -11,10 +11,6 @@ const schemas = {
   "repository-inventory-v1": Protocol.inventory,
   "context-index-v1": Protocol.contextIndex,
   "scan-report-v2": Protocol.scanReport,
-  "adapter-manifest-v1": Protocol.adapterManifest,
-  "adapter-request-v1": Protocol.adapterRequest,
-  "adapter-result-v2": Protocol.adapterResultV2,
-  "adapter-result-v3": Protocol.adapterResult,
   "evidence-v2": Protocol.evidence,
   "measurement-v1": Protocol.measurement,
   "benchmark-record-v2": Protocol.benchmarkRecord,
@@ -29,8 +25,6 @@ const schemas = {
 };
 
 const semanticSchemas = new Set([
-  "adapter-result-v2",
-  "adapter-result-v3",
   "benchmark-import-v2",
   "benchmark-record-v2",
   "evidence-v2",

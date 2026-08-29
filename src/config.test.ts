@@ -79,7 +79,7 @@ describe("configuration", () => {
     await mkdir(nested, {recursive: true});
     await writeFile(
       join(directory, "smokinggun.config.json"),
-      JSON.stringify({cwd: ".", output: "artifacts/report.json", adapters: ["adapters/example.json"]}),
+      JSON.stringify({cwd: ".", output: "artifacts/report.json"}),
       "utf8",
     );
     const result = await loadConfig({}, {XDG_CONFIG_HOME: join(directory, "missing-user-config")}, nested);
@@ -87,7 +87,6 @@ describe("configuration", () => {
     if (!isConfigFailure(result)) {
       expect(result.cwd).toBe(directory);
       expect(result.output).toBe(join(directory, "artifacts", "report.json"));
-      expect(result.adapters).toEqual([join(directory, "adapters", "example.json")]);
     }
   });
 
@@ -108,10 +107,10 @@ describe("configuration", () => {
     const outside = join(parent, "outside");
     await mkdir(nested, {recursive: true});
     await mkdir(outside);
-    for (const field of ["cwd", "output", "adapters"] as const) {
+    for (const field of ["cwd", "output"] as const) {
       const link = join(directory, `escape-${field}`);
       await symlink(outside, link, "dir");
-      const value = field === "adapters" ? {[field]: [`escape-${field}/adapter.json`]} : {[field]: `escape-${field}`};
+      const value = {[field]: `escape-${field}`};
       await writeFile(join(directory, "smokinggun.config.json"), JSON.stringify(value), "utf8");
       const result = await loadConfig({}, {XDG_CONFIG_HOME: join(parent, "missing-user-config")}, nested);
       expect(result).toMatchObject({_tag: "ConfigFailure", code: "config-path-traversal"});
@@ -130,7 +129,6 @@ describe("configuration", () => {
       JSON.stringify({
         cwd: repository,
         output: join(repository, "report.json"),
-        adapters: [join(repository, "adapter.json")],
       }),
       "utf8",
     );
@@ -141,31 +139,22 @@ describe("configuration", () => {
     if (!isConfigFailure(result)) {
       expect(result.cwd).toBe(repository);
       expect(result.output).toBe(join(repository, "report.json"));
-      expect(result.adapters).toEqual([join(repository, "adapter.json")]);
     }
   });
 
-  it("canonicalizes duplicate set-like configuration and rejects empty path entries", async () => {
+  it("canonicalizes duplicate set-like configuration", async () => {
     const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
     const duplicate = join(directory, "duplicate.json");
     const canonical = join(directory, "canonical.json");
-    await writeFile(
-      duplicate,
-      JSON.stringify({exclude: ["dist", "dist", "node_modules"], adapters: ["adapter.json", "adapter.json"]}),
-      "utf8",
-    );
-    await writeFile(canonical, JSON.stringify({exclude: ["dist", "node_modules"], adapters: ["adapter.json"]}), "utf8");
+    await writeFile(duplicate, JSON.stringify({exclude: ["dist", "dist", "node_modules"]}), "utf8");
+    await writeFile(canonical, JSON.stringify({exclude: ["dist", "node_modules"]}), "utf8");
     const duplicateResult = await loadConfig({config: duplicate, cwd: directory});
     const canonicalResult = await loadConfig({config: canonical, cwd: directory});
     expect(isConfigFailure(duplicateResult)).toBe(false);
     expect(isConfigFailure(canonicalResult)).toBe(false);
     if (!isConfigFailure(duplicateResult) && !isConfigFailure(canonicalResult)) {
       expect(duplicateResult.exclude).toEqual(["dist", "node_modules"]);
-      expect(duplicateResult.adapters).toEqual([join(directory, "adapter.json")]);
       expect(duplicateResult.digest).toBe(canonicalResult.digest);
     }
-    const invalid = join(directory, "invalid.json");
-    await writeFile(invalid, JSON.stringify({adapters: [""]}), "utf8");
-    expect(isConfigFailure(await loadConfig({config: invalid, cwd: directory}))).toBe(true);
   });
 });

@@ -9,15 +9,15 @@ describe("scan selection boundary", () => {
       "smokinggun.python-semantic",
       "smokinggun.tree-sitter",
     ]) {
-      const selection = parseScannerSelection([id], []);
+      const selection = parseScannerSelection([id]);
       expect("schemaVersion" in selection).toBe(false);
     }
   });
 
   it("rejects unknown and ambiguous scanner requests before scanning", () => {
-    const unknown = parseScannerSelection(["definitely-not-a-scanner"], []);
+    const unknown = parseScannerSelection(["definitely-not-a-scanner"]);
     expect(unknown).toMatchObject({code: "invalid-scanner-selection"});
-    const ambiguous = parseScannerSelection(["auto", "smokinggun.structural"], []);
+    const ambiguous = parseScannerSelection(["auto", "smokinggun.structural"]);
     expect(ambiguous).toMatchObject({code: "invalid-scanner-selection"});
   });
 

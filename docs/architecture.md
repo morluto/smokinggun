@@ -14,9 +14,9 @@ A producer that cannot capture an input within declared bounds returns visible i
 
 ### 2. The host owns scope and producer identity
 
-The scan plan defines one canonical target set. Built-in scanners and external adapters consume that plan. The host stamps producer identity, reconciles every result with the target set, and derives coverage from its target ledger.
+The scan plan defines one canonical target set. Built-in scanners consume that plan. The host stamps producer identity, reconciles every result with the target set, and derives coverage from its target ledger.
 
-Adapter-supplied identity, coverage, policy, and digest fields are untrusted claims until the host binds them to the request and retained bytes. Out-of-scope or unverifiable evidence cannot become complete coverage or policy evidence.
+Imported identity, coverage, policy, and digest fields are untrusted claims until the host binds them to retained bytes. Out-of-scope or unverifiable evidence cannot become complete coverage or policy evidence.
 
 ### 3. Imports do not acquire producer authority
 
@@ -37,7 +37,7 @@ Atomic replacement prevents torn files; it is not compare-and-swap and does not 
 ## Ownership map
 
 ```text
-CLI / protocol adapters
+CLI / protocol boundaries
   parse unknown input and render typed outcomes
              |
              v
@@ -62,6 +62,6 @@ SmokingGun is the product, executable, protocol namespace, scanner namespace, an
 
 ## Feature boundary
 
-New scanners, adapters, measurement models, and investigation states must preserve these invariants end to end. A feature that cannot establish its claimed boundary is removed or reported as unavailable rather than preserved through compatibility logic.
+New scanners, import formats, measurement models, and investigation states must preserve these invariants end to end. A feature that cannot establish its claimed boundary is removed or reported as unavailable rather than preserved through compatibility logic.
 
-The authoritative scan path ends at content-addressed reports. Structural, TypeScript, and Python scanners consume captured text; explicitly authorized adapters receive a private read-only materialization of those same bytes plus narrow runtime roots explicitly selected by the host. Adapter manifests cannot widen host filesystem visibility. Adapter artifacts cross the bounded AdapterResultV3 JSON channel as base64 bytes and are retained by exact digest; artifact-free AdapterResultV2 remains accepted, and adapters receive no writable host mount. SmokingGun owns no workload runner or execution backend. Measurements and scaling analyses enter only as external artifacts; unverifiable provenance remains visible and blocks promotion.
+The authoritative scan path ends at content-addressed reports. Structural, TypeScript, and Python scanners consume captured text. SmokingGun owns no workload runner, plugin runtime, or execution backend. Measurements and scaling analyses enter only as external artifacts; unverifiable provenance remains visible and blocks promotion.

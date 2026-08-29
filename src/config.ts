@@ -25,7 +25,6 @@ const fileConfigSchema = z.strictObject({
   failOn: z.string().min(1).optional(),
   sourceProfile: z.enum(scanProfiles).optional(),
   exclude: z.array(z.string().min(1)).optional(),
-  adapters: z.array(z.string().min(1)).optional(),
   maxFindings: z.number().int().positive().optional(),
 });
 
@@ -44,7 +43,6 @@ export type CliOverrides = Readonly<{
   readonly failOn?: string;
   readonly sourceProfile?: ScanProfile;
   readonly exclude?: ReadonlyArray<string>;
-  readonly adapters?: ReadonlyArray<string>;
   readonly maxFindings?: number;
 }>;
 
@@ -60,7 +58,6 @@ export type RuntimeConfig = {
   readonly failOn: string | undefined;
   readonly sourceProfile: ScanProfile;
   readonly exclude: ReadonlyArray<string>;
-  readonly adapters: ReadonlyArray<string>;
   readonly maxFindings: number;
   readonly source: string;
   readonly digest: string;
@@ -80,7 +77,6 @@ const defaults: FileConfig = {
   failOn: undefined,
   sourceProfile: "runtime",
   exclude: [],
-  adapters: [],
   maxFindings: 80,
 };
 
@@ -142,10 +138,6 @@ export async function loadConfig(
         ? initialCwd
         : dirname(configPath);
   const resolvedOutput = merged.output === undefined ? undefined : resolve(outputBase, merged.output);
-  const resolvedAdapters = resolveAdapterPaths(
-    merged.adapters ?? [],
-    configPath === undefined ? initialCwd : dirname(configPath),
-  );
 
   // Validate auto-discovered config paths to prevent traversal attacks (#73)
   if (configPath !== undefined && configScope === "project") {
@@ -165,15 +157,6 @@ export async function loadConfig(
         `output resolves to ${resolvedOutput}, which escapes ${configRoot}. Use --output to override explicitly.`,
       );
     }
-    for (const adapterPath of resolvedAdapters) {
-      if (!isWithinRoot(configRoot, await canonicalProspectivePath(adapterPath))) {
-        return configFailure(
-          "config-path-traversal",
-          "Auto-discovered configuration references an adapter outside its project root.",
-          `adapter ${adapterPath} escapes ${configRoot}. Use --adapter to override explicitly.`,
-        );
-      }
-    }
   }
 
   const normalized: RuntimeConfig = {
@@ -188,7 +171,6 @@ export async function loadConfig(
     failOn: merged.failOn,
     sourceProfile: merged.sourceProfile ?? "runtime",
     exclude: uniqueSorted(merged.exclude ?? []),
-    adapters: resolvedAdapters,
     maxFindings: merged.maxFindings ?? 80,
     source,
     digest: digestConfig({
@@ -202,7 +184,6 @@ export async function loadConfig(
       failOn: merged.failOn,
       sourceProfile: merged.sourceProfile ?? "runtime",
       exclude: uniqueSorted(merged.exclude ?? []),
-      adapters: resolvedAdapters,
       maxFindings: merged.maxFindings ?? 80,
     }),
   };
@@ -315,8 +296,6 @@ function parseEnvironment(environment: NodeJS.ProcessEnv): FileConfig | ConfigFa
   }
   if (environment.SMOKINGGUN_EXCLUDE !== undefined)
     values.exclude = environment.SMOKINGGUN_EXCLUDE.split(",").filter((value) => value.length > 0);
-  if (environment.SMOKINGGUN_ADAPTERS !== undefined)
-    values.adapters = environment.SMOKINGGUN_ADAPTERS.split(",").filter((value) => value.length > 0);
   return values;
 }
 
@@ -333,17 +312,12 @@ function stripConfigMeta(overrides: CliOverrides): FileConfig {
   if (overrides.failOn !== undefined) values.failOn = overrides.failOn;
   if (overrides.sourceProfile !== undefined) values.sourceProfile = overrides.sourceProfile;
   if (overrides.exclude !== undefined) values.exclude = [...overrides.exclude];
-  if (overrides.adapters !== undefined) values.adapters = [...overrides.adapters];
   if (overrides.maxFindings !== undefined) values.maxFindings = overrides.maxFindings;
   return values;
 }
 
 function uniqueSorted(values: ReadonlyArray<string>): string[] {
   return [...new Set(values)].sort(comparePortable);
-}
-
-function resolveAdapterPaths(values: ReadonlyArray<string>, base: string): string[] {
-  return uniqueSorted(values.map((value) => resolve(base, value)));
 }
 
 function digestConfig(value: unknown): string {

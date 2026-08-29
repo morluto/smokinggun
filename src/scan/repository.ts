@@ -1,5 +1,4 @@
 import {lstat, readdir, stat} from "node:fs/promises";
-import {createHash} from "node:crypto";
 import {relative, resolve} from "node:path";
 import {execa} from "execa";
 import {type CoverageRecordV1, type FindingV2, type ProblemV1, type ScanReportV2} from "../protocol/index.js";
@@ -19,14 +18,12 @@ import {
 import {scanTypeScriptSnapshot, semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {buildRepositoryInventory} from "./inventory.js";
-import type {AdapterExecutionAuthorization, ParsedExternalAdapters} from "../scanners/external.js";
 import {toolIdentity} from "../tool-identity.js";
 import {stableJson} from "../serialization.js";
 import {
   explicitlyRequiresScanner,
   hasUnmatchedExplicitScope,
   matchesScanScope,
-  runsAdapter,
   runsBuiltInScanner,
   type ScanScope,
   type ScannerSelection,
@@ -37,8 +34,6 @@ import {
   type SourceCaptureLimits,
   type UnavailableSourceFile,
 } from "./source-snapshot.js";
-import {withSourceSnapshotView} from "./snapshot-view.js";
-import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
 import {isAuxiliarySourceDirectory, isAuxiliarySourcePath, type ScanProfile} from "./profile.js";
 
 type CoverageDetails = Pick<
@@ -85,14 +80,7 @@ export type ScanOptions = {
   readonly profile?: ScanProfile;
   readonly maxFindings?: number;
   readonly signal?: AbortSignal;
-  readonly adapters: ParsedExternalAdapters;
-  readonly adapterAuthorization: AdapterExecutionAuthorization;
-  readonly adapterRuntimeRoots?: ReadonlyArray<string>;
   readonly sourceCaptureLimits?: SourceCaptureLimits;
-  readonly retainAdapterArtifact?: (
-    path: string,
-    bytes: Uint8Array,
-  ) => Promise<{readonly reference: string; readonly digest: string}>;
 };
 
 export type ScanRepositoryResult = {
@@ -280,9 +268,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const repository = await repositoryIdentity(root, files, options.signal);
   const inventory = await buildRepositoryInventory(pathRoot, scopedFiles, [...excludes]);
   const sourceDigest = sourceSnapshot.digest;
-  const adapterRun = await runConfiguredAdapters(options.adapters, sourceSnapshot, options);
-  findings.push(...adapterRun.findings);
-  parseDiagnostics.push(...adapterRun.diagnostics);
   parseDiagnostics.push(...scannerDisagreements(findings));
   const policyFindings = relateFindings(findings).sort(compareFindings);
   const allFindings = pruneFindingRelations(selectRepresentativeFindings(policyFindings, options.maxFindings ?? 80));
@@ -477,7 +462,6 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     ...parserRecords,
     ...(semanticCoverage === undefined ? [] : [semanticCoverage]),
     ...(pythonCoverage === undefined ? [] : [pythonCoverage]),
-    ...adapterRun.coverage,
   ];
   const resolvedCoverage = resolveCoverageIdentityCollisions(coverageRecords);
   const report: ScanReportV2 = {
@@ -500,194 +484,9 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         ? "Review coverage and unknowns before concluding that no optimization candidate exists."
         : "Inspect the first candidate from each represented repository area; ordering is deterministic, not runtime importance.",
     filesModified: [],
-    rawArtifacts: [...adapterRun.rawArtifacts],
-    ...(Object.keys(adapterRun.rawArtifactDigests).length === 0
-      ? {}
-      : {rawArtifactDigests: adapterRun.rawArtifactDigests}),
+    rawArtifacts: [],
   };
   return {report, policyFindings};
-}
-
-async function runConfiguredAdapters(
-  parsed: ParsedExternalAdapters,
-  snapshot: Awaited<ReturnType<typeof captureSourceSnapshot>>,
-  options: ScanOptions,
-): Promise<{
-  readonly findings: ReadonlyArray<FindingV2>;
-  readonly coverage: ReadonlyArray<CoverageRecordV1>;
-  readonly diagnostics: ReadonlyArray<ProblemV1>;
-  readonly rawArtifacts: ReadonlyArray<string>;
-  readonly rawArtifactDigests: Readonly<Record<string, string>>;
-}> {
-  if (parsed.adapters.length === 0 && parsed.invalidDescriptors.length === 0 && parsed.diagnostics.length === 0)
-    return {
-      findings: [],
-      coverage: [],
-      diagnostics: [],
-      rawArtifacts: [],
-      rawArtifactDigests: {},
-    };
-  const selectedAdapters = selectExternalAdapters(parsed, options.selection);
-  if (
-    selectedAdapters.adapters.length === 0 &&
-    selectedAdapters.invalidDescriptors.length === 0 &&
-    selectedAdapters.diagnostics.length === 0
-  )
-    return {
-      findings: [],
-      coverage: [],
-      diagnostics: [],
-      rawArtifacts: [],
-      rawArtifactDigests: {},
-    };
-  const findings: FindingV2[] = [];
-  const coverage: CoverageRecordV1[] = [];
-  const diagnostics: ProblemV1[] = [...selectedAdapters.diagnostics];
-  const rawArtifacts: string[] = [];
-  const rawArtifactDigests: Record<string, string> = {};
-  const sourceTargets = snapshot.capturedFiles.map((file) => file.path).sort(comparePortable);
-  const unavailableTargets = snapshot.files
-    .flatMap((file) => (file._tag === "unavailable" ? [file.path] : []))
-    .sort(comparePortable);
-  const invalidCoverageIdentities = new Set<string>();
-  for (const descriptor of selectedAdapters.invalidDescriptors) {
-    const scanner = `smokinggun.adapter:${descriptor.id}`;
-    const identity = `${scanner}\0${descriptor.version}\0mixed`;
-    if (invalidCoverageIdentities.has(identity)) continue;
-    invalidCoverageIdentities.add(identity);
-    coverage.push({
-      scanner,
-      version: descriptor.version,
-      language: "mixed",
-      filesDiscovered: snapshot.requestedFileCount,
-      filesAnalyzed: 0,
-      parseStatus: "unavailable",
-      skippedFiles: sourceTargets,
-      reason: descriptor.availability === "invalid" ? descriptor.reason : "Adapter manifest validation failed.",
-    });
-  }
-  const runAdapters = async (snapshotRoot: string): Promise<void> => {
-    for (const adapter of selectedAdapters.adapters) {
-      if (!runsAdapter(options.selection, adapter.manifest.id)) continue;
-      const language = adapter.manifest.languages.length === 1 ? (adapter.manifest.languages[0] ?? "mixed") : "mixed";
-      const unavailable = (code: string, message: string, recovery: string): void => {
-        diagnostics.push({schemaVersion: "smokinggun.problem.v1", code, message, recovery});
-        coverage.push({
-          scanner: `smokinggun.adapter:${adapter.manifest.id}`,
-          version: adapter.manifest.version,
-          language,
-          filesDiscovered: snapshot.requestedFileCount,
-          filesAnalyzed: 0,
-          parseStatus: "unavailable",
-          skippedFiles: sourceTargets,
-          reason: message,
-        });
-      };
-      if (!adapter.manifest.capabilities.includes("static-scan")) {
-        unavailable(
-          "adapter-capability-mismatch",
-          `Adapter ${adapter.manifest.id} does not declare the requested static-scan capability.`,
-          "Use an adapter whose manifest supports static-scan.",
-        );
-        continue;
-      }
-      if (options.adapterAuthorization._tag !== "AdapterExecutionAuthorized") {
-        unavailable(
-          "adapter-execution-required",
-          `Adapter ${adapter.manifest.id} was not executed because explicit authorization is missing.`,
-          "Rerun with --allow-adapter-execution.",
-        );
-        continue;
-      }
-      if (adapter.manifest.sideEffects.includes("network")) {
-        unavailable(
-          "adapter-network-blocked",
-          `Adapter ${adapter.manifest.id} requests network access during an offline static scan.`,
-          "Use an offline adapter with no network side effect.",
-        );
-        continue;
-      }
-      const request = {
-        schemaVersion: "smokinggun.adapter-request.v1" as const,
-        requestId: `req_${createHash("sha256").update(`${snapshot.digest}\0${adapter.manifest.id}`).digest("hex").slice(0, 16)}`,
-        root: ".",
-        config: {scanner: adapter.manifest.id},
-        operation: "scan" as const,
-        targets: sourceTargets,
-        revision: null,
-        sourceDigest: snapshot.digest,
-        configDigest: options.configDigest,
-        requestedCapabilities: ["static-scan"],
-        executionPolicy: {
-          network: "disabled" as const,
-          shell: false as const,
-          maxOutputBytes: adapter.manifest.limits.maxOutputBytes,
-        },
-      };
-      const result = await runParsedSubprocessAdapter(adapter.manifest, request, {
-        root: snapshotRoot,
-        ...(options.adapterRuntimeRoots === undefined ? {} : {runtimeRoots: options.adapterRuntimeRoots}),
-        ...(options.signal === undefined ? {} : {signal: options.signal}),
-        ...(options.retainAdapterArtifact === undefined ? {} : {retainArtifact: options.retainAdapterArtifact}),
-      });
-      if ("code" in result) {
-        unavailable(result.code, result.message, result.recovery ?? "Inspect the adapter diagnostic and retry.");
-        continue;
-      }
-      findings.push(...result.findings);
-      const adapterCoverage: ReadonlyArray<CoverageRecordV1> =
-        result.coverage.length > 0
-          ? result.coverage
-          : [
-              {
-                scanner: `smokinggun.adapter:${adapter.manifest.id}`,
-                version: adapter.manifest.version,
-                language,
-                filesDiscovered: snapshot.requestedFileCount,
-                filesAnalyzed: 0,
-                parseStatus: "unavailable",
-                skippedFiles: sourceTargets,
-                reason: `The adapter returned state ${result.state} without coverage.`,
-              },
-            ];
-      coverage.push(
-        ...adapterCoverage.map((record): CoverageRecordV1 =>
-          unavailableTargets.length === 0
-            ? record
-            : {
-                ...record,
-                filesDiscovered: snapshot.requestedFileCount,
-                parseStatus: record.parseStatus === "unavailable" ? "unavailable" : "partial",
-                skippedFiles: [...new Set([...record.skippedFiles, ...unavailableTargets])].sort(comparePortable),
-                reason: "One or more requested source files were absent from the immutable snapshot.",
-              },
-        ),
-      );
-      diagnostics.push(...result.diagnostics);
-      rawArtifacts.push(...result.rawArtifacts);
-      Object.assign(rawArtifactDigests, result.rawArtifactDigests);
-    }
-  };
-  if (selectedAdapters.adapters.length > 0) await withSourceSnapshotView(snapshot, runAdapters);
-  return {
-    findings,
-    coverage,
-    diagnostics,
-    rawArtifacts: [...new Set(rawArtifacts)].sort(comparePortable),
-    rawArtifactDigests,
-  };
-}
-
-function selectExternalAdapters(parsed: ParsedExternalAdapters, selection: ScannerSelection): ParsedExternalAdapters {
-  if (selection._tag === "AutomaticScannerSelection") return parsed;
-  return {
-    adapters: parsed.adapters.filter((adapter) => runsAdapter(selection, adapter.manifest.id)),
-    // Invalid manifests have no trustworthy selectable identity. Explicit
-    // scanner selection therefore excludes them instead of letting unrelated
-    // configuration affect focused coverage or diagnostics.
-    invalidDescriptors: [],
-    diagnostics: [],
-  };
 }
 
 async function collectFiles(
@@ -976,7 +775,7 @@ function resolveCoverageIdentityCollisions(records: ReadonlyArray<CoverageRecord
       schemaVersion: "smokinggun.problem.v1",
       code: "duplicate-coverage-identity",
       message: reason,
-      recovery: "Configure each scanner or adapter to report a distinct coverage identity.",
+      recovery: "Configure each scanner to report a distinct coverage identity.",
     });
   }
   return {records: resolved, diagnostics};

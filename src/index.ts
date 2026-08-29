@@ -5,20 +5,6 @@ export {renderScanReport, toSarif} from "./reports/render.js";
 export {importSarif} from "./adapters/sarif.js";
 export {importBenchmark} from "./adapters/benchmarks.js";
 export {importPprof, importPerfettoSummary} from "./adapters/profiles.js";
-export {runParsedSubprocessAdapter, runSubprocessAdapter} from "./adapters/subprocess.js";
-export {
-  adapterExecutionAuthorized,
-  adapterExecutionNotAuthorized,
-  loadExternalAdapters,
-  noExternalAdapters,
-  parseExternalAdapters,
-  resolveExternalAdapters,
-  type AdapterExecutionAuthorization,
-  type LoadedExternalAdapter,
-  type LoadedExternalAdapters,
-  type ParsedExternalAdapter,
-  type ParsedExternalAdapters,
-} from "./scanners/external.js";
 export {parseMeasurement, parseMeasurementArtifact} from "./measurements/artifacts.js";
 export {importScip} from "./context/scip.js";
 export {buildTypeScriptIndex} from "./context/index.js";

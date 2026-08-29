@@ -6,11 +6,6 @@ import {scanRepository} from "../scan/repository.js";
 import {shouldPrint, writeResult} from "../cli/output.js";
 import {resolveConfiguredPath} from "../config.js";
 import {parseScannerSelection, parseScanScope} from "../scan/selection.js";
-import {
-  adapterExecutionAuthorized,
-  adapterExecutionNotAuthorized,
-  parseExternalAdapters,
-} from "../scanners/external.js";
 
 export default class Scan extends BaseCommand {
   static override description = "Scan a local repository for complexity candidates.";
@@ -19,18 +14,6 @@ export default class Scan extends BaseCommand {
     scanner: Flags.string({description: "Scanner IDs or auto; repeat for multiple backends.", multiple: true}),
     only: Flags.string({
       description: "Restrict analysis to language:<name>, extension, or path filters.",
-      multiple: true,
-    }),
-    adapter: Flags.string({
-      description: "External adapter manifest path; repeat to configure adapters.",
-      multiple: true,
-    }),
-    "allow-adapter-execution": Flags.boolean({
-      description: "Authorize execution of explicitly configured external adapters.",
-      default: false,
-    }),
-    "adapter-runtime-root": Flags.string({
-      description: "Host directory to expose read-only to authorized adapters; repeat for package dependencies.",
       multiple: true,
     }),
   };
@@ -43,20 +26,7 @@ export default class Scan extends BaseCommand {
       const target = resolveConfiguredPath(context.config.cwd, parsed.args.path);
       const scanner = parseOptionalStringArrayFlag(parsed.flags.scanner, "scanner");
       const only = parseOptionalStringArrayFlag(parsed.flags.only, "only");
-      const adapter = parseOptionalStringArrayFlag(parsed.flags.adapter, "adapter");
-      const adapterRuntimeRoots = parseOptionalStringArrayFlag(
-        parsed.flags["adapter-runtime-root"],
-        "adapter-runtime-root",
-      )?.map((path) => resolveConfiguredPath(context.config.cwd, path));
-      const adapterManifests = [
-        ...context.config.adapters,
-        ...(adapter ?? []).map((path) => resolveConfiguredPath(context.config.cwd, path)),
-      ];
-      const adapters = await parseExternalAdapters(adapterManifests, context.config.cwd, context.signal);
-      const selection = parseScannerSelection(
-        scanner,
-        adapters.adapters.map((adapter) => adapter.manifest.id),
-      );
+      const selection = parseScannerSelection(scanner);
       if ("schemaVersion" in selection) this.emitProblem(selection, 2, context);
       const scope = parseScanScope(only);
       if ("schemaVersion" in scope) this.emitProblem(scope, 2, context);
@@ -68,12 +38,6 @@ export default class Scan extends BaseCommand {
         profile: context.config.sourceProfile,
         maxFindings: context.config.maxFindings,
         signal: context.signal,
-        adapters,
-        ...(adapterRuntimeRoots === undefined ? {} : {adapterRuntimeRoots}),
-        adapterAuthorization: parsed.flags["allow-adapter-execution"]
-          ? adapterExecutionAuthorized
-          : adapterExecutionNotAuthorized,
-        retainAdapterArtifact: (_path, bytes) => context.artifactStore.putBytes("adapter-artifact", bytes),
       });
       const rendered = renderScanReport(report, context.config.format);
       await writeResult(rendered, context);

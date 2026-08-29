@@ -1,27 +1,16 @@
 import {chmod, mkdir, mkdtemp, rm, symlink, writeFile} from "node:fs/promises";
-import {existsSync} from "node:fs";
 import {execFileSync} from "node:child_process";
-import {createHash} from "node:crypto";
-import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
 import {Protocol} from "../protocol/index.js";
-import {scannerId, scannerVersion} from "../scanners/structural-finding.js";
+import {toSarif} from "../reports/render.js";
 import {scanRepository} from "./repository.js";
 import {automaticScannerSelection, entireScanRoot, parseScanScope, parseScannerSelection} from "./selection.js";
-import {
-  adapterExecutionAuthorized,
-  adapterExecutionNotAuthorized,
-  noExternalAdapters,
-  parseExternalAdapters,
-} from "../scanners/external.js";
 
 const defaultScanOptions = {
   selection: automaticScannerSelection(),
   scope: entireScanRoot(),
-  adapters: noExternalAdapters(),
-  adapterAuthorization: adapterExecutionNotAuthorized,
 };
 
 describe("repository scan seam", () => {
@@ -159,6 +148,24 @@ describe("repository scan seam", () => {
       expect(result.report.diagnostics).toContainEqual(
         expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("3")}),
       );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("keeps SARIF successful when auxiliary suppression is the only diagnostic", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-sarif-"));
+    try {
+      await mkdir(join(root, "src"));
+      await mkdir(join(root, "tests"));
+      await writeFile(join(root, "src", "product.go"), "package product\nfunc Run() {}\n", "utf8");
+      await writeFile(join(root, "tests", "product.go"), "package tests\nfunc TestRun() {}\n", "utf8");
+
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64)});
+
+      expect(result.report.diagnostics).toEqual([expect.objectContaining({code: "auxiliary-source-suppressed"})]);
+      expect(result.report.coverage.every((record) => record.parseStatus === "complete")).toBe(true);
+      expect(toSarif(result.report)).toMatchObject({runs: [{invocations: [{executionSuccessful: true}]}]});
     } finally {
       await rm(root, {recursive: true, force: true});
     }
@@ -356,7 +363,7 @@ describe("repository scan seam", () => {
     try {
       await writeFile(unreadable, "value = 1\n", "utf8");
       await chmod(unreadable, 0o000);
-      const selection = parseScannerSelection(["smokinggun.python-semantic"], []);
+      const selection = parseScannerSelection(["smokinggun.python-semantic"]);
       if ("schemaVersion" in selection) throw new Error(selection.message);
       const result = await scanRepository(root, {...defaultScanOptions, configDigest: "e".repeat(64), selection});
       expect(result.report.coverage).toContainEqual(
@@ -374,143 +381,6 @@ describe("repository scan seam", () => {
       await rm(root, {recursive: true, force: true});
     }
   });
-
-  it("coalesces coverage for manifests with an ambiguous adapter identity", async () => {
-    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-duplicate-adapter-"));
-    try {
-      await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
-      const manifest = (path: string) =>
-        writeFile(
-          path,
-          JSON.stringify({
-            schemaVersion: "smokinggun.adapter-manifest.v1",
-            id: "duplicate-adapter",
-            version: "1.0.0",
-            command: [execPath, "--version"],
-            capabilities: ["static-scan"],
-            limits: {timeoutMs: 1_000, maxOutputBytes: 1_000, maxArtifactBytes: 1_000},
-          }),
-          "utf8",
-        );
-      const first = join(root, "first-adapter.json");
-      const second = join(root, "second-adapter.json");
-      await Promise.all([manifest(first), manifest(second)]);
-      const adapters = await parseExternalAdapters([first, second], root);
-      const result = await scanRepository(root, {
-        ...defaultScanOptions,
-        adapters,
-        configDigest: "e".repeat(64),
-      });
-      expect(
-        result.report.coverage.filter((record) => record.scanner === "smokinggun.adapter:duplicate-adapter"),
-      ).toHaveLength(1);
-      expect(result.report.diagnostics.filter((diagnostic) => diagnostic.code === "duplicate-adapter-id")).toHaveLength(
-        2,
-      );
-      expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
-    } finally {
-      await rm(root, {recursive: true, force: true});
-    }
-  });
-
-  it.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))(
-    "runs authorized adapters against the captured snapshot",
-    async () => {
-      const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-colliding-coverage-"));
-      try {
-        await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
-        const artifactBytes = Buffer.from("adapter evidence");
-        const artifactDigest = createHash("sha256").update(artifactBytes).digest("hex");
-        const artifactReference = `artifact://sha256/${artifactDigest}`;
-        const script = `let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>{const request=JSON.parse(input);process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[],coverage:[{scanner:'${scannerId}',version:'${scannerVersion}',language:'mixed',filesDiscovered:1,filesAnalyzed:1,parseStatus:'complete',skippedFiles:[]}],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:['evidence.json'],rawArtifactDigests:{'evidence.json':'${artifactDigest}'},rawArtifactContents:{'evidence.json':'${artifactBytes.toString("base64")}'}}));});`;
-        const manifest = join(root, "adapter.json");
-        await writeFile(
-          manifest,
-          JSON.stringify({
-            schemaVersion: "smokinggun.adapter-manifest.v1",
-            id: "coverage-collider",
-            version: "1.0.0",
-            command: [execPath, "-e", script],
-            capabilities: ["static-scan"],
-            limits: {timeoutMs: 2_000, maxOutputBytes: 100_000, maxArtifactBytes: 10_000},
-          }),
-          "utf8",
-        );
-        const adapters = await parseExternalAdapters([manifest], root);
-        const result = await scanRepository(root, {
-          ...defaultScanOptions,
-          adapters,
-          adapterAuthorization: adapterExecutionAuthorized,
-          retainAdapterArtifact: async (path, bytes) => {
-            expect(path).toBe("evidence.json");
-            expect(bytes).toEqual(artifactBytes);
-            return {reference: artifactReference, digest: artifactDigest};
-          },
-          configDigest: "e".repeat(64),
-        });
-        expect(result.report.coverage.filter((record) => record.scanner === scannerId)).toHaveLength(1);
-        expect(result.report.coverage).toContainEqual(
-          expect.objectContaining({scanner: "smokinggun.adapter:coverage-collider", parseStatus: "complete"}),
-        );
-        expect(result.report.diagnostics).not.toContainEqual(
-          expect.objectContaining({code: "duplicate-coverage-identity"}),
-        );
-        expect(result.report.rawArtifacts).toEqual([artifactReference]);
-        expect(result.report.rawArtifactDigests).toEqual({[artifactReference]: artifactDigest});
-        expect(Protocol.scanReport.safeParse(result.report).success).toBe(true);
-      } finally {
-        await rm(root, {recursive: true, force: true});
-      }
-    },
-  );
-
-  it.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))(
-    "records repository inventory without executing configured adapters against the live checkout",
-    async () => {
-      const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-adapter-"));
-      try {
-        await writeFile(join(root, "fixture.ts"), "for (const item of items) work(item);\n", "utf8");
-        const script =
-          "if (process.argv.includes('--version')) { console.log('fixture-adapter 1.0.0'); process.exit(0); } let input=''; process.stdin.on('data', chunk => input += chunk).on('end', () => { const request = JSON.parse(input); process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:request.requestId,state:'complete',findings:[{schemaVersion:'smokinggun.finding.v2',id:'sg_0123456789abcdef',scanner:'fixture-adapter',scannerVersion:'1.0.0',ruleId:'fixture-rule',language:'typescript',kind:'fixture',claimClass:'static-fact',severity:'low',confidence:'unknown',status:'unvalidated',relatedFindings:[],message:'Configured adapter evidence',suggestion:'Inspect the fixture evidence.',location:{path:'fixture.ts',startLine:1,startColumn:0,endLine:1,endColumn:1},assumptions:[],evidence:['fixture-adapter:fixture-rule'],complexity:{}}],coverage:[],analyzedTargets:request.targets,diagnostics:[],rawArtifacts:[]})); });";
-        const manifest = join(root, "adapter.json");
-        await writeFile(
-          manifest,
-          JSON.stringify({
-            schemaVersion: "smokinggun.adapter-manifest.v1",
-            id: "fixture-adapter",
-            version: "1.0.0",
-            command: [execPath, "-e", script],
-            capabilities: ["static-scan"],
-            languages: ["typescript"],
-            limits: {timeoutMs: 2_000, maxOutputBytes: 100_000, maxArtifactBytes: 10_000},
-          }),
-          "utf8",
-        );
-        const adapters = await parseExternalAdapters([manifest], root);
-        const result = await scanRepository(root, {
-          configDigest: "c".repeat(64),
-          ...defaultScanOptions,
-          adapters,
-          adapterAuthorization: adapterExecutionAuthorized,
-        });
-        expect(result.report.inventory?.languages).toContainEqual({
-          language: "typescript",
-          files: 1,
-          extensions: [".ts"],
-        });
-        expect(result.report.findings.some((finding) => finding.scanner === "smokinggun.adapter:fixture-adapter")).toBe(
-          true,
-        );
-        expect(
-          result.report.coverage.some(
-            (record) => record.scanner === "smokinggun.adapter:fixture-adapter" && record.parseStatus === "complete",
-          ),
-        ).toBe(true);
-      } finally {
-        await rm(root, {recursive: true, force: true});
-      }
-    },
-  );
 
   it("marks provenance dirty when analyzed source includes untracked files", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-provenance-"));
@@ -717,7 +587,7 @@ describe("repository scan seam", () => {
   });
 
   it("accepts canonical scanner IDs and emits coverage only for selected backends", async () => {
-    const pythonSelection = parseScannerSelection(["smokinggun.python-semantic"], []);
+    const pythonSelection = parseScannerSelection(["smokinggun.python-semantic"]);
     if ("schemaVersion" in pythonSelection) throw new Error(pythonSelection.message);
     const pythonResult = await scanRepository("fixtures/corpus/python", {
       ...defaultScanOptions,
@@ -735,7 +605,7 @@ describe("repository scan seam", () => {
       ),
     ).toBe(false);
 
-    const structuralSelection = parseScannerSelection(["smokinggun.structural"], []);
+    const structuralSelection = parseScannerSelection(["smokinggun.structural"]);
     if ("schemaVersion" in structuralSelection) throw new Error(structuralSelection.message);
     const structuralResult = await scanRepository("fixtures/corpus/typescript", {
       ...defaultScanOptions,
@@ -748,45 +618,4 @@ describe("repository scan seam", () => {
     );
     expect(structuralResult.report.diagnostics.some((diagnostic) => diagnostic.code === "scanner-skipped")).toBe(false);
   });
-});
-
-it("does not probe or synthesize coverage for unselected adapters", async () => {
-  const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-selection-"));
-  try {
-    await writeFile(join(root, "fixture.ts"), "export const value = 1;\n", "utf8");
-    const validManifest = join(root, "valid-adapter.json");
-    await writeFile(
-      validManifest,
-      JSON.stringify({
-        schemaVersion: "smokinggun.adapter-manifest.v1",
-        id: "valid-adapter",
-        version: "1.0.0",
-        command: [execPath, "--version"],
-        capabilities: ["static-scan"],
-        limits: {timeoutMs: 1_000, maxOutputBytes: 1_000, maxArtifactBytes: 1_000},
-      }),
-      "utf8",
-    );
-    const invalidManifest = join(root, "invalid-adapter.json");
-    await writeFile(invalidManifest, "{not json", "utf8");
-
-    const adapters = await parseExternalAdapters([validManifest, invalidManifest], root);
-    const selection = parseScannerSelection(["smokinggun.structural"], ["valid-adapter"]);
-    if ("schemaVersion" in selection) throw new Error(selection.message);
-
-    const result = await scanRepository(root, {
-      ...defaultScanOptions,
-      configDigest: "e".repeat(64),
-      selection,
-      adapters,
-      adapterAuthorization: adapterExecutionAuthorized,
-    });
-
-    expect(result.report.coverage.some((r) => r.scanner === "smokinggun.adapter:valid-adapter")).toBe(false);
-    expect(result.report.coverage.some((r) => r.scanner === "smokinggun.adapter:invalid-adapter")).toBe(false);
-    expect(result.report.diagnostics.some((d) => d.message?.includes("valid-adapter"))).toBe(false);
-    expect(result.report.diagnostics.some((d) => d.message?.includes("invalid-adapter"))).toBe(false);
-  } finally {
-    await rm(root, {recursive: true, force: true});
-  }
 });

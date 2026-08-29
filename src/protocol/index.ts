@@ -267,7 +267,6 @@ const timingsSchema = z.strictObject({
   durationMs: z.number().nonnegative(),
 });
 
-const adapterArtifactPathSchema = portableRepositoryChildPathSchema;
 const retainedArtifactReferenceSchema = z.string().regex(/^artifact:\/\/sha256\/[a-f0-9]{64}$/);
 const rawArtifactSchema = z.string().min(1);
 
@@ -471,187 +470,6 @@ const scanReportSchema = z
           message: "An artifact digest requires a matching rawArtifacts entry.",
           path: ["rawArtifactDigests", artifact],
         });
-  });
-
-const adapterManifestSchema = z.strictObject({
-  schemaVersion: version("smokinggun.adapter-manifest.v1"),
-  protocolVersion: z.literal("smokinggun.adapter.v1").default("smokinggun.adapter.v1"),
-  id: z.string().min(1),
-  version: z.string().min(1),
-  command: commandSchema,
-  tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional(),
-  languages: uniqueNonemptyStrings("Adapter languages must be unique.").default([]),
-  capabilities: uniqueNonemptyStrings("Adapter capabilities must be unique."),
-  inputKinds: uniqueNonemptyStrings("Adapter input kinds must be unique.").default([]),
-  outputKinds: uniqueNonemptyStrings("Adapter output kinds must be unique.").default([]),
-  requirements: uniqueNonemptyStrings("Adapter requirements must be unique.").default([]),
-  sideEffects: z
-    .array(z.enum(["read", "execute", "write", "network", "service", "resource"]))
-    .refine((effects) => new Set(effects).size === effects.length, "Adapter side effects must be unique.")
-    .default(["execute"]),
-  determinism: z
-    .enum(["deterministic", "seeded", "environment-sensitive", "nondeterministic"])
-    .default("environment-sensitive"),
-  probeCommand: commandSchema.optional(),
-  configSchema: z.record(z.string(), z.unknown()).optional(),
-  limits: z.strictObject({
-    timeoutMs: z.number().int().positive(),
-    maxOutputBytes: z.number().int().positive(),
-    maxArtifactBytes: z.number().int().positive(),
-  }),
-});
-
-const adapterRequestSchema = z.strictObject({
-  schemaVersion: version("smokinggun.adapter-request.v1"),
-  requestId: z.string().min(1),
-  root: z.string().min(1),
-  config: z.record(z.string(), z.unknown()),
-  operation: z.enum(["probe", "scan", "context", "benchmark", "profile", "trace"]).default("scan"),
-  targets: uniqueNonemptyStrings("Adapter targets must be unique.").default([]),
-  revision: z.string().nullable().default(null),
-  sourceDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  configDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  requestedCapabilities: uniqueNonemptyStrings("Requested adapter capabilities must be unique.").default([]),
-  executionPolicy: z
-    .strictObject({
-      network: z.enum(["disabled", "explicit"]),
-      shell: z.literal(false),
-      maxOutputBytes: z.number().int().positive(),
-    })
-    .default({network: "disabled", shell: false, maxOutputBytes: 1_000_000}),
-});
-
-const adapterResultFields = {
-  schemaVersion: version("smokinggun.adapter-result.v3"),
-  requestId: z.string().min(1),
-  findings: z.array(findingSchema),
-  coverage: z.array(coverageSchema),
-  analyzedTargets: uniqueNonemptyStrings("Analyzed adapter targets must be unique.").default([]),
-  rawArtifacts: z.array(adapterArtifactPathSchema),
-  rawArtifactDigests: z.record(adapterArtifactPathSchema, z.string().regex(/^[a-f0-9]{64}$/)).default({}),
-  rawArtifactContents: z
-    .record(
-      adapterArtifactPathSchema,
-      z.string().regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
-    )
-    .default({}),
-  adapter: z
-    .strictObject({
-      id: z.string().min(1),
-      version: z.string().min(1),
-      command: commandSchema,
-      tool: z.strictObject({name: z.string().min(1), version: z.string().min(1)}).optional(),
-    })
-    .optional(),
-  requestDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  configDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  sourceDigest: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .optional(),
-  reproduction: z.record(z.string(), z.unknown()).optional(),
-};
-
-const adapterResultSchema = z
-  .discriminatedUnion("state", [
-    z.strictObject({
-      ...adapterResultFields,
-      state: z.literal("complete"),
-      coverage: z.array(completeCoverageSchema),
-      diagnostics: z.array(problemSchema),
-    }),
-    z.strictObject({...adapterResultFields, state: z.literal("partial"), diagnostics: z.array(problemSchema)}),
-    z.strictObject({
-      ...adapterResultFields,
-      state: z.enum(["unavailable", "blocked", "failed", "cancelled"]),
-      diagnostics: z.array(problemSchema).min(1),
-    }),
-  ])
-  .superRefine((result, context) => {
-    requireUniqueFindingIds(result.findings, context);
-    requireRetainedFindingRelations(result.findings, context);
-    requireUniqueCoverageRecords(result.coverage, context);
-    const rawArtifacts = requireUniqueStrings(result.rawArtifacts, context, "rawArtifacts");
-    for (const artifact of Object.keys(result.rawArtifactDigests))
-      if (!rawArtifacts.has(artifact))
-        context.addIssue({
-          code: "custom",
-          message: "An artifact digest requires a matching rawArtifacts entry.",
-          path: ["rawArtifactDigests", artifact],
-        });
-    for (const artifact of Object.keys(result.rawArtifactContents))
-      if (!rawArtifacts.has(artifact))
-        context.addIssue({
-          code: "custom",
-          message: "Inline artifact bytes require a matching rawArtifacts entry.",
-          path: ["rawArtifactContents", artifact],
-        });
-    if (
-      result.state === "partial" &&
-      result.diagnostics.length === 0 &&
-      result.coverage.every((coverage) => coverage.parseStatus === "complete")
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["coverage"],
-        message: "A partial adapter result requires a diagnostic or incomplete coverage record.",
-      });
-  });
-
-const adapterResultV2Fields = {
-  ...adapterResultFields,
-  schemaVersion: version("smokinggun.adapter-result.v2"),
-  rawArtifactContents: z.never().optional(),
-};
-
-const adapterResultV2Schema = z
-  .discriminatedUnion("state", [
-    z.strictObject({
-      ...adapterResultV2Fields,
-      state: z.literal("complete"),
-      coverage: z.array(completeCoverageSchema),
-      diagnostics: z.array(problemSchema),
-    }),
-    z.strictObject({...adapterResultV2Fields, state: z.literal("partial"), diagnostics: z.array(problemSchema)}),
-    z.strictObject({
-      ...adapterResultV2Fields,
-      state: z.enum(["unavailable", "blocked", "failed", "cancelled"]),
-      diagnostics: z.array(problemSchema).min(1),
-    }),
-  ])
-  .superRefine((result, context) => {
-    requireUniqueFindingIds(result.findings, context);
-    requireRetainedFindingRelations(result.findings, context);
-    requireUniqueCoverageRecords(result.coverage, context);
-    requireUniqueStrings(result.rawArtifacts, context, "rawArtifacts");
-    if (result.rawArtifacts.length > 0 || Object.keys(result.rawArtifactDigests).length > 0)
-      context.addIssue({
-        code: "custom",
-        path: ["rawArtifacts"],
-        message: "AdapterResultV2 is accepted only for results without artifacts; inline artifacts require V3.",
-      });
-    if (
-      result.state === "partial" &&
-      result.diagnostics.length === 0 &&
-      result.coverage.every((coverage) => coverage.parseStatus === "complete")
-    )
-      context.addIssue({
-        code: "custom",
-        path: ["coverage"],
-        message: "A partial adapter result requires a diagnostic or incomplete coverage record.",
-      });
   });
 
 const reproductionSchema = z.strictObject({
@@ -1444,10 +1262,6 @@ export type ContextReferenceV1 = z.infer<typeof contextReferenceSchema>;
 export type ContextCallV1 = z.infer<typeof contextCallSchema>;
 export type ContextIndexV1 = z.infer<typeof contextIndexSchema>;
 export type ScanReportV2 = z.infer<typeof scanReportSchema>;
-export type AdapterManifestV1 = z.infer<typeof adapterManifestSchema>;
-export type AdapterRequestV1 = z.infer<typeof adapterRequestSchema>;
-export type AdapterResultV3 = z.infer<typeof adapterResultSchema>;
-export type AdapterResultV2 = z.infer<typeof adapterResultV2Schema>;
 export type EvidenceRecordV2 = z.infer<typeof evidenceSchema>;
 export type MeasurementV1 = z.infer<typeof measurementSchema>;
 export type BenchmarkRecordV2 = z.infer<typeof benchmarkRecordSchema>;
@@ -1478,10 +1292,6 @@ export const Protocol = {
   inventory: inventorySchema,
   contextIndex: contextIndexSchema,
   scanReport: scanReportSchema,
-  adapterManifest: adapterManifestSchema,
-  adapterRequest: adapterRequestSchema,
-  adapterResult: adapterResultSchema,
-  adapterResultV2: adapterResultV2Schema,
   evidence: evidenceSchema,
   measurement: measurementSchema,
   measurementArtifact: measurementArtifactSchema,

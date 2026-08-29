@@ -45,8 +45,6 @@ export type SourceSnapshot = {
   readonly digest: string;
   readonly files: ReadonlyArray<SourceFileCapture>;
   readonly capturedFiles: ReadonlyArray<CapturedSourceFile>;
-  readonly requestedFileCount: number;
-  readonly capturedFileCount: number;
   readonly capturedBytes: number;
   readonly isComplete: boolean;
 };
@@ -117,8 +115,6 @@ export async function captureSourceSnapshot(
     digest,
     files,
     capturedFiles,
-    requestedFileCount: files.length,
-    capturedFileCount: capturedFiles.length,
     capturedBytes,
     isComplete: files.every((file) => file._tag === "captured"),
   };
