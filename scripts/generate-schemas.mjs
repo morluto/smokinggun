@@ -36,6 +36,7 @@ const semanticSchemas = new Set([
   "evidence-v2",
   "finding-v2",
   "investigation-bundle-v2",
+  "repository-inventory-v1",
   "scan-report-v2",
 ]);
 
