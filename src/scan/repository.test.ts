@@ -175,6 +175,48 @@ describe("repository scan seam", () => {
     }
   });
 
+  it("applies path overrides only to auxiliary files under the selected path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-path-"));
+    try {
+      await mkdir(join(root, "docs"));
+      await mkdir(join(root, "src"));
+      const candidate = "for (const value of values) values.includes(value);\n";
+      await writeFile(join(root, "docs", "guide.ts"), candidate, "utf8");
+      await writeFile(join(root, "src", "product.test.ts"), candidate, "utf8");
+      const scope = parseScanScope(["docs", ".ts"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+
+      const result = await scanRepository(root, {...defaultScanOptions, scope});
+
+      expect(result.report.findings.every((finding) => finding.location.path === "docs/guide.ts")).toBe(true);
+      expect(result.report.inventory?.tests).toEqual(["src/product.test.ts"]);
+      expect(result.report.diagnostics).toContainEqual(
+        expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("1")}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("keeps newly recognized test names in inventory when runtime scanning suppresses them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-inventory-"));
+    try {
+      const candidate = "for (const value of values) values.includes(value);\n";
+      for (const file of ["foo_test.go", "test_foo.py", "TestFoo.java", "FooTests.cs"])
+        await writeFile(join(root, file), candidate, "utf8");
+
+      const result = await scanRepository(root, defaultScanOptions);
+
+      expect(result.report.findings).toEqual([]);
+      expect(result.report.inventory?.tests).toEqual(["FooTests.cs", "TestFoo.java", "foo_test.go", "test_foo.py"]);
+      expect(result.report.diagnostics).toContainEqual(
+        expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("4")}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("does not report an unmatched scope when the runtime profile suppresses its auxiliary files", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-filter-"));
     try {
@@ -488,6 +530,24 @@ describe("repository scan seam", () => {
     }
   });
 
+  it("does not retain auxiliary source symlinks in runtime coverage", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-symlink-profile-"));
+    try {
+      await mkdir(join(root, "tests"));
+      await writeFile(join(root, "normal.ts"), "export const value = 1;\n", "utf8");
+      await symlink("../normal.ts", join(root, "tests", "linked.ts"));
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "d".repeat(64)});
+
+      expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1, parseStatus: "complete"});
+      expect(result.report.coverage[0]?.skippedFiles).not.toContain("tests/linked.ts");
+      expect(result.report.diagnostics).not.toContainEqual(
+        expect.objectContaining({code: "symlink-skipped", path: "tests/linked.ts"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("treats an unmatched explicit scope as incomplete coverage", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-scope-"));
     try {
@@ -541,6 +601,26 @@ describe("repository scan seam", () => {
       );
     } finally {
       await rm(root, {recursive: true, force: true});
+    }
+  });
+
+  it("does not retain auxiliary directory symlinks in runtime coverage", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-directory-symlink-profile-"));
+    const outside = await mkdtemp(join(tmpdir(), "smokinggun-scan-directory-symlink-profile-target-"));
+    try {
+      await writeFile(join(root, "normal.ts"), "export const value = 1;\n", "utf8");
+      await writeFile(join(outside, "fixture.ts"), "export const value = 2;\n", "utf8");
+      await symlink(outside, join(root, "tests"));
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "d".repeat(64)});
+
+      expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1, parseStatus: "complete"});
+      expect(result.report.coverage[0]?.skippedFiles).not.toContain("tests");
+      expect(result.report.diagnostics).not.toContainEqual(
+        expect.objectContaining({code: "symlink-skipped", path: "tests"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+      await rm(outside, {recursive: true, force: true});
     }
   });
 

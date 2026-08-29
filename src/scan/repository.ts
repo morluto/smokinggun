@@ -34,7 +34,7 @@ import {
 } from "./source-snapshot.js";
 import {withSourceSnapshotView} from "./snapshot-view.js";
 import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
-import {isAuxiliarySourcePath, type ScanProfile} from "./profile.js";
+import {isAuxiliarySourceDirectory, isAuxiliarySourcePath, type ScanProfile} from "./profile.js";
 
 type CoverageDetails = Pick<
   CoverageRecordV1,
@@ -108,13 +108,21 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
   const scopedFiles = discovered.files.filter(inScope);
-  const hasExplicitPathScope =
-    options.scope._tag === "FilteredScanRoot" && options.scope.filters.some((filter) => filter._tag === "PathFilter");
-  const appliesRuntimeProfile =
-    rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime" && !hasExplicitPathScope;
-  const auxiliaryFiles = appliesRuntimeProfile
-    ? scopedFiles.filter((path) => isAuxiliarySourcePath(portablePath(relative(pathRoot, path))))
-    : [];
+  const appliesRuntimeProfile = rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime";
+  const hasPathOverride = (path: string): boolean =>
+    options.scope._tag === "FilteredScanRoot" &&
+    options.scope.filters.some(
+      (filter) => filter._tag === "PathFilter" && (path === filter.path || path.startsWith(`${filter.path}/`)),
+    );
+  const isSuppressedAuxiliaryFile = (path: string): boolean => {
+    const reportPath = portablePath(relative(pathRoot, path));
+    return appliesRuntimeProfile && isAuxiliarySourcePath(reportPath) && !hasPathOverride(reportPath);
+  };
+  const isSuppressedAuxiliaryDirectory = (path: string): boolean => {
+    const reportPath = portablePath(relative(pathRoot, path));
+    return appliesRuntimeProfile && isAuxiliarySourceDirectory(reportPath) && !hasPathOverride(reportPath);
+  };
+  const auxiliaryFiles = appliesRuntimeProfile ? scopedFiles.filter((path) => isSuppressedAuxiliaryFile(path)) : [];
   const auxiliaryFileSet = new Set(auxiliaryFiles);
   const files = auxiliaryFiles.length === 0 ? scopedFiles : scopedFiles.filter((path) => !auxiliaryFileSet.has(path));
   const sourceSnapshot = await captureSourceSnapshot(
@@ -127,8 +135,12 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const unavailableSources = new Map(
     sourceSnapshot.files.flatMap((file) => (file._tag === "unavailable" ? [[file.path, file] as const] : [])),
   );
-  const skippedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
-  const skippedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
+  const skippedSourceSymlinks = discovered.sourceSymlinks
+    .filter(inScope)
+    .filter((path) => !isSuppressedAuxiliaryFile(path));
+  const skippedDirectorySymlinks = discovered.directorySymlinks
+    .filter(inScope)
+    .filter((path) => !isSuppressedAuxiliaryDirectory(path));
   const runStructural = runsBuiltInScanner(options.selection, "structural");
   const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
   const runPython = runsBuiltInScanner(options.selection, "python-semantic");
