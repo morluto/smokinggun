@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {realpath, stat} from "node:fs/promises";
+import {realpath} from "node:fs/promises";
 import {homedir} from "node:os";
 import {basename, dirname, isAbsolute, join, resolve} from "node:path";
 import {z} from "zod";
