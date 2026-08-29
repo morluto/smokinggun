@@ -651,6 +651,24 @@ try {
   )
     throw new Error("an unready investigation must fail before persisting imported context");
 
+  const absentContextInvestigation = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    "inv_2222222222222222",
+    "--format",
+    "json",
+  ]);
+  const absentContextInvestigationValue = JSON.parse(absentContextInvestigation.stdout);
+  if (
+    absentContextInvestigation.code !== 2 ||
+    absentContextInvestigationValue.schemaVersion !== "smokinggun.problem.v1" ||
+    absentContextInvestigationValue.code !== "investigation-unavailable"
+  )
+    throw new Error("a missing investigation must fail before importing context");
+
   const missingContext = await run([
     entry,
     "context",
