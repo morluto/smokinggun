@@ -54,4 +54,19 @@ describe("report renderers", () => {
 
     expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: true}]}]});
   });
+
+  it("reports unavailable scan coverage as an unsuccessful invocation", () => {
+    const sarif = toSarif({
+      ...report,
+      coverage: [
+        {
+          ...report.coverage[0],
+          parseStatus: "unavailable",
+          reason: "The scanner could not run.",
+        },
+      ],
+    });
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: false}]}]});
+  });
 });
