@@ -42,6 +42,18 @@ export function decodeUtf8Bytes(bytes: Uint8Array): string {
   try {
     return new TextDecoder("utf-8", {fatal: true}).decode(bytes);
   } catch {
-    throw new Error("File is not valid UTF-8.");
+    throw new InvalidUtf8Error();
+  }
+}
+
+/** Whether a textual input failed strict UTF-8 decoding. */
+export function isInvalidUtf8Error(cause: unknown): boolean {
+  return cause instanceof InvalidUtf8Error;
+}
+
+class InvalidUtf8Error extends Error {
+  constructor() {
+    super("File is not valid UTF-8.");
+    this.name = "InvalidUtf8Error";
   }
 }

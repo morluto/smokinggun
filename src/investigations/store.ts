@@ -10,7 +10,7 @@ import {
 } from "../protocol/index.js";
 import {comparePortable} from "../paths.js";
 import {stableJson} from "../serialization.js";
-import {decodeUtf8Bytes, writeFileAtomically} from "../files.js";
+import {decodeUtf8Bytes, isInvalidUtf8Error, writeFileAtomically} from "../files.js";
 
 type StoredInvestigation = {
   readonly bundle: InvestigationBundleV2;
@@ -386,7 +386,12 @@ async function acquireUpdateLock(directory: string): Promise<() => Promise<void>
 }
 
 async function recoverAbandonedLock(path: string): Promise<boolean> {
-  const input = await readOptional(path);
+  let input: string | undefined;
+  try {
+    input = await readOptional(path);
+  } catch (cause: unknown) {
+    if (!isInvalidUtf8Error(cause)) throw cause;
+  }
   const info = await stat(path).catch(() => undefined);
   let pid: number | undefined;
   if (input !== undefined)
