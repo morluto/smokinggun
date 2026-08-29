@@ -285,16 +285,19 @@ export default class Compare extends BaseCommand {
     inputs: ComparisonInputs,
   ): Promise<void> {
     const comparison = Protocol.comparison.parse(result);
-    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
-    const artifact = `${comparison.id}.json`;
-    const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
-    const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
-    const report = storedArtifact.reference;
     const investigationIds = [
       ...new Set(
         [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
       ),
     ];
+    await Promise.all(
+      investigationIds.map((investigationId) => requireLatestInvestigation(context.artifacts, investigationId)),
+    );
+    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
+    const artifact = `${comparison.id}.json`;
+    const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
+    const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
+    const report = storedArtifact.reference;
     const pending = [];
     for (const investigationId of investigationIds) {
       const investigation = await requireLatestInvestigation(context.artifacts, investigationId);
