@@ -308,6 +308,14 @@ const inventorySchema = z
     digest: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .superRefine((inventory, context) => {
+    const {digest, ...content} = inventory;
+    const expectedDigest = createHash("sha256").update(canonicalJson(content)).digest("hex");
+    if (digest !== expectedDigest)
+      context.addIssue({
+        code: "custom",
+        path: ["digest"],
+        message: "Repository inventory digest must match its canonical content.",
+      });
     const languages = new Set<string>();
     for (const [index, language] of inventory.languages.entries()) {
       if (languages.has(language.language))
