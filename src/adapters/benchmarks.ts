@@ -88,7 +88,19 @@ function importPyperf(input: unknown, options: BenchmarkImportOptions): Benchmar
     const entry = objectValue(value);
     if (entry === undefined || typeof entry.name !== "string") continue;
     const runs = arrayValue(entry.runs) ?? [];
-    const samples = runs.flatMap((run) => finiteArray(objectValue(run)?.values) ?? []).map((sample) => sample * 1000);
+    const samples: number[] = [];
+    for (const run of runs) {
+      const runObject = objectValue(run);
+      if (runObject === undefined || !("values" in runObject)) continue;
+      const values = finiteArray(runObject.values);
+      if (values === undefined)
+        return problem(
+          "invalid-pyperf",
+          `pyperf benchmark ${entry.name} contains a run with malformed measured values.`,
+          "Regenerate the artifact so every values field is an array of finite numbers.",
+        );
+      samples.push(...values.map((sample) => sample * 1000));
+    }
     const fallback = finiteNumber(entry.mean);
     const normalized = samples.length > 0 ? samples : fallback === undefined ? [] : [fallback * 1000];
     if (normalized.length > 0)
@@ -252,7 +264,26 @@ function importJmh(input: unknown, options: BenchmarkImportOptions): BenchmarkRe
       typeof metric.scoreUnit !== "string"
     )
       continue;
-    const rawData = arrayValue(metric.rawData)?.flatMap((group) => finiteArray(group) ?? []) ?? [];
+    const rawData: number[] = [];
+    if (metric.rawData !== undefined) {
+      const groups = arrayValue(metric.rawData);
+      if (groups === undefined)
+        return problem(
+          "invalid-jmh",
+          `JMH benchmark ${entry.benchmark} contains malformed raw data.`,
+          "Regenerate the artifact so rawData is an array of numeric arrays.",
+        );
+      for (const group of groups) {
+        const values = finiteArray(group);
+        if (values === undefined)
+          return problem(
+            "invalid-jmh",
+            `JMH benchmark ${entry.benchmark} contains a malformed raw-data group.`,
+            "Regenerate the artifact so every rawData group is an array of finite numbers.",
+          );
+        rawData.push(...values);
+      }
+    }
     const score = finiteNumber(metric.score);
     const unit = metric.scoreUnit;
     const declaredMode = typeof entry.mode === "string" ? entry.mode : undefined;
