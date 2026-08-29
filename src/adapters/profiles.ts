@@ -90,6 +90,12 @@ export function importPprof(input: Uint8Array, options: ProfileImportOptions): P
         "The gzip-compressed pprof profile exceeds the decompressed output limit.",
         `Use a pprof artifact whose decompressed size is at most ${(options.maxDecompressedBytes ?? defaultMaxPprofDecompressedBytes) / (1024 * 1024)} MiB.`,
       );
+    if (cause instanceof UnsafePprofNumericError)
+      return problem(
+        "pprof-numeric-value-out-of-range",
+        "The pprof profile contains a numeric value outside JavaScript's exact integer range.",
+        "Regenerate the profile with sample values and identifiers between Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER.",
+      );
     return problem(
       "pprof-decode-failed",
       "The artifact is not a readable gzip-compressed pprof Profile.",
@@ -334,8 +340,11 @@ function stringAt(strings: ReadonlyArray<string>, index: number): string {
 
 function numberValue(value: number | bigint): number {
   const number = typeof value === "bigint" ? Number(value) : value;
-  return Number.isSafeInteger(number) ? number : 0;
+  if (!Number.isSafeInteger(number)) throw new UnsafePprofNumericError();
+  return number;
 }
+
+class UnsafePprofNumericError extends Error {}
 
 function problem(code: string, message: string, recovery: string): ProblemV1 {
   return {schemaVersion: "smokinggun.problem.v1", code, message, recovery};
