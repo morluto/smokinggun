@@ -49,6 +49,25 @@ describe("repository scan seam", () => {
     }
   }, 30_000);
 
+  it("reports one partial-parse diagnostic for each incomplete tree-sitter parse", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-partial-parse-"));
+    try {
+      await writeFile(join(root, "broken.ts"), "export function broken( {\n", "utf8");
+
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "a".repeat(64)});
+      const diagnostics = result.report.diagnostics.filter(
+        (diagnostic) => diagnostic.code === "partial-parse" && diagnostic.path === "broken.ts",
+      );
+
+      expect(diagnostics).toHaveLength(1);
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({scanner: "smokinggun.tree-sitter", parseStatus: "partial"}),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("discovers C++ source and header extensions supported by the pinned grammar", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-cpp-"));
     try {
