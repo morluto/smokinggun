@@ -1,25 +1,92 @@
 name: Feature request
-description: Suggest a new capability for SmokingGun
-labels: [enhancement]
+description: Propose a focused improvement to SmokingGun
+title: "[Feature] "
+labels:
+  - enhancement
 body:
-  - type: textarea
-    id: problem
+  - type: markdown
     attributes:
-      label: Problem
-      description: What can you not do today with SmokingGun?
+      value: |
+        Keep one primary scanner, evidence, or workflow outcome per request.
+        Describe how the proposal preserves the boundary between candidates,
+        imported observations, and verified conclusions.
+
+  - type: checkboxes
+    id: before-submitting
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the open and closed issues and pull requests for a related proposal.
+          required: true
+        - label: I removed credentials, tokens, private paths, and sensitive source data.
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Source capture or inventory
+        - Complexity or semantic scanning
+        - Imported benchmark or profile evidence
+        - Evidence or report serialization
+        - CLI
+        - MCP or agent integration
+        - Package or release
+        - Other
     validations:
       required: true
+
   - type: textarea
-    id: proposal
+    id: current-limitation
     attributes:
-      label: Proposed solution
-      description: How should SmokingGun behave, and which commands or output would be affected?
+      label: Current limitation
+      description: What can agents or users not determine, reproduce, or validate today?
     validations:
       required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use cases
+      description: Give concrete repositories, source shapes, artifacts, scanner workflows, or agent tasks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-outcome
+    attributes:
+      label: Desired outcome and success criteria
+      description: Describe observable commands, output, coverage, evidence classification, correctness gates, and resource limits.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence-plan
+    attributes:
+      label: Evidence and measurement plan
+      description: Explain what would establish that the capability is useful and correct. For optimization claims, include workload, baseline, candidate, metric, units, and methodology.
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and non-goals
+      description: Call out read-only and no-execution boundaries, supported languages/formats, protocol compatibility, and work that should remain out of scope.
+
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
-      description: Other approaches you have considered
-    validations:
-      required: false
+      description: Describe existing scanners, upstream tools, imported formats, or workarounds considered and why they do not meet the need.
+
+  - type: textarea
+    id: possible-direction
+    attributes:
+      label: Possible direction
+      description: Optional implementation idea. Treat it as a proposal, not a requirement.
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link relevant schemas, source, measurements, fixtures, issues, or discussions.

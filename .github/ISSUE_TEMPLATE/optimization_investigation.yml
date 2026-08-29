@@ -1,0 +1,68 @@
+name: Optimization investigation
+description: Propose or document a complexity hotspot investigation
+title: "[Investigation] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when a hotspot candidate needs a bounded investigation. A
+        static estimate is a reason to measure, not proof that a change helps.
+
+  - type: checkboxes
+    id: before-submitting
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the open and closed issues for a related investigation.
+          required: true
+        - label: I removed credentials, tokens, private paths, and sensitive source data.
+          required: true
+
+  - type: textarea
+    id: investigation-question
+    attributes:
+      label: Investigation question
+      description: State the concrete performance, memory, or complexity question to answer.
+      placeholder: Does changing ... improve ... for ...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: hotspot-evidence
+    attributes:
+      label: Hotspot evidence
+      description: Include the scanner, rule, path/symbol, estimate, coverage, assumptions, and the exact output that motivated the investigation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload and baseline
+      description: Identify the representative source/workload, baseline revision, environment, metric, units, and measurement method.
+    validations:
+      required: true
+
+  - type: textarea
+    id: candidate
+    attributes:
+      label: Candidate change and non-goals
+      description: Describe the proposed change, what it leaves unchanged, and why it addresses the measured cost rather than only the estimate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and correctness gates
+      description: Define the improvement threshold, correctness oracle, resource limits, and evidence needed to accept or reject the hypothesis.
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link source, scanner output, benchmark/profile artifacts, or related issues.
