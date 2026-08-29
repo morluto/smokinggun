@@ -115,6 +115,35 @@ describe("standard benchmark importers", () => {
     });
   });
 
+  it("keeps pyperf calibration runs but rejects malformed measured values", () => {
+    const calibrationOnly = importBenchmark(
+      {
+        benchmarks: [
+          {
+            name: "example",
+            runs: [{metadata: {calibrate_loops: 8}, warmups: [[1, 0.001]]}, {values: [0.001, 0.002]}],
+          },
+        ],
+      },
+      {tool: "pyperf"},
+    );
+    expect("code" in calibrationOnly).toBe(false);
+    if (!("code" in calibrationOnly)) expect(calibrationOnly.records[0]?.samplesMs).toEqual([1, 2]);
+
+    const malformed = importBenchmark(
+      {
+        benchmarks: [
+          {
+            name: "example",
+            runs: [{values: [0.001]}, {values: [0.002, "corrupt"]}],
+          },
+        ],
+      },
+      {tool: "pyperf"},
+    );
+    expect(malformed).toMatchObject({code: "invalid-pyperf"});
+  });
+
   it("converts JMH throughput to milliseconds per operation", () => {
     const result = importBenchmark(
       [
@@ -134,5 +163,23 @@ describe("standard benchmark importers", () => {
       {tool: "jmh"},
     );
     expect("code" in unsupportedUnit && unsupportedUnit.code).toBe("unsupported-jmh-time-unit");
+  });
+
+  it("rejects malformed JMH raw-data groups instead of dropping them", () => {
+    const result = importBenchmark(
+      [
+        {
+          benchmark: "Example.run",
+          mode: "avgt",
+          primaryMetric: {
+            score: 1.5,
+            scoreUnit: "ms/op",
+            rawData: [[1], [2, "corrupt"]],
+          },
+        },
+      ],
+      {tool: "jmh"},
+    );
+    expect(result).toMatchObject({code: "invalid-jmh"});
   });
 });
