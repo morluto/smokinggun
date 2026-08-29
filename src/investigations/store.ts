@@ -129,8 +129,7 @@ export async function recordImportedInvestigationMeasurements(
   id: string,
   measurements: ReadonlyArray<InvestigationMeasurementImport>,
 ): Promise<void> {
-  const stored = await loadLatestInvestigation(dataRoot, id);
-  if (stored === undefined) return;
+  const stored = await requireLatestInvestigation(dataRoot, id);
   const existingDigests = new Set(
     stored.bundle.evidence.flatMap((evidence) =>
       evidence.kind === "measurement" && evidence.digest !== undefined ? [evidence.digest] : [],

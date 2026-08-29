@@ -294,6 +294,77 @@ try {
   )
     throw new Error("comparison SARIF stream contract failed");
 
+  const missingInvestigationId = "inv_2222222222222222";
+  const missingBaselineArtifact = join(sandbox, "missing-investigation-baseline.json");
+  const missingCandidateArtifact = join(sandbox, "missing-investigation-candidate.json");
+  await writeFile(
+    missingBaselineArtifact,
+    JSON.stringify({...measurement("e", 10), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  await writeFile(
+    missingCandidateArtifact,
+    JSON.stringify({...measurement("f", 8), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  const missingInvestigationComparison = await run([
+    entry,
+    "compare",
+    missingBaselineArtifact,
+    missingCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const missingInvestigationComparisonValue = JSON.parse(missingInvestigationComparison.stdout);
+  if (
+    missingInvestigationComparison.code !== 2 ||
+    missingInvestigationComparisonValue.code !== "comparison-failed" ||
+    !missingInvestigationComparisonValue.message.includes(`Investigation ${missingInvestigationId} does not exist.`) ||
+    missingInvestigationComparison.stderr.length !== 0
+  )
+    throw new Error("comparison must reject a measurement attachment to a missing investigation");
+
+  const partiallyMissingInvestigationId = "inv_3333333333333333";
+  const existingInvestigationPointerPath = join(
+    sandbox,
+    "data",
+    "investigations",
+    investigationValue.id,
+    "latest.json",
+  );
+  const existingInvestigationPointer = await readFile(existingInvestigationPointerPath, "utf8");
+  const partiallyMissingBaselineArtifact = join(sandbox, "partially-missing-baseline.json");
+  const partiallyMissingCandidateArtifact = join(sandbox, "partially-missing-candidate.json");
+  await writeFile(
+    partiallyMissingBaselineArtifact,
+    JSON.stringify({...measurement("3", 10), investigation: investigationValue.id}),
+    "utf8",
+  );
+  await writeFile(
+    partiallyMissingCandidateArtifact,
+    JSON.stringify({...measurement("4", 8), investigation: partiallyMissingInvestigationId}),
+    "utf8",
+  );
+  const partiallyMissingComparison = await run([
+    entry,
+    "compare",
+    partiallyMissingBaselineArtifact,
+    partiallyMissingCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const partiallyMissingComparisonValue = JSON.parse(partiallyMissingComparison.stdout);
+  if (
+    partiallyMissingComparison.code !== 2 ||
+    partiallyMissingComparisonValue.code !== "comparison-failed" ||
+    !partiallyMissingComparisonValue.message.includes(
+      `Investigation ${partiallyMissingInvestigationId} does not exist.`,
+    ) ||
+    (await readFile(existingInvestigationPointerPath, "utf8")) !== existingInvestigationPointer ||
+    partiallyMissingComparison.stderr.length !== 0
+  )
+    throw new Error("comparison must preflight every investigation before changing any investigation state");
+
   if (process.platform !== "win32") {
     const linkedBaselineArtifact = join(sandbox, "linked-baseline.json");
     await symlink(baselineArtifact, linkedBaselineArtifact);

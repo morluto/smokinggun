@@ -10,9 +10,9 @@ import {parseMeasurementArtifact} from "../measurements/artifacts.js";
 import {
   appendInvestigationEvidence,
   appendInvestigationReport,
-  loadLatestInvestigation,
   recordImportedInvestigationMeasurements,
   recordParsedInvestigationSnapshot,
+  requireLatestInvestigation,
   type InvestigationMeasurementImport,
 } from "../investigations/store.js";
 import {
@@ -192,20 +192,22 @@ export default class Compare extends BaseCommand {
     inputs: ComparisonInputs,
   ): Promise<void> {
     const comparison = Protocol.comparison.parse(result);
-    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
-    const artifact = `${comparison.id}.json`;
-    const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
-    const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
-    const report = storedArtifact.reference;
     const investigationIds = [
       ...new Set(
         [baseline.investigation, candidate.investigation].filter((value): value is string => value !== undefined),
       ),
     ];
+    await Promise.all(
+      investigationIds.map((investigationId) => requireLatestInvestigation(context.artifacts, investigationId)),
+    );
+    await this.importInvestigationMeasurements(context, baseline, candidate, inputs);
+    const artifact = `${comparison.id}.json`;
+    const comparisonBytes = Buffer.from(`${stableJson(comparison)}\n`, "utf8");
+    const storedArtifact = await context.artifactStore.putBytes(artifact, comparisonBytes);
+    const report = storedArtifact.reference;
     const pending = [];
     for (const investigationId of investigationIds) {
-      const investigation = await loadLatestInvestigation(context.artifacts, investigationId);
-      if (investigation === undefined) continue;
+      const investigation = await requireLatestInvestigation(context.artifacts, investigationId);
       const baselineInputDigest = "baselineDigest" in comparison ? comparison.baselineDigest : undefined;
       const candidateInputDigest = "candidateDigest" in comparison ? comparison.candidateDigest : undefined;
       const requiredInputDigests = [
@@ -296,7 +298,6 @@ export default class Compare extends BaseCommand {
       ),
     ];
     for (const investigationId of investigationIds) {
-      if ((await loadLatestInvestigation(context.artifacts, investigationId)) === undefined) continue;
       const imports: InvestigationMeasurementImport[] = [];
       const storedBaseline = await context.artifactStore.putBytes(inputs.baseline.path, inputs.baseline.bytes);
       if (storedBaseline.digest !== inputs.baseline.digest)

@@ -141,6 +141,22 @@ describe("investigation snapshots", () => {
     expect((await requireLatestInvestigation(root, id)).bundle.state).toBe("scanned");
   });
 
+  it("rejects measurement imports for missing investigations", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
+    const id = "inv_1234567890abcdef";
+
+    await expect(
+      recordImportedInvestigationMeasurements(root, id, [
+        {
+          role: "baseline",
+          artifact: `artifact://sha256/${"a".repeat(64)}`,
+          digest: "a".repeat(64),
+          claimClass: "constant-factor",
+        },
+      ]),
+    ).rejects.toThrow(`Investigation ${id} does not exist.`);
+  });
+
   it("materializes a legacy bundle as an addressable parent before migration", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
     const bundle = {
