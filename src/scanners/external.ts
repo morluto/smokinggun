@@ -1,8 +1,8 @@
-import {readFile} from "node:fs/promises";
 import {isAbsolute, relative, resolve} from "node:path";
 import {execa} from "execa";
 import {Protocol, type AdapterManifestV1, type ProblemV1} from "../protocol/index.js";
 import {executionEnvironment, redactSensitive} from "../adapters/environment.js";
+import {readBoundedUtf8File} from "../files.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {sandboxAdapterCommand} from "../adapters/sandbox.js";
 import type {ScannerDescriptor} from "./registry.js";
@@ -48,6 +48,8 @@ export const adapterExecutionAuthorized: AdapterExecutionAuthorization = {
   _tag: "AdapterExecutionAuthorized",
 };
 
+const maxAdapterManifestBytes = 1024 * 1024;
+
 export function noExternalAdapters(): ParsedExternalAdapters {
   return {adapters: [], invalidDescriptors: [], diagnostics: []};
 }
@@ -71,7 +73,7 @@ export async function parseExternalAdapters(
     const manifestLabel = manifestPath ?? "the supplied external manifest";
     let input: unknown;
     try {
-      input = JSON.parse(await readFile(inputPath, "utf8"));
+      input = JSON.parse(await readBoundedUtf8File(inputPath, maxAdapterManifestBytes));
     } catch (cause: unknown) {
       const detail = cause instanceof Error ? redactSensitive(cause.message) : "The manifest could not be read.";
       diagnostics.push(

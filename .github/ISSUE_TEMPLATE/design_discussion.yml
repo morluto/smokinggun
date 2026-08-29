@@ -1,0 +1,68 @@
+name: Design discussion
+description: Resolve a SmokingGun scanner, evidence, or protocol decision before implementation
+title: "[Design] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for a new scanner family, evidence boundary, public schema,
+        or execution/sandbox decision. Keep one decision per discussion.
+
+  - type: checkboxes
+    id: before-submitting
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the open and closed issues and pull requests for a related discussion.
+          required: true
+        - label: I removed credentials, tokens, private paths, and sensitive source data.
+          required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision needed
+      description: State the exact question maintainers need to resolve.
+      placeholder: Should SmokingGun ... or ...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context-evidence
+    attributes:
+      label: Context and evidence
+      description: Explain why the decision is needed now. Separate static findings, imported observations, executed measurements, and inference.
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundary-invariants
+    attributes:
+      label: Boundary and invariants
+      description: Identify the owner, source snapshot and artifact identity rules, read-only/no-execution guarantees, coverage semantics, and result contract.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and tradeoffs
+      description: Compare viable approaches, including correctness, evidence quality, resource bounds, compatibility, safety, and maintenance costs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: success-criteria
+    attributes:
+      label: Success criteria and open questions
+      description: State what evidence would settle the decision and list only unresolved questions that could change the choice.
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link relevant architecture, schemas, tests, measurements, or prior discussions.

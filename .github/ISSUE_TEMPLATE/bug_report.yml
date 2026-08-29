@@ -1,33 +1,127 @@
 name: Bug report
-description: Report a bug in SmokingGun
-labels: [bug]
+description: Report a reproducible problem in SmokingGun
+title: "[Bug] "
+labels:
+  - bug
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Please report one primary behavior per issue. SmokingGun findings are
+        candidates, not proof: distinguish observed output from interpretation
+        and remove credentials and private paths.
+
+  - type: checkboxes
+    id: before-submitting
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the open and closed issues for a related report.
+          required: true
+        - label: I removed credentials, tokens, private paths, and sensitive source data.
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Source capture or inventory
+        - Complexity or semantic scanning
+        - Imported benchmark or profile evidence
+        - Evidence or report serialization
+        - CLI
+        - MCP or agent integration
+        - Package or release
+        - Other
+    validations:
+      required: true
+
   - type: textarea
-    id: description
+    id: observed-behavior
     attributes:
-      label: Description
-      description: What happened, and what did you expect instead?
+      label: Observed behavior
+      description: What happened? Include the command, input type, output format, and whether the result was a finding, diagnostic, or process failure.
     validations:
       required: true
-  - type: input
-    id: version
-    attributes:
-      label: SmokingGun version
-      description: The version from `smokinggun --version` (or the package version)
-    validations:
-      required: true
+
   - type: textarea
     id: reproduction
     attributes:
       label: Reproduction
-      description: The commands you ran and the machine-readable output you observed. Static scans should stay local and offline.
-      render: shell
+      description: Give the smallest local, offline command, fixture, or event sequence that demonstrates the problem.
+      placeholder: |
+        1. Prepare ...
+        2. Run `smokinggun ...`
+        3. Observe ...
     validations:
       required: true
+
   - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What output, coverage status, evidence classification, or error should have been returned?
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-scope
+    attributes:
+      label: Impact and scope
+      description: What workloads, languages, formats, scanners, or agent workflows are affected? What remains unaffected? State whether this changes a candidate finding or verified evidence.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SmokingGun version or revision
+      description: Use `smokinggun --version` or provide the source revision.
+      placeholder: 4.0.0 or git revision
+    validations:
+      required: true
+
+  - type: input
     id: environment
     attributes:
       label: Environment
-      description: OS, Node version, pnpm version
+      description: Include OS, architecture, Node.js, pnpm, and relevant parser or artifact versions.
+      placeholder: Linux x86_64; Node 22.18; pnpm 11.20
     validations:
-      required: false
+      required: true
+
+  - type: dropdown
+    id: failure-stage
+    attributes:
+      label: Earliest failure stage
+      description: Select where the incorrect behavior first becomes observable.
+      options:
+        - Request parsing or bounds
+        - Source capture or inventory
+        - Scanner execution
+        - Evidence import or validation
+        - Report or protocol projection
+        - Package or CLI execution
+        - Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: relevant-evidence
+    attributes:
+      label: Relevant output or evidence
+      description: Paste the smallest useful machine-readable or human-readable output, error, coverage record, or measurement. Redact sensitive values.
+      render: text
+
+  - type: textarea
+    id: analysis
+    attributes:
+      label: Analysis or suspected cause
+      description: Optional. Clearly mark source-derived reasoning or a hypothesis; do not present a hotspot estimate or candidate finding as proof.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add a reduced fixture, schema/version details, screenshots, links, or a proposed regression test.

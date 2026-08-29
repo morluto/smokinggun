@@ -2,7 +2,6 @@ import {Args} from "@oclif/core";
 import {ExitError} from "@oclif/core/errors";
 import {BaseCommand, globalFlags} from "../cli/base-command.js";
 import type {RuntimeContext} from "../cli/context.js";
-import {readFile} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {stableJson} from "../serialization.js";
 import {writeResult} from "../cli/output.js";
@@ -29,6 +28,7 @@ import {
   buildScalingComparison,
   classifyComparableMeasurementArtifacts,
 } from "../measurements/compare.js";
+import {readArtifactBytes} from "../artifacts/store.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -40,8 +40,8 @@ export default class Compare extends BaseCommand {
     const parsed = await this.parse(Compare);
     const context = await this.context(parsed.flags);
     try {
-      const baselineBytes = await readFile(parsed.args.baseline);
-      const candidateBytes = await readFile(parsed.args.candidate);
+      const baselineBytes = await readArtifactBytes(parsed.args.baseline);
+      const candidateBytes = await readArtifactBytes(parsed.args.candidate);
       const baseline = parseMeasurementArtifact(JSON.parse(baselineBytes.toString("utf8")));
       const candidate = parseMeasurementArtifact(JSON.parse(candidateBytes.toString("utf8")));
       if ("code" in baseline) this.emitProblem(baseline, 2, context);

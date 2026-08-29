@@ -993,6 +993,7 @@ const scalingPointSchema = z.discriminatedUnion("status", [
   completedScalingPointSchema,
   timedOutScalingPointSchema,
   failedScalingPointSchema,
+  cancelledScalingPointSchema,
 ]);
 
 const scalingModelSchema = z.strictObject({

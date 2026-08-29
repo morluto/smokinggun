@@ -1,13 +1,15 @@
 import {createHash} from "node:crypto";
-import {readFile, realpath} from "node:fs/promises";
+import {realpath, stat} from "node:fs/promises";
 import {homedir} from "node:os";
 import {basename, dirname, isAbsolute, join, resolve} from "node:path";
 import {z} from "zod";
 import type {ProblemV1} from "./protocol/index.js";
+import {readBoundedUtf8File} from "./files.js";
 import {comparePortable, isWithinRoot} from "./paths.js";
 import {stableJson} from "./serialization.js";
 
 const outputFormats = ["human", "json", "markdown", "sarif"] as const;
+const maxConfigBytes = 1024 * 1024;
 export type OutputFormat = (typeof outputFormats)[number];
 
 const fileConfigSchema = z.strictObject({
@@ -221,7 +223,7 @@ async function readJsonConfig(
   path: string,
 ): Promise<{readonly _tag: "ok"; readonly value: FileConfig} | ConfigFailure> {
   try {
-    const raw = await readFile(path, "utf8");
+    const raw = await readBoundedUtf8File(path, maxConfigBytes);
     const parsed: unknown = JSON.parse(raw);
     const result = fileConfigSchema.safeParse(parsed);
     if (!result.success) {
