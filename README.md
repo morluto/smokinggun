@@ -49,6 +49,12 @@ Static scans are read-only, offline, and do not execute repository code or modif
 
 Semantic scanners consume the captured source snapshot directly. External adapters run only with explicit authorization and an enforcing read-only sandbox; they receive captured source bytes rather than the live checkout. Benchmark, profile, and measurement artifacts cross an import boundary without granting workload-execution authority. See [the authority architecture](docs/architecture.md) for the ownership rules behind these choices.
 
+## Input requirements
+
+Textual inputs—including configuration, adapter manifests, reports, and JSON evidence artifacts—must be valid UTF-8. SmokingGun rejects malformed byte sequences instead of silently replacing them, because replacement text would no longer represent the captured evidence. Binary formats such as gzip-compressed pprof profiles remain binary until their format decoder handles them.
+
+Numeric pprof fields must fit JavaScript's exact integer range (`Number.MIN_SAFE_INTEGER` through `Number.MAX_SAFE_INTEGER`). SmokingGun rejects values outside that range instead of rounding identifiers or measurements.
+
 ## About
 
 SmokingGun's authoritative path is immutable capture, snapshot-backed scanning, truthful coverage, content-addressed reports, and explicit evidence imports. SARIF, SCIP, benchmarks, profiles, and measurements remain external inputs. Missing or failed coverage stays visible instead of becoming a clean scan.

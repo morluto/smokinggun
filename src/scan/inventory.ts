@@ -46,7 +46,7 @@ export async function buildRepositoryInventory(
   const packageManagers = new Set<string>();
   for (const entry of rootEntries) {
     const manager = manifestNames[entry.name];
-    if (manager === undefined) continue;
+    if (manager === undefined || !entry.isFile()) continue;
     manifests.push(entry.name);
     packageManagers.add(manager);
   }

@@ -26,6 +26,36 @@ it("classifies only same-kind artifacts from the same benchmark plan", () => {
   });
 });
 
+it("rejects comparisons that declare different statistical policies", () => {
+  const baselineMeasurement = measurement();
+  const candidateMeasurement = {
+    ...measurement(),
+    statisticalPolicy: {kind: "median-improvement" as const, minimumRelativeImprovement: 0.25},
+  };
+  const baselineScaling = scaling("base", [10]);
+  const candidateScaling = scaling("candidate", [8]);
+  candidateScaling.points[0] = {
+    ...candidateScaling.points[0]!,
+    statisticalPolicy: {kind: "non-overlapping-iqr", minimumRelativeImprovement: 0},
+  };
+  const baselineMultiScaling = multiScaling("base", 10);
+  const candidateMultiScaling = multiScaling("candidate", 8);
+  candidateMultiScaling.points[0] = {
+    ...candidateMultiScaling.points[0]!,
+    statisticalPolicy: {kind: "median-improvement", minimumRelativeImprovement: 0.1},
+  };
+  const results = [
+    classifyComparableMeasurementArtifacts(baselineMeasurement, candidateMeasurement),
+    classifyComparableMeasurementArtifacts(baselineScaling, candidateScaling),
+    classifyComparableMeasurementArtifacts(baselineMultiScaling, candidateMultiScaling),
+  ];
+  expect(results).toMatchObject([
+    {code: "statistical-policy-mismatch"},
+    {code: "statistical-policy-mismatch"},
+    {code: "statistical-policy-mismatch"},
+  ]);
+});
+
 it("matches scaling measurements by declared input value rather than array position", () => {
   const baseline = scaling("base", [10, 20]);
   const candidate = scaling("candidate", [8, 16]);
@@ -89,7 +119,26 @@ it("blocks promotion when imported measurements bind different shared input sets
     medianMs: 0.5,
     meanMs: 0.5,
     quartiles: {q1Ms: 0.5, q3Ms: 0.5},
-    reproduction: {...measurement().reproduction, subjectDigest: "e".repeat(64), inputSetDigest: "f".repeat(64)},
+    reproduction: {...measurement().reproduction, inputSetDigest: "f".repeat(64)},
+  };
+  const result = buildMeasurementComparison(baseline, candidate, "baseline.json", "candidate.json", [
+    "a".repeat(64),
+    "b".repeat(64),
+  ]);
+  expect(result.promotion).toBe("blocked");
+  expect(result.promotionReasons).toContain("execution-input-identity-mismatch");
+});
+
+it("blocks promotion when imported measurements bind different subjects", () => {
+  const baseline = measurement();
+  const candidate = {
+    ...measurement(),
+    id: `meas_${"e".repeat(16)}` as const,
+    samplesMs: [0.5],
+    medianMs: 0.5,
+    meanMs: 0.5,
+    quartiles: {q1Ms: 0.5, q3Ms: 0.5},
+    reproduction: {...measurement().reproduction, subjectDigest: "f".repeat(64)},
   };
   const result = buildMeasurementComparison(baseline, candidate, "baseline.json", "candidate.json", [
     "a".repeat(64),

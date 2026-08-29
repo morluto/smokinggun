@@ -90,6 +90,12 @@ export function importPprof(input: Uint8Array, options: ProfileImportOptions): P
         "The gzip-compressed pprof profile exceeds the decompressed output limit.",
         `Use a pprof artifact whose decompressed size is at most ${(options.maxDecompressedBytes ?? defaultMaxPprofDecompressedBytes) / (1024 * 1024)} MiB.`,
       );
+    if (cause instanceof UnsafePprofNumericError)
+      return problem(
+        "pprof-numeric-value-out-of-range",
+        "The pprof profile contains a numeric value outside JavaScript's exact integer range.",
+        "Regenerate the profile with sample values and identifiers between Number.MIN_SAFE_INTEGER and Number.MAX_SAFE_INTEGER.",
+      );
     return problem(
       "pprof-decode-failed",
       "The artifact is not a readable gzip-compressed pprof Profile.",
@@ -146,18 +152,8 @@ export function importPerfettoSummary(input: unknown, options: ProfileImportOpti
 
 /** Run an explicitly installed Perfetto trace processor and import its bounded CSV query result. */
 export async function importPerfettoTrace(options: PerfettoTraceOptions): Promise<TraceSummaryV1 | ProblemV1> {
-  if (options.query.trim().length === 0 || options.query.length > 10_000)
-    return problem(
-      "invalid-perfetto-query",
-      "The Perfetto query is empty or exceeds the bounded query length.",
-      "Provide a bounded SQL query of at most 10,000 characters.",
-    );
-  if (!isSingleSqlStatement(options.query))
-    return problem(
-      "invalid-perfetto-query",
-      "The Perfetto query contains multiple statements.",
-      "Provide one SQL statement; a single trailing terminator and semicolons inside quoted values are allowed.",
-    );
+  const queryProblem = validatePerfettoQuery(options.query);
+  if (queryProblem !== undefined) return queryProblem;
   const executable = options.executable ?? process.env.SMOKINGGUN_TRACE_PROCESSOR ?? "trace_processor";
   try {
     const result = await execa(
@@ -226,6 +222,23 @@ export async function importPerfettoTrace(options: PerfettoTraceOptions): Promis
         : "Install trace_processor and set SMOKINGGUN_TRACE_PROCESSOR if it is not on PATH.",
     );
   }
+}
+
+/** Validate a bounded Perfetto query before a raw trace is retained or processed. */
+export function validatePerfettoQuery(query: string): ProblemV1 | undefined {
+  if (query.trim().length === 0 || query.length > 10_000)
+    return problem(
+      "invalid-perfetto-query",
+      "The Perfetto query is empty or exceeds the bounded query length.",
+      "Provide a bounded SQL query of at most 10,000 characters.",
+    );
+  if (!isSingleSqlStatement(query))
+    return problem(
+      "invalid-perfetto-query",
+      "The Perfetto query contains multiple statements.",
+      "Provide one SQL statement; a single trailing terminator and semicolons inside quoted values are allowed.",
+    );
+  return undefined;
 }
 
 function isSingleSqlStatement(query: string): boolean {
@@ -334,8 +347,11 @@ function stringAt(strings: ReadonlyArray<string>, index: number): string {
 
 function numberValue(value: number | bigint): number {
   const number = typeof value === "bigint" ? Number(value) : value;
-  return Number.isSafeInteger(number) ? number : 0;
+  if (!Number.isSafeInteger(number)) throw new UnsafePprofNumericError();
+  return number;
 }
+
+class UnsafePprofNumericError extends Error {}
 
 function problem(code: string, message: string, recovery: string): ProblemV1 {
   return {schemaVersion: "smokinggun.problem.v1", code, message, recovery};

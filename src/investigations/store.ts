@@ -10,7 +10,7 @@ import {
 } from "../protocol/index.js";
 import {comparePortable} from "../paths.js";
 import {stableJson} from "../serialization.js";
-import {writeFileAtomically} from "../files.js";
+import {decodeUtf8Bytes, isInvalidUtf8Error, writeFileAtomically} from "../files.js";
 
 type StoredInvestigation = {
   readonly bundle: InvestigationBundleV2;
@@ -129,8 +129,7 @@ export async function recordImportedInvestigationMeasurements(
   id: string,
   measurements: ReadonlyArray<InvestigationMeasurementImport>,
 ): Promise<void> {
-  const stored = await loadLatestInvestigation(dataRoot, id);
-  if (stored === undefined) return;
+  const stored = await requireLatestInvestigation(dataRoot, id);
   const existingDigests = new Set(
     stored.bundle.evidence.flatMap((evidence) =>
       evidence.kind === "measurement" && evidence.digest !== undefined ? [evidence.digest] : [],
@@ -386,7 +385,12 @@ async function acquireUpdateLock(directory: string): Promise<() => Promise<void>
 }
 
 async function recoverAbandonedLock(path: string): Promise<boolean> {
-  const input = await readOptional(path);
+  let input: string | undefined;
+  try {
+    input = await readOptional(path);
+  } catch (cause: unknown) {
+    if (!isInvalidUtf8Error(cause)) throw cause;
+  }
   const info = await stat(path).catch(() => undefined);
   let pid: number | undefined;
   if (input !== undefined)
@@ -429,7 +433,7 @@ async function readOptional(path: string): Promise<string | undefined> {
     const info = await handle.stat();
     if (!info.isFile() || info.size > 16 * 1024 * 1024)
       throw new Error(`Investigation store entry ${path} is not a bounded regular file.`);
-    return (await handle.readFile()).toString("utf8");
+    return decodeUtf8Bytes(await handle.readFile());
   } finally {
     await handle.close();
   }

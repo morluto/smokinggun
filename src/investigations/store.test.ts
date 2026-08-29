@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {mkdir, mkdtemp, readFile, writeFile} from "node:fs/promises";
+import {mkdir, mkdtemp, readFile, utimes, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
@@ -139,6 +139,22 @@ describe("investigation snapshots", () => {
       ]),
     ).rejects.toThrow(/without baseline measurement evidence/);
     expect((await requireLatestInvestigation(root, id)).bundle.state).toBe("scanned");
+  });
+
+  it("rejects measurement imports for missing investigations", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
+    const id = "inv_1234567890abcdef";
+
+    await expect(
+      recordImportedInvestigationMeasurements(root, id, [
+        {
+          role: "baseline",
+          artifact: `artifact://sha256/${"a".repeat(64)}`,
+          digest: "a".repeat(64),
+          claimClass: "constant-factor",
+        },
+      ]),
+    ).rejects.toThrow(`Investigation ${id} does not exist.`);
   });
 
   it("materializes a legacy bundle as an addressable parent before migration", async () => {
@@ -340,6 +356,29 @@ describe("investigation snapshots", () => {
     const latest = await loadLatestInvestigation(root, initial.id);
     expect(latest?.parentDigest).toBe(parentDigest);
     expect(latest?.bundle.diagnostics).toHaveLength(1);
+  });
+
+  it("recovers an abandoned lock with malformed UTF-8 metadata", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-investigation-"));
+    const initial = {
+      schemaVersion: "smokinggun.investigation-bundle.v2" as const,
+      id: "inv_9988776655443322",
+      state: "created" as const,
+      root: ".",
+      createdAt: new Date().toISOString(),
+      reports: [],
+      evidence: [],
+      diagnostics: [],
+    };
+    const parentDigest = await recordInvestigationSnapshot(root, initial, null);
+    const lock = join(root, "investigations", initial.id, ".update.lock");
+    await writeFile(lock, Buffer.from([0xff]));
+    const stale = new Date(Date.now() - 31_000);
+    await utimes(lock, stale, stale);
+
+    await expect(
+      recordInvestigationSnapshot(root, {...initial, state: "inventoried" as const}, parentDigest),
+    ).resolves.toMatch(/^[a-f0-9]{64}$/);
   });
 });
 

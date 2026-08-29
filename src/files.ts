@@ -31,8 +31,29 @@ export async function readBoundedUtf8File(path: string, maxBytes: number): Promi
       offset += bytesRead;
     }
     if (offset > maxBytes) throw new Error(`File exceeds the ${maxBytes} byte limit.`);
-    return bytes.subarray(0, offset).toString("utf8");
+    return decodeUtf8Bytes(bytes.subarray(0, offset));
   } finally {
     await handle.close();
+  }
+}
+
+/** Decode exact textual input bytes without silently replacing malformed UTF-8. */
+export function decodeUtf8Bytes(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", {fatal: true, ignoreBOM: true}).decode(bytes);
+  } catch {
+    throw new InvalidUtf8Error();
+  }
+}
+
+/** Whether a textual input failed strict UTF-8 decoding. */
+export function isInvalidUtf8Error(cause: unknown): boolean {
+  return cause instanceof InvalidUtf8Error;
+}
+
+class InvalidUtf8Error extends Error {
+  constructor() {
+    super("File is not valid UTF-8.");
+    this.name = "InvalidUtf8Error";
   }
 }

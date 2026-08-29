@@ -194,7 +194,15 @@ export function importSarif(
 }
 
 function normalizeSarifPath(path: string, root: string): string | undefined {
-  const candidate = (path.startsWith("file://") ? fileURLToPath(path) : path).replace(/\\/g, "/");
+  const scheme = /^[a-z][a-z0-9+.-]*:/iu.exec(path)?.[0];
+  const isWindowsAbsolute = /^[a-z]:[\\/]/iu.test(path);
+  if (scheme !== undefined && !isWindowsAbsolute && scheme.toLowerCase() !== "file:") return undefined;
+  let candidate: string;
+  try {
+    candidate = (scheme === undefined || isWindowsAbsolute ? path : fileURLToPath(path)).replace(/\\/g, "/");
+  } catch {
+    return undefined;
+  }
   if (isAbsolute(candidate)) {
     const relativePath = relative(resolve(root), resolve(candidate));
     if (relativePath.startsWith("..") || isAbsolute(relativePath)) return undefined;

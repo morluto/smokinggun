@@ -294,6 +294,77 @@ try {
   )
     throw new Error("comparison SARIF stream contract failed");
 
+  const missingInvestigationId = "inv_2222222222222222";
+  const missingBaselineArtifact = join(sandbox, "missing-investigation-baseline.json");
+  const missingCandidateArtifact = join(sandbox, "missing-investigation-candidate.json");
+  await writeFile(
+    missingBaselineArtifact,
+    JSON.stringify({...measurement("e", 10), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  await writeFile(
+    missingCandidateArtifact,
+    JSON.stringify({...measurement("f", 8), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  const missingInvestigationComparison = await run([
+    entry,
+    "compare",
+    missingBaselineArtifact,
+    missingCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const missingInvestigationComparisonValue = JSON.parse(missingInvestigationComparison.stdout);
+  if (
+    missingInvestigationComparison.code !== 2 ||
+    missingInvestigationComparisonValue.code !== "comparison-failed" ||
+    !missingInvestigationComparisonValue.message.includes(`Investigation ${missingInvestigationId} does not exist.`) ||
+    missingInvestigationComparison.stderr.length !== 0
+  )
+    throw new Error("comparison must reject a measurement attachment to a missing investigation");
+
+  const partiallyMissingInvestigationId = "inv_3333333333333333";
+  const existingInvestigationPointerPath = join(
+    sandbox,
+    "data",
+    "investigations",
+    investigationValue.id,
+    "latest.json",
+  );
+  const existingInvestigationPointer = await readFile(existingInvestigationPointerPath, "utf8");
+  const partiallyMissingBaselineArtifact = join(sandbox, "partially-missing-baseline.json");
+  const partiallyMissingCandidateArtifact = join(sandbox, "partially-missing-candidate.json");
+  await writeFile(
+    partiallyMissingBaselineArtifact,
+    JSON.stringify({...measurement("3", 10), investigation: investigationValue.id}),
+    "utf8",
+  );
+  await writeFile(
+    partiallyMissingCandidateArtifact,
+    JSON.stringify({...measurement("4", 8), investigation: partiallyMissingInvestigationId}),
+    "utf8",
+  );
+  const partiallyMissingComparison = await run([
+    entry,
+    "compare",
+    partiallyMissingBaselineArtifact,
+    partiallyMissingCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const partiallyMissingComparisonValue = JSON.parse(partiallyMissingComparison.stdout);
+  if (
+    partiallyMissingComparison.code !== 2 ||
+    partiallyMissingComparisonValue.code !== "comparison-failed" ||
+    !partiallyMissingComparisonValue.message.includes(
+      `Investigation ${partiallyMissingInvestigationId} does not exist.`,
+    ) ||
+    (await readFile(existingInvestigationPointerPath, "utf8")) !== existingInvestigationPointer ||
+    partiallyMissingComparison.stderr.length !== 0
+  )
+    throw new Error("comparison must preflight every investigation before changing any investigation state");
+
   if (process.platform !== "win32") {
     const linkedBaselineArtifact = join(sandbox, "linked-baseline.json");
     await symlink(baselineArtifact, linkedBaselineArtifact);
@@ -611,26 +682,53 @@ try {
 
   let rawTrace = false;
   if (process.platform !== "win32") {
-    const sandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-trace-"));
-    const trace = join(sandbox, "fixture.pftrace");
-    const processor = join(sandbox, "trace_processor");
+    const traceSandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-trace-"));
+    const trace = join(traceSandbox, "fixture.pftrace");
+    const processor = join(traceSandbox, "trace_processor");
     try {
       await writeFile(trace, "not-a-json-trace", "utf8");
-      await writeFile(processor, "#!/usr/bin/env node\nprocess.stdout.write('name,dur\\nmain,12.5\\n');\n", "utf8");
+      await writeFile(
+        processor,
+        "#!/usr/bin/env node\nconst fs = require('node:fs');\nconst pinned = process.argv[3] !== process.env.SMOKINGGUN_TEST_ORIGINAL_TRACE && fs.readFileSync(process.argv[3], 'utf8') === 'not-a-json-trace';\nprocess.stdout.write(`name,dur,pinned\\nmain,12.5,${pinned}\\n`);\n",
+        "utf8",
+      );
       await chmod(processor, 0o755);
       const traceResult = await run([entry, "report", trace, "--profile", "perfetto", "--format", "json"], {
         SMOKINGGUN_TRACE_PROCESSOR: processor,
+        SMOKINGGUN_TEST_ORIGINAL_TRACE: trace,
       });
       const traceValue = JSON.parse(traceResult.stdout);
       if (
         traceResult.code !== 0 ||
         traceValue.schemaVersion !== "smokinggun.trace-summary.v1" ||
-        traceValue.rows[0]?.name !== "main"
+        traceValue.rows[0]?.name !== "main" ||
+        traceValue.rows[0]?.pinned !== "true"
       )
         throw new Error("raw Perfetto trace report contract failed");
+      const invalidQueryTrace = join(traceSandbox, "invalid-query.pftrace");
+      await writeFile(invalidQueryTrace, "invalid-query-trace", "utf8");
+      const invalidQueryDigest = createHash("sha256")
+        .update(await readFile(invalidQueryTrace))
+        .digest("hex");
+      const invalidQueryResult = await run(
+        [entry, "report", invalidQueryTrace, "--profile", "perfetto", "--trace-query", "", "--format", "json"],
+        {SMOKINGGUN_TRACE_PROCESSOR: processor},
+      );
+      const invalidQueryValue = JSON.parse(invalidQueryResult.stdout);
+      const invalidQueryStored = await access(join(sandbox, "data", "artifacts", "sha256", invalidQueryDigest)).then(
+        () => true,
+        () => false,
+      );
+      if (
+        invalidQueryResult.code !== 2 ||
+        invalidQueryValue.code !== "invalid-perfetto-query" ||
+        invalidQueryStored ||
+        invalidQueryResult.stderr.length !== 0
+      )
+        throw new Error("invalid raw Perfetto queries must be rejected before artifact storage");
       rawTrace = true;
     } finally {
-      await rm(sandbox, {recursive: true, force: true});
+      await rm(traceSandbox, {recursive: true, force: true});
     }
   }
 
@@ -671,6 +769,42 @@ try {
     unreadyInvestigationFiles[0] !== "bundle.json"
   )
     throw new Error("an unready investigation must fail before persisting imported context");
+
+  const absentContextInvestigation = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    "inv_2222222222222222",
+    "--format",
+    "json",
+  ]);
+  const absentContextInvestigationValue = JSON.parse(absentContextInvestigation.stdout);
+  if (
+    absentContextInvestigation.code !== 2 ||
+    absentContextInvestigationValue.schemaVersion !== "smokinggun.problem.v1" ||
+    absentContextInvestigationValue.code !== "investigation-unavailable"
+  )
+    throw new Error("a missing investigation must fail before importing context");
+
+  const invalidContextInvestigation = await run([
+    entry,
+    "context",
+    "import",
+    scipArtifact,
+    "--investigation",
+    "invalid-id",
+    "--format",
+    "json",
+  ]);
+  const invalidContextInvestigationValue = JSON.parse(invalidContextInvestigation.stdout);
+  if (
+    invalidContextInvestigation.code !== 2 ||
+    invalidContextInvestigationValue.schemaVersion !== "smokinggun.problem.v1" ||
+    invalidContextInvestigationValue.code !== "investigation-unavailable"
+  )
+    throw new Error("an invalid investigation ID must produce a structured unavailable problem");
 
   const missingContext = await run([
     entry,
@@ -743,7 +877,7 @@ function measurement(id, medianMs) {
       environmentKeys: [],
       environmentDigest: "b".repeat(64),
       executable: {path: "[HOST_PATH]/node", digest: "c".repeat(64)},
-      subjectDigest: id.repeat(64),
+      subjectDigest: "9".repeat(64),
       inputSetDigest: "d".repeat(64),
       timeoutMs: 1000,
       warmups: 0,

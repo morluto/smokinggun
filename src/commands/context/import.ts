@@ -22,23 +22,33 @@ export default class ContextImport extends BaseCommand {
   public async run(): Promise<void> {
     const parsed = await this.parse(ContextImport);
     const context = await this.context(parsed.flags);
-    const result = await importScip(parsed.args.artifact, context.config.cwd);
-    const index = result.state === "unavailable" ? undefined : result.index;
-    const value = {
-      schemaVersion: "smokinggun.context-import.v1",
-      state: result.state,
-      ...(index === undefined ? {} : {index}),
-      diagnostics: result.diagnostics,
-    };
     const investigation =
-      parsed.flags.investigation === undefined || index === undefined
+      parsed.flags.investigation === undefined
         ? undefined
-        : await loadLatestInvestigation(context.artifacts, parsed.flags.investigation);
-    if (
-      parsed.flags.investigation !== undefined &&
-      investigation !== undefined &&
-      !canRecordContext(investigation.bundle)
-    )
+        : await loadLatestInvestigation(context.artifacts, parsed.flags.investigation).catch(() =>
+            this.emitProblem(
+              {
+                schemaVersion: "smokinggun.problem.v1",
+                code: "investigation-unavailable",
+                message: "The requested investigation is invalid or does not exist.",
+                recovery: "Create or select an existing investigation before importing context.",
+              },
+              2,
+              context,
+            ),
+          );
+    if (parsed.flags.investigation !== undefined && investigation === undefined)
+      this.emitProblem(
+        {
+          schemaVersion: "smokinggun.problem.v1",
+          code: "investigation-unavailable",
+          message: "The requested investigation is invalid or does not exist.",
+          recovery: "Create or select an existing investigation before importing context.",
+        },
+        2,
+        context,
+      );
+    if (investigation !== undefined && !canRecordContext(investigation.bundle))
       this.emitProblem(
         {
           schemaVersion: "smokinggun.problem.v1",
@@ -49,6 +59,14 @@ export default class ContextImport extends BaseCommand {
         1,
         context,
       );
+    const result = await importScip(parsed.args.artifact, context.config.cwd);
+    const index = result.state === "unavailable" ? undefined : result.index;
+    const value = {
+      schemaVersion: "smokinggun.context-import.v1",
+      state: result.state,
+      ...(index === undefined ? {} : {index}),
+      diagnostics: result.diagnostics,
+    };
     const human = [
       `SCIP import: ${result.state}`,
       index === undefined

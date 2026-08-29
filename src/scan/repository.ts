@@ -219,29 +219,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     analyzed += 1;
     analyzedFiles.push(file);
     const treeStructural = runStructural ? await scanWithTreeSitter(reportPath, source, options.signal) : undefined;
-    const result = {
-      findings: treeStructural?.findings ?? [],
-      parseStatus:
-        treeStructural === undefined || treeStructural.coverage.status === "complete"
-          ? ("complete" as const)
-          : ("partial" as const),
-      ...(treeStructural?.coverage.status === "complete" || treeStructural === undefined
-        ? {}
-        : {reason: treeStructural.coverage.error}),
-    };
-    findings.push(...result.findings);
-    if (result.parseStatus === "partial") {
-      partial = true;
-      partialReason = result.reason;
-      parseDiagnostics.push({
-        schemaVersion: "smokinggun.problem.v1",
-        code: "partial-parse",
-        message: `Structural coverage is partial for ${reportPath}.`,
-        path: reportPath,
-        detail: result.reason,
-        recovery: "Inspect the file manually or rerun after fixing the syntax.",
-      });
-    }
+    findings.push(...(treeStructural?.findings ?? []));
     if (runStructural) {
       const parserResult = treeStructural?.coverage ?? (await parseWithTreeSitter(reportPath, source, options.signal));
       const parserEntry = parserEntryFor(parserResult.language);
@@ -256,6 +234,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
         partial = true;
       }
       if (parserResult.status !== "complete") {
+        partialReason ??= parserResult.error;
         parserEntry.reasons.add(parserResult.error);
         parseDiagnostics.push({
           schemaVersion: "smokinggun.problem.v1",
