@@ -153,6 +153,28 @@ describe("repository scan seam", () => {
     }
   });
 
+  it.each([".ts", "language:typescript"])("keeps runtime filtering for %s scopes", async (filter) => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-filter-"));
+    try {
+      await mkdir(join(root, "tests"));
+      await writeFile(join(root, "src.ts"), "for (const value of values) values.includes(value);\n", "utf8");
+      await writeFile(
+        join(root, "tests", "src.test.ts"),
+        "for (const value of values) values.includes(value);\n",
+        "utf8",
+      );
+      const scope = parseScanScope([filter]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+      const result = await scanRepository(root, {...defaultScanOptions, scope});
+
+      expect(result.report.findings.every((finding) => finding.location.path === "src.ts")).toBe(true);
+      expect(result.report.inventory?.tests).toEqual(["tests/src.test.ts"]);
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "auxiliary-source-suppressed"}));
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("honors an explicitly selected auxiliary source file", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-"));
     try {

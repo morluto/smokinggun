@@ -108,8 +108,10 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
   const scopedFiles = discovered.files.filter(inScope);
+  const hasExplicitPathScope =
+    options.scope._tag === "FilteredScanRoot" && options.scope.filters.some((filter) => filter._tag === "PathFilter");
   const appliesRuntimeProfile =
-    rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime" && options.scope._tag === "EntireScanRoot";
+    rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime" && !hasExplicitPathScope;
   const auxiliaryFiles = appliesRuntimeProfile
     ? scopedFiles.filter((path) => isAuxiliarySourcePath(portablePath(relative(pathRoot, path))))
     : [];
