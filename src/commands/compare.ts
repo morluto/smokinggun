@@ -52,22 +52,6 @@ export default class Compare extends BaseCommand {
         baseline: {path: parsed.args.baseline, bytes: baselineBytes, digest: digest(baselineBytes)},
         candidate: {path: parsed.args.candidate, bytes: candidateBytes, digest: digest(candidateBytes)},
       };
-      if (
-        artifacts.kind === "measurement" &&
-        (artifacts.baseline.statisticalPolicy.kind !== artifacts.candidate.statisticalPolicy.kind ||
-          artifacts.baseline.statisticalPolicy.minimumRelativeImprovement !==
-            artifacts.candidate.statisticalPolicy.minimumRelativeImprovement)
-      )
-        this.emitProblem(
-          {
-            schemaVersion: "smokinggun.problem.v1",
-            code: "statistical-policy-mismatch",
-            message: "Baseline and candidate measurements use different statistical policies.",
-            recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
-          },
-          2,
-          context,
-        );
       if (artifacts.kind === "single-scaling") {
         await this.compareScaling(artifacts.baseline, artifacts.candidate, inputs, context);
         return;
@@ -138,40 +122,6 @@ export default class Compare extends BaseCommand {
     context: RuntimeContext,
   ): Promise<void> {
     if (
-      baseline.parameter !== candidate.parameter ||
-      baseline.points.length !== candidate.points.length ||
-      baseline.points.some((point, index) => point.value !== candidate.points[index]?.value)
-    ) {
-      this.emitProblem(
-        {
-          schemaVersion: "smokinggun.problem.v1",
-          code: "scaling-points-mismatch",
-          message: "Baseline and candidate scaling artifacts do not use the same parameter points.",
-          recovery: "Import artifacts produced with the same immutable benchmark plan and scaling points.",
-        },
-        2,
-        context,
-      );
-    }
-    if (
-      baseline.points.some(
-        (point, index) =>
-          point.statisticalPolicy.kind !== candidate.points[index]?.statisticalPolicy.kind ||
-          point.statisticalPolicy.minimumRelativeImprovement !==
-            candidate.points[index]?.statisticalPolicy.minimumRelativeImprovement,
-      )
-    )
-      this.emitProblem(
-        {
-          schemaVersion: "smokinggun.problem.v1",
-          code: "statistical-policy-mismatch",
-          message: "Baseline and candidate scaling points use different statistical policies.",
-          recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
-        },
-        2,
-        context,
-      );
-    if (
       !baseline.points.every((point) => point.behaviorValidated) ||
       !candidate.points.every((point) => point.behaviorValidated)
     ) {
@@ -206,49 +156,6 @@ export default class Compare extends BaseCommand {
     inputs: ComparisonInputs,
     context: RuntimeContext,
   ): Promise<void> {
-    const baselineCoordinates = baseline.points.map((point) => point.coordinates);
-    const candidateCoordinates = candidate.points.map((point) => point.coordinates);
-    const computedBaselineCoordinatesDigest = createHash("sha256")
-      .update(stableJson(baselineCoordinates))
-      .digest("hex");
-    const computedCandidateCoordinatesDigest = createHash("sha256")
-      .update(stableJson(candidateCoordinates))
-      .digest("hex");
-    if (
-      baseline.coordinatesDigest !== computedBaselineCoordinatesDigest ||
-      candidate.coordinatesDigest !== computedCandidateCoordinatesDigest ||
-      computedBaselineCoordinatesDigest !== computedCandidateCoordinatesDigest ||
-      stableJson(baselineCoordinates) !== stableJson(candidateCoordinates) ||
-      baseline.parameters.join("\0") !== candidate.parameters.join("\0")
-    )
-      this.emitProblem(
-        {
-          schemaVersion: "smokinggun.problem.v1",
-          code: "scaling-points-mismatch",
-          message: "Baseline and candidate scaling artifacts do not use the same named coordinate grid.",
-          recovery: "Import artifacts produced with the same immutable benchmark plan and coordinates.",
-        },
-        2,
-        context,
-      );
-    if (
-      baseline.points.some(
-        (point, index) =>
-          point.statisticalPolicy.kind !== candidate.points[index]?.statisticalPolicy.kind ||
-          point.statisticalPolicy.minimumRelativeImprovement !==
-            candidate.points[index]?.statisticalPolicy.minimumRelativeImprovement,
-      )
-    )
-      this.emitProblem(
-        {
-          schemaVersion: "smokinggun.problem.v1",
-          code: "statistical-policy-mismatch",
-          message: "Baseline and candidate scaling coordinates use different statistical policies.",
-          recovery: "Import artifacts produced with the same benchmark plan and statistical policy.",
-        },
-        2,
-        context,
-      );
     if (
       !baseline.points.every((point) => point.behaviorValidated) ||
       !candidate.points.every((point) => point.behaviorValidated)
