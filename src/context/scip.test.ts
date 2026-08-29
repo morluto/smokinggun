@@ -96,6 +96,23 @@ it("rejects non-canonical SCIP document paths instead of silently normalizing th
   }
 });
 
+it("rejects SCIP document paths with trailing separators", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
+  try {
+    const artifact = join(directory, "index.scip");
+    await writeFile(
+      artifact,
+      toBinary(IndexSchema, create(IndexSchema, {documents: [{language: "TypeScript", relativePath: "src/"}]})),
+    );
+    const result = await importScip(artifact, directory);
+    expect(result.state).toBe("partial");
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({code: "scip-path-invalid"}));
+    expect(result.index?.files).toEqual([]);
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
 it("marks duplicate SCIP document paths as partial before constructing the context index", async () => {
   const directory = await mkdtemp(join(tmpdir(), "smokinggun-scip-"));
   try {
