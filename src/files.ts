@@ -40,7 +40,7 @@ export async function readBoundedUtf8File(path: string, maxBytes: number): Promi
 /** Decode exact textual input bytes without silently replacing malformed UTF-8. */
 export function decodeUtf8Bytes(bytes: Uint8Array): string {
   try {
-    return new TextDecoder("utf-8", {fatal: true}).decode(bytes);
+    return new TextDecoder("utf-8", {fatal: true, ignoreBOM: true}).decode(bytes);
   } catch {
     throw new InvalidUtf8Error();
   }

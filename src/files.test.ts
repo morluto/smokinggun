@@ -2,7 +2,7 @@ import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {expect, it} from "vitest";
-import {readBoundedUtf8File, writeFileAtomically} from "./files.js";
+import {decodeUtf8Bytes, readBoundedUtf8File, writeFileAtomically} from "./files.js";
 
 it("creates parent directories and atomically replaces file contents", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-files-"));
@@ -26,4 +26,8 @@ it("rejects invalid UTF-8 instead of replacing input bytes", async () => {
   } finally {
     await rm(root, {recursive: true, force: true});
   }
+});
+
+it("preserves a valid leading BOM during strict decoding", () => {
+  expect(decodeUtf8Bytes(Uint8Array.from([0xef, 0xbb, 0xbf, 0x7b, 0x7d]))).toBe("\ufeff{}");
 });
