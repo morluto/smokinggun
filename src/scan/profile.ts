@@ -38,7 +38,7 @@ export function isTestSourcePath(path: string): boolean {
     /^(?:test|spec)(?:[-_.]|$)/iu.test(stem) ||
     (prefix !== undefined && /^[A-Z]/u.test(stem.slice(prefix.length))) ||
     /(?:^|[-_.])(?:test|spec)s?$/iu.test(stem) ||
-    /(?:Test|Spec)s?$/u.test(stem)
+    /(?:Test|Spec)s?(?:Case)?$/u.test(stem)
   );
 }
 
