@@ -1,3 +1,4 @@
+import {existsSync} from "node:fs";
 import {access, mkdtemp, rm, truncate, writeFile} from "node:fs/promises";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
@@ -10,6 +11,8 @@ import {
   loadExternalAdapters,
   parseExternalAdapters,
 } from "./external.js";
+
+const sandboxIt = it.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"));
 
 it("blocks network-capable adapters before capability probing", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
@@ -66,7 +69,7 @@ it("does not execute adapter probes without explicit authorization", async () =>
   }
 });
 
-it("probes the complete adapter command when no probe command is declared", async () => {
+sandboxIt("probes the complete adapter command when no probe command is declared", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
   try {
     const manifest = join(root, "adapter.json");
@@ -91,7 +94,7 @@ it("probes the complete adapter command when no probe command is declared", asyn
   }
 });
 
-it("uses an explicit probe command instead of the adapter command", async () => {
+sandboxIt("uses an explicit probe command instead of the adapter command", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
   try {
     const manifest = join(root, "adapter.json");
