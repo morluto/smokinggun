@@ -65,6 +65,7 @@ export default class Scan extends BaseCommand {
         selection,
         scope,
         excludes: context.config.exclude,
+        profile: context.config.sourceProfile,
         maxFindings: context.config.maxFindings,
         signal: context.signal,
         adapters,

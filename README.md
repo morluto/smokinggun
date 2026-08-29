@@ -36,9 +36,14 @@ Scan a repository:
 smokinggun scan .
 smokinggun scan . --format markdown
 smokinggun scan . --format sarif --output smokinggun.sarif
+smokinggun scan . --source-profile all
 ```
 
 Reports include the hotspot, supporting evidence, coverage, assumptions, and the validation needed next.
+
+The default `runtime` profile suppresses findings from tests, documentation, examples, and fixtures while retaining
+those files in repository inventory. Use `--source-profile all` to scan every supported source file, or `--only <path>` to
+focus explicitly on an auxiliary area.
 
 Static scans are read-only, offline, and do not execute repository code or modify source files. Findings are candidates, not proof. SmokingGun imports measurement evidence from existing benchmark tools; it does not launch workloads or rewrite code.
 

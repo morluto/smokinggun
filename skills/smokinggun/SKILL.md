@@ -15,6 +15,10 @@ Run the first action from the repository under review:
 smokinggun scan .
 ```
 
+The default runtime source profile suppresses candidates from tests, documentation, examples, and fixtures while
+keeping those files visible in repository inventory. Use `smokinggun scan . --source-profile all` when the task calls
+for candidates from every supported source file, or `--only <path>` to inspect one auxiliary area explicitly.
+
 If the `smokinggun` command is unavailable, do not treat that as a scan with no findings. Tell the user that SmokingGun could not be run and ask for authorization to use one of these recovery paths:
 
 ```bash

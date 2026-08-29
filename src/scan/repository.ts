@@ -39,6 +39,7 @@ import {
 } from "./source-snapshot.js";
 import {withSourceSnapshotView} from "./snapshot-view.js";
 import {runParsedSubprocessAdapter} from "../adapters/subprocess.js";
+import {isAuxiliarySourceDirectory, isAuxiliarySourcePath, type ScanProfile} from "./profile.js";
 
 type CoverageDetails = Pick<
   CoverageRecordV1,
@@ -81,6 +82,7 @@ export type ScanOptions = {
   readonly selection: ScannerSelection;
   readonly scope: ScanScope;
   readonly excludes?: ReadonlyArray<string>;
+  readonly profile?: ScanProfile;
   readonly maxFindings?: number;
   readonly signal?: AbortSignal;
   readonly adapters: ParsedExternalAdapters;
@@ -108,9 +110,42 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const pathRoot = rootInfo.isDirectory() ? root : resolve(root, "..");
   const excludes = new Set([...defaultExcludes, ...(options.excludes ?? [])]);
   const sourceCaptureLimits = options.sourceCaptureLimits ?? defaultSourceCaptureLimits;
-  const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
+  const appliesRuntimeProfile = rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime";
+  const pathFilters =
+    options.scope._tag === "FilteredScanRoot"
+      ? options.scope.filters.filter((filter) => filter._tag === "PathFilter").map((filter) => filter.path)
+      : [];
+  const hasPathOverride = (path: string): boolean =>
+    pathFilters.some((filter) => path === filter || path.startsWith(`${filter}/`));
+  const hasPathOverrideInDirectory = (path: string): boolean =>
+    pathFilters.some((filter) => path === filter || filter.startsWith(`${path}/`));
+  const isSuppressedAuxiliaryFile = (path: string): boolean => {
+    const reportPath = portablePath(relative(pathRoot, path));
+    return appliesRuntimeProfile && isAuxiliarySourcePath(reportPath) && !hasPathOverride(reportPath);
+  };
+  const isSuppressedAuxiliaryDirectory = (path: string): boolean => {
+    const reportPath = portablePath(relative(pathRoot, path));
+    return appliesRuntimeProfile && isAuxiliarySourceDirectory(reportPath) && !hasPathOverrideInDirectory(reportPath);
+  };
+  const discovered = await collectFiles(
+    root,
+    excludes,
+    sourceCaptureLimits,
+    options.signal,
+    appliesRuntimeProfile
+      ? {
+          isAuxiliarySourcePath: isSuppressedAuxiliaryFile,
+          isAuxiliaryDirectory: isSuppressedAuxiliaryDirectory,
+        }
+      : undefined,
+  );
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
-  const files = discovered.files.filter(inScope);
+  const scopedFiles = discovered.files.filter(inScope);
+  const scopedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
+  const scopedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
+  const auxiliaryFiles = appliesRuntimeProfile ? scopedFiles.filter((path) => isSuppressedAuxiliaryFile(path)) : [];
+  const auxiliaryFileSet = new Set(auxiliaryFiles);
+  const files = auxiliaryFiles.length === 0 ? scopedFiles : scopedFiles.filter((path) => !auxiliaryFileSet.has(path));
   const sourceSnapshot = await captureSourceSnapshot(
     pathRoot,
     files,
@@ -121,8 +156,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const unavailableSources = new Map(
     sourceSnapshot.files.flatMap((file) => (file._tag === "unavailable" ? [[file.path, file] as const] : [])),
   );
-  const skippedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
-  const skippedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
+  const skippedSourceSymlinks = scopedSourceSymlinks.filter((path) => !isSuppressedAuxiliaryFile(path));
+  const skippedDirectorySymlinks = scopedDirectorySymlinks.filter((path) => !isSuppressedAuxiliaryDirectory(path));
   const runStructural = runsBuiltInScanner(options.selection, "structural");
   const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
   const runPython = runsBuiltInScanner(options.selection, "python-semantic");
@@ -243,7 +278,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       : ["One or more selected TypeScript source files could not be read."]),
   ];
   const repository = await repositoryIdentity(root, files, options.signal);
-  const inventory = await buildRepositoryInventory(pathRoot, files, [...excludes]);
+  const inventory = await buildRepositoryInventory(pathRoot, scopedFiles, [...excludes]);
   const sourceDigest = sourceSnapshot.digest;
   const adapterRun = await runConfiguredAdapters(options.adapters, sourceSnapshot, options);
   findings.push(...adapterRun.findings);
@@ -255,7 +290,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     discovered.traversalLimit === undefined &&
     hasUnmatchedExplicitScope(
       options.scope,
-      files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
+      scopedFiles.length + scopedSourceSymlinks.length + scopedDirectorySymlinks.length,
     );
   const skippedSymlinkPaths = [...skippedSourceSymlinks, ...skippedDirectorySymlinks];
   const coverage: CoverageRecordV1 | undefined = runStructural
@@ -330,6 +365,18 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
       path: portablePath(relative(pathRoot, path)),
       recovery: "Replace the symlink with content inside the scan root before scanning.",
     })),
+    ...(auxiliaryFiles.length === 0
+      ? []
+      : [
+          {
+            schemaVersion: "smokinggun.problem.v1" as const,
+            code: "auxiliary-source-suppressed",
+            message: `Suppressed ${auxiliaryFiles.length} auxiliary source file${auxiliaryFiles.length === 1 ? "" : "s"} from the runtime scan profile.`,
+            detail:
+              "Tests, documentation, examples, and fixtures remain visible in repository inventory but do not produce runtime candidates by default.",
+            recovery: "Rerun with --source-profile all, or use --only with an explicit path to scan auxiliary source.",
+          },
+        ]),
     ...(allFindings.length === policyFindings.length
       ? []
       : [
@@ -648,6 +695,10 @@ async function collectFiles(
   excludes: ReadonlySet<string>,
   limits: SourceCaptureLimits,
   signal?: AbortSignal,
+  profile?: {
+    readonly isAuxiliarySourcePath: (path: string) => boolean;
+    readonly isAuxiliaryDirectory: (path: string) => boolean;
+  },
 ): Promise<{
   readonly files: ReadonlyArray<string>;
   readonly sourceSymlinks: ReadonlyArray<string>;
@@ -658,27 +709,33 @@ async function collectFiles(
   const sourceSymlinks: string[] = [];
   const directorySymlinks: string[] = [];
   let directoriesVisited = 0;
+  let auxiliaryDirectoriesVisited = 0;
+  let sourceFilesVisited = 0;
+  let auxiliaryFilesVisited = 0;
   let traversalLimit: string | undefined;
+  const profileAware = profile !== undefined;
   const rootInfo = await stat(root);
   if (rootInfo.isFile())
     return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], sourceSymlinks, directorySymlinks};
   if (!rootInfo.isDirectory()) return {files, sourceSymlinks, directorySymlinks};
   const visit = async (directory: string, depth: number): Promise<void> => {
-    if (traversalLimit !== undefined) return;
     signal?.throwIfAborted();
     if (depth > limits.maxDepth) {
-      traversalLimit = `Traversal exceeded the maximum depth of ${limits.maxDepth}.`;
+      traversalLimit ??= `Traversal exceeded the maximum depth of ${limits.maxDepth}.`;
       return;
     }
-    directoriesVisited += 1;
-    if (directoriesVisited > limits.maxDirectories) {
-      traversalLimit = `Traversal exceeded the maximum directory count of ${limits.maxDirectories}.`;
+    const isAuxiliaryDirectory = profile?.isAuxiliaryDirectory(directory) ?? false;
+    if (isAuxiliaryDirectory) auxiliaryDirectoriesVisited += 1;
+    else directoriesVisited += 1;
+    const directoryCount = isAuxiliaryDirectory ? auxiliaryDirectoriesVisited : directoriesVisited;
+    if (directoryCount > limits.maxDirectories) {
+      traversalLimit ??= `Traversal exceeded the maximum directory count of ${limits.maxDirectories}.`;
       return;
     }
     const entries = await readdir(directory, {withFileTypes: true});
     entries.sort((left, right) => comparePortable(left.name, right.name));
     for (const entry of entries) {
-      if (traversalLimit !== undefined) return;
+      if (!profileAware && traversalLimit !== undefined) return;
       signal?.throwIfAborted();
       if (excludes.has(entry.name)) continue;
       const path = resolve(directory, entry.name);
@@ -691,9 +748,14 @@ async function collectFiles(
       if (entry.isDirectory()) {
         await visit(path, depth + 1);
       } else if (entry.isFile() && isSupportedExtension(extensionOf(path))) {
-        if (files.length >= limits.maxFiles) {
-          traversalLimit = `Traversal exceeded the maximum source-file count of ${limits.maxFiles}.`;
-          return;
+        const isAuxiliarySource = profile?.isAuxiliarySourcePath(path) ?? false;
+        if (isAuxiliarySource) auxiliaryFilesVisited += 1;
+        else sourceFilesVisited += 1;
+        const sourceFileCount = isAuxiliarySource ? auxiliaryFilesVisited : sourceFilesVisited;
+        if (sourceFileCount > limits.maxFiles) {
+          traversalLimit ??= `Traversal exceeded the maximum source-file count of ${limits.maxFiles}.`;
+          if (!profileAware) return;
+          continue;
         }
         files.push(path);
       }

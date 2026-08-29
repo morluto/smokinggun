@@ -2,6 +2,7 @@ import {mkdir} from "node:fs/promises";
 import {execa} from "execa";
 import {join} from "node:path";
 import type {OutputFormat, RuntimeConfig} from "../config.js";
+import type {ScanProfile} from "../scan/profile.js";
 import {isConfigFailure, loadConfig, userDataDirectory} from "../config.js";
 import type {ProblemV1} from "../protocol/index.js";
 import {storeArtifact, storeArtifactBytes, type StoredArtifact} from "../artifacts/store.js";
@@ -17,6 +18,7 @@ export type GlobalFlags = {
   readonly nonInteractive?: boolean;
   readonly strict?: boolean;
   readonly failOn?: string;
+  readonly sourceProfile?: ScanProfile;
   readonly exclude?: ReadonlyArray<string>;
   readonly maxFindings?: number;
 };

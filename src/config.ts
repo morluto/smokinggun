@@ -7,6 +7,7 @@ import type {ProblemV1} from "./protocol/index.js";
 import {readBoundedUtf8File} from "./files.js";
 import {comparePortable, isWithinRoot} from "./paths.js";
 import {stableJson} from "./serialization.js";
+import {scanProfiles, type ScanProfile} from "./scan/profile.js";
 
 const outputFormats = ["human", "json", "markdown", "sarif"] as const;
 const maxConfigBytes = 1024 * 1024;
@@ -22,6 +23,7 @@ const fileConfigSchema = z.strictObject({
   nonInteractive: z.boolean().optional(),
   strict: z.boolean().optional(),
   failOn: z.string().min(1).optional(),
+  sourceProfile: z.enum(scanProfiles).optional(),
   exclude: z.array(z.string().min(1)).optional(),
   adapters: z.array(z.string().min(1)).optional(),
   maxFindings: z.number().int().positive().optional(),
@@ -40,6 +42,7 @@ export type CliOverrides = Readonly<{
   readonly nonInteractive?: boolean;
   readonly strict?: boolean;
   readonly failOn?: string;
+  readonly sourceProfile?: ScanProfile;
   readonly exclude?: ReadonlyArray<string>;
   readonly adapters?: ReadonlyArray<string>;
   readonly maxFindings?: number;
@@ -55,6 +58,7 @@ export type RuntimeConfig = {
   readonly nonInteractive: boolean;
   readonly strict: boolean;
   readonly failOn: string | undefined;
+  readonly sourceProfile: ScanProfile;
   readonly exclude: ReadonlyArray<string>;
   readonly adapters: ReadonlyArray<string>;
   readonly maxFindings: number;
@@ -74,6 +78,7 @@ const defaults: FileConfig = {
   nonInteractive: false,
   strict: false,
   failOn: undefined,
+  sourceProfile: "runtime",
   exclude: [],
   adapters: [],
   maxFindings: 80,
@@ -181,6 +186,7 @@ export async function loadConfig(
     nonInteractive: merged.nonInteractive ?? false,
     strict: merged.strict ?? false,
     failOn: merged.failOn,
+    sourceProfile: merged.sourceProfile ?? "runtime",
     exclude: uniqueSorted(merged.exclude ?? []),
     adapters: resolvedAdapters,
     maxFindings: merged.maxFindings ?? 80,
@@ -194,6 +200,7 @@ export async function loadConfig(
       nonInteractive: merged.nonInteractive ?? false,
       strict: merged.strict ?? false,
       failOn: merged.failOn,
+      sourceProfile: merged.sourceProfile ?? "runtime",
       exclude: uniqueSorted(merged.exclude ?? []),
       adapters: resolvedAdapters,
       maxFindings: merged.maxFindings ?? 80,
@@ -277,6 +284,15 @@ function parseEnvironment(environment: NodeJS.ProcessEnv): FileConfig | ConfigFa
   }
   if (environment.SMOKINGGUN_OUTPUT !== undefined) values.output = environment.SMOKINGGUN_OUTPUT;
   if (environment.SMOKINGGUN_FAIL_ON !== undefined) values.failOn = environment.SMOKINGGUN_FAIL_ON;
+  if (environment.SMOKINGGUN_PROFILE !== undefined) {
+    if (!isScanProfile(environment.SMOKINGGUN_PROFILE))
+      return configFailure(
+        "invalid-environment",
+        "SMOKINGGUN_PROFILE is invalid.",
+        "Expected one of " + scanProfiles.join(", ") + ".",
+      );
+    values.sourceProfile = environment.SMOKINGGUN_PROFILE;
+  }
   for (const [name, key] of [
     ["SMOKINGGUN_NO_COLOR", "noColor"],
     ["SMOKINGGUN_QUIET", "quiet"],
@@ -315,6 +331,7 @@ function stripConfigMeta(overrides: CliOverrides): FileConfig {
   if (overrides.nonInteractive !== undefined) values.nonInteractive = overrides.nonInteractive;
   if (overrides.strict !== undefined) values.strict = overrides.strict;
   if (overrides.failOn !== undefined) values.failOn = overrides.failOn;
+  if (overrides.sourceProfile !== undefined) values.sourceProfile = overrides.sourceProfile;
   if (overrides.exclude !== undefined) values.exclude = [...overrides.exclude];
   if (overrides.adapters !== undefined) values.adapters = [...overrides.adapters];
   if (overrides.maxFindings !== undefined) values.maxFindings = overrides.maxFindings;
@@ -335,6 +352,10 @@ function digestConfig(value: unknown): string {
 
 function isOutputFormat(value: string): value is OutputFormat {
   return outputFormats.some((format) => format === value);
+}
+
+function isScanProfile(value: string): value is ScanProfile {
+  return scanProfiles.some((profile) => profile === value);
 }
 
 function configFailure(code: string, message: string, detail: string): ConfigFailure {

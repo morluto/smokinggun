@@ -5,6 +5,7 @@ import type {RepositoryInventoryV1} from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
 import {sourceLanguageForExtension} from "../scanners/structural-finding.js";
+import {isTestSourcePath} from "./profile.js";
 
 const manifestNames: Readonly<Record<string, string>> = {
   "package.json": "npm",
@@ -49,9 +50,7 @@ export async function buildRepositoryInventory(
     manifests.push(entry.name);
     packageManagers.add(manager);
   }
-  const tests = relativeFiles.filter((file) =>
-    /(?:^|\/)(?:test|tests|spec|specs|__tests__)(?:\/|\.)|(?:\.test|\.spec)\.[^.]+$/i.test(file),
-  );
+  const tests = relativeFiles.filter(isTestSourcePath);
   const benchmarks = relativeFiles.filter((file) =>
     /(?:^|\/)(?:bench|benchmark|benchmarks)(?:\/|\.)|(?:\.bench|\.benchmark)\.[^.]+$/i.test(file),
   );
