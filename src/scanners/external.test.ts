@@ -66,6 +66,57 @@ it("does not execute adapter probes without explicit authorization", async () =>
   }
 });
 
+it("probes the complete adapter command when no probe command is declared", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
+  try {
+    const manifest = join(root, "adapter.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        schemaVersion: "smokinggun.adapter-manifest.v1",
+        id: "missing-entrypoint-adapter",
+        version: "1.0.0",
+        command: [execPath, "missing-adapter.js"],
+        capabilities: ["static-scan"],
+        limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+      }),
+      "utf8",
+    );
+
+    const result = await loadExternalAdapters([manifest], root, {authorization: adapterExecutionAuthorized});
+
+    expect(result.descriptors[0]?.availability).toBe("unavailable");
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+it("uses an explicit probe command instead of the adapter command", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-probe-"));
+  try {
+    const manifest = join(root, "adapter.json");
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        schemaVersion: "smokinggun.adapter-manifest.v1",
+        id: "explicit-probe-adapter",
+        version: "1.0.0",
+        command: [execPath, "missing-adapter.js"],
+        probeCommand: [execPath, "--version"],
+        capabilities: ["static-scan"],
+        limits: {timeoutMs: 1000, maxOutputBytes: 1000, maxArtifactBytes: 1000},
+      }),
+      "utf8",
+    );
+
+    const result = await loadExternalAdapters([manifest], root, {authorization: adapterExecutionAuthorized});
+
+    expect(result.descriptors[0]?.availability).toBe("available");
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
 it("rejects every manifest in an ambiguous adapter identity group", async () => {
   const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
   try {
