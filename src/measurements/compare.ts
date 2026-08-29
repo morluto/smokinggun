@@ -38,6 +38,8 @@ export function classifyComparableMeasurementArtifacts(
     case "smokinggun.measurement.v1":
       if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
       if (baseline.benchmarkDigest !== candidate.benchmarkDigest) return benchmarkMismatch();
+      if (!sameStatisticalPolicy(baseline.statisticalPolicy, candidate.statisticalPolicy))
+        return statisticalPolicyMismatch();
       return {kind: "measurement", baseline, candidate};
     case "smokinggun.scaling.v2":
       if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
@@ -50,6 +52,7 @@ export function classifyComparableMeasurementArtifacts(
         )
       )
         return scalingPointPlanMismatch();
+      if (!sameOrderedStatisticalPolicies(baseline.points, candidate.points)) return statisticalPolicyMismatch();
       return {kind: "single-scaling", baseline, candidate};
     case "smokinggun.scaling.v3":
       if (candidate.schemaVersion !== baseline.schemaVersion) return measurementKindMismatch();
@@ -63,6 +66,7 @@ export function classifyComparableMeasurementArtifacts(
         )
       )
         return scalingPointPlanMismatch();
+      if (!sameOrderedStatisticalPolicies(baseline.points, candidate.points)) return statisticalPolicyMismatch();
       return {kind: "multi-scaling", baseline, candidate};
   }
 }
@@ -443,6 +447,36 @@ function scalingPointPlanMismatch(): ProblemV1 {
     "scaling-points-mismatch",
     "Baseline and candidate scaling artifacts do not declare the same ordered input points.",
     "Import scaling artifacts produced from the same immutable benchmark plan and input points.",
+  );
+}
+
+function statisticalPolicyMismatch(): ProblemV1 {
+  return comparisonProblem(
+    "statistical-policy-mismatch",
+    "Baseline and candidate measurements declare different statistical policies.",
+    "Compare measurements produced with the same statistical policy at every input point.",
+  );
+}
+
+type StatisticalPolicy = {
+  readonly kind: "median-improvement" | "non-overlapping-iqr";
+  readonly minimumRelativeImprovement: number;
+};
+
+function sameStatisticalPolicy(left: StatisticalPolicy, right: StatisticalPolicy): boolean {
+  return left.kind === right.kind && left.minimumRelativeImprovement === right.minimumRelativeImprovement;
+}
+
+function sameOrderedStatisticalPolicies(
+  left: ReadonlyArray<{readonly statisticalPolicy: StatisticalPolicy}>,
+  right: ReadonlyArray<{readonly statisticalPolicy: StatisticalPolicy}>,
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((point, index) => {
+      const other = right[index];
+      return other !== undefined && sameStatisticalPolicy(point.statisticalPolicy, other.statisticalPolicy);
+    })
   );
 }
 
