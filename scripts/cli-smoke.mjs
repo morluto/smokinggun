@@ -1,6 +1,6 @@
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
-import {access, chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile} from "node:fs/promises";
+import {access, chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {create, toBinary} from "@bufbuild/protobuf";
@@ -293,6 +293,27 @@ try {
     comparisonSarif.stderr.length !== 0
   )
     throw new Error("comparison SARIF stream contract failed");
+
+  if (process.platform !== "win32") {
+    const linkedBaselineArtifact = join(sandbox, "linked-baseline.json");
+    await symlink(baselineArtifact, linkedBaselineArtifact);
+    const linkedComparison = await run([
+      entry,
+      "compare",
+      linkedBaselineArtifact,
+      candidateArtifact,
+      "--format",
+      "json",
+    ]);
+    const linkedComparisonValue = JSON.parse(linkedComparison.stdout);
+    if (
+      linkedComparison.code !== 2 ||
+      linkedComparisonValue.code !== "comparison-failed" ||
+      !linkedComparisonValue.message.includes("regular, non-symlink") ||
+      linkedComparison.stderr.length !== 0
+    )
+      throw new Error("comparison inputs must use the bounded regular-file artifact boundary");
+  }
 
   const retryInvestigationId = "inv_0123456789abcdef";
   const retryInvestigationDirectory = join(sandbox, "data", "investigations", retryInvestigationId);
