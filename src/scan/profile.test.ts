@@ -9,6 +9,7 @@ it.each([
   "TestFoo.java",
   "FooTests.cs",
   "CacheTestCase.java",
+  "conftest.py",
 ])("recognizes %s as an auxiliary source path", (path) => {
   expect(isAuxiliarySourcePath(path)).toBe(true);
 });
@@ -29,6 +30,7 @@ it.each([
   "TestFoo.java",
   "FooTests.cs",
   "CacheTestCase.java",
+  "conftest.py",
 ])("recognizes %s as a test source path for inventory", (path) => {
   expect(isTestSourcePath(path)).toBe(true);
 });

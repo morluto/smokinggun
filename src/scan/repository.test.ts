@@ -228,7 +228,14 @@ describe("repository scan seam", () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-inventory-"));
     try {
       const candidate = "for (const value of values) values.includes(value);\n";
-      for (const file of ["foo_test.go", "test_foo.py", "TestFoo.java", "FooTests.cs", "CacheTestCase.java"])
+      for (const file of [
+        "foo_test.go",
+        "test_foo.py",
+        "TestFoo.java",
+        "FooTests.cs",
+        "CacheTestCase.java",
+        "conftest.py",
+      ])
         await writeFile(join(root, file), candidate, "utf8");
 
       const result = await scanRepository(root, defaultScanOptions);
@@ -238,11 +245,12 @@ describe("repository scan seam", () => {
         "CacheTestCase.java",
         "FooTests.cs",
         "TestFoo.java",
+        "conftest.py",
         "foo_test.go",
         "test_foo.py",
       ]);
       expect(result.report.diagnostics).toContainEqual(
-        expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("5")}),
+        expect.objectContaining({code: "auxiliary-source-suppressed", message: expect.stringContaining("6")}),
       );
     } finally {
       await rm(root, {recursive: true, force: true});

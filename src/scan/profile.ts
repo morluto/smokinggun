@@ -32,6 +32,7 @@ export function isTestSourcePath(path: string): boolean {
   const normalized = path.replaceAll("\\", "/");
   const segments = normalized.split("/");
   if (segments.slice(0, -1).some((segment) => testDirectoryNames.has(segment.toLowerCase()))) return true;
+  if ((segments.at(-1) ?? "").toLowerCase() === "conftest.py") return true;
   const stem = sourceFileStem(normalized);
   const prefix = /^(?:test|spec)/iu.exec(stem)?.[0];
   return (
