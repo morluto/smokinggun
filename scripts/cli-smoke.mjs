@@ -595,16 +595,22 @@ try {
     const processor = join(sandbox, "trace_processor");
     try {
       await writeFile(trace, "not-a-json-trace", "utf8");
-      await writeFile(processor, "#!/usr/bin/env node\nprocess.stdout.write('name,dur\\nmain,12.5\\n');\n", "utf8");
+      await writeFile(
+        processor,
+        "#!/usr/bin/env node\nconst fs = require('node:fs');\nconst pinned = process.argv[3] !== process.env.SMOKINGGUN_TEST_ORIGINAL_TRACE && fs.readFileSync(process.argv[3], 'utf8') === 'not-a-json-trace';\nprocess.stdout.write(`name,dur,pinned\\nmain,12.5,${pinned}\\n`);\n",
+        "utf8",
+      );
       await chmod(processor, 0o755);
       const traceResult = await run([entry, "report", trace, "--profile", "perfetto", "--format", "json"], {
         SMOKINGGUN_TRACE_PROCESSOR: processor,
+        SMOKINGGUN_TEST_ORIGINAL_TRACE: trace,
       });
       const traceValue = JSON.parse(traceResult.stdout);
       if (
         traceResult.code !== 0 ||
         traceValue.schemaVersion !== "smokinggun.trace-summary.v1" ||
-        traceValue.rows[0]?.name !== "main"
+        traceValue.rows[0]?.name !== "main" ||
+        traceValue.rows[0]?.pinned !== "true"
       )
         throw new Error("raw Perfetto trace report contract failed");
       rawTrace = true;
