@@ -22,6 +22,24 @@ it("decodes a gzip-compressed pprof profile through the maintained binding", () 
   expect(result.topFunctions[0]).toMatchObject({name: "work", value: 3, unit: "count"});
 });
 
+it("rejects pprof numeric values that cannot be represented exactly", () => {
+  const strings = new StringTable();
+  const type = strings.dedup("bytes");
+  const unit = strings.dedup("bytes");
+  const name = strings.dedup("allocate");
+  const profile = new Profile({
+    stringTable: strings,
+    sampleType: [new ValueType({type, unit})],
+    function: [new PprofFunction({id: 1, name, systemName: name, filename: strings.dedup("fixture.ts"), startLine: 1})],
+    location: [new Location({id: 1, line: [{functionId: 1, line: 1, column: 1}]})],
+    sample: [new Sample({locationId: [1], value: [BigInt(Number.MAX_SAFE_INTEGER) + 1n]})],
+  });
+
+  const result = importPprof(gzipSync(profile.encode()), {sourceArtifact: "profile.pb.gz"});
+
+  expect(result).toMatchObject({code: "pprof-numeric-value-out-of-range"});
+});
+
 it("rejects pprof gzip output above the configured decompressed size limit", () => {
   const result = importPprof(gzipSync(Buffer.alloc(256)), {
     sourceArtifact: "oversized.pb.gz",
