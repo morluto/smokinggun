@@ -94,5 +94,6 @@
     "ignored",
     "digest"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "Structural JSON Schema only. Parse boundary input with SmokingGun's exported Protocol schema, which enforces semantic cross-field constraints."
 }

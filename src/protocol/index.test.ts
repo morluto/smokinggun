@@ -119,7 +119,7 @@ describe("protocol contracts", () => {
       skippedFiles: [],
     };
     expect(Protocol.scanReport.safeParse({...report, coverage: [coverage, coverage]}).success).toBe(false);
-    const inventory = {
+    const inventoryContent = {
       schemaVersion: "smokinggun.repository-inventory.v1",
       languages: [],
       manifests: ["package.json"],
@@ -128,9 +128,15 @@ describe("protocol contracts", () => {
       benchmarks: [],
       generated: [],
       ignored: [],
-      digest: "a".repeat(64),
+    };
+    const inventory = {
+      ...inventoryContent,
+      digest: createHash("sha256").update(canonicalJson(inventoryContent)).digest("hex"),
     };
     expect(Protocol.scanReport.safeParse({...report, inventory}).success).toBe(true);
+    expect(Protocol.scanReport.safeParse({...report, inventory: {...inventory, digest: "a".repeat(64)}}).success).toBe(
+      false,
+    );
     expect(
       Protocol.scanReport.safeParse({...report, inventory: {...inventory, manifests: ["package.json", "package.json"]}})
         .success,
