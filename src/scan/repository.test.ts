@@ -588,6 +588,23 @@ describe("repository scan seam", () => {
     }
   });
 
+  it("counts suppressed auxiliary symlinks as matched scope", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-symlink-profile-scope-"));
+    try {
+      await mkdir(join(root, "tests"));
+      await writeFile(join(root, "normal.ts"), "export const value = 1;\n", "utf8");
+      await symlink("../normal.ts", join(root, "tests", "linked.ts"));
+      const scope = parseScanScope([".ts"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+
+      const result = await scanRepository(root, {...defaultScanOptions, scope});
+
+      expect(result.report.diagnostics).not.toContainEqual(expect.objectContaining({code: "scan-scope-unmatched"}));
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("treats an unmatched explicit scope as incomplete coverage", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-scope-"));
     try {

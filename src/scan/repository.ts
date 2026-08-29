@@ -141,6 +141,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   );
   const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
   const scopedFiles = discovered.files.filter(inScope);
+  const scopedSourceSymlinks = discovered.sourceSymlinks.filter(inScope);
+  const scopedDirectorySymlinks = discovered.directorySymlinks.filter(inScope);
   const auxiliaryFiles = appliesRuntimeProfile ? scopedFiles.filter((path) => isSuppressedAuxiliaryFile(path)) : [];
   const auxiliaryFileSet = new Set(auxiliaryFiles);
   const files = auxiliaryFiles.length === 0 ? scopedFiles : scopedFiles.filter((path) => !auxiliaryFileSet.has(path));
@@ -154,12 +156,8 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const unavailableSources = new Map(
     sourceSnapshot.files.flatMap((file) => (file._tag === "unavailable" ? [[file.path, file] as const] : [])),
   );
-  const skippedSourceSymlinks = discovered.sourceSymlinks
-    .filter(inScope)
-    .filter((path) => !isSuppressedAuxiliaryFile(path));
-  const skippedDirectorySymlinks = discovered.directorySymlinks
-    .filter(inScope)
-    .filter((path) => !isSuppressedAuxiliaryDirectory(path));
+  const skippedSourceSymlinks = scopedSourceSymlinks.filter((path) => !isSuppressedAuxiliaryFile(path));
+  const skippedDirectorySymlinks = scopedDirectorySymlinks.filter((path) => !isSuppressedAuxiliaryDirectory(path));
   const runStructural = runsBuiltInScanner(options.selection, "structural");
   const runTypeScript = runsBuiltInScanner(options.selection, "typescript-semantic");
   const runPython = runsBuiltInScanner(options.selection, "python-semantic");
@@ -313,7 +311,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     discovered.traversalLimit === undefined &&
     hasUnmatchedExplicitScope(
       options.scope,
-      scopedFiles.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
+      scopedFiles.length + scopedSourceSymlinks.length + scopedDirectorySymlinks.length,
     );
   const skippedSymlinkPaths = [...skippedSourceSymlinks, ...skippedDirectorySymlinks];
   const coverage: CoverageRecordV1 | undefined = runStructural
