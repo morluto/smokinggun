@@ -1,5 +1,39 @@
 # smokinggun
 
+## 5.0.0
+
+### Major Changes
+
+- c7b4a97: Remove the unused executable-adapter protocol, configuration, CLI flags, and sandbox runtime. Static scanners and passive SARIF, SCIP, benchmark, pprof, and Perfetto imports remain available.
+
+### Minor Changes
+
+- cbbbb1c: Default repository scans to runtime source while preserving auxiliary files in inventory, with `--source-profile all` and explicit `--only` paths available to scan tests, documentation, examples, and fixtures.
+
+### Patch Changes
+
+- 67ffe66: Mark completed scan reports as successful SARIF invocations even when they contain warning diagnostics.
+- 7eb9677: Reject measurement imports that name an investigation which does not exist instead of silently discarding the requested attachment.
+- cd2b1e8: Reject malformed pyperf and JMH raw observations instead of silently importing a partial sample set.
+- c2706b3: Report each incomplete Tree-sitter parse once instead of emitting duplicate diagnostics for the same file.
+- 19f5d7b: Accept cancelled points in single-parameter scaling artifacts, matching multi-parameter scaling and the public execution-state model.
+- 1bc6b6a: Reject measurement comparisons whose baseline and candidate declare different statistical policies.
+- ebd824f: Reject scan reports whose repository inventory digest does not match the inventory's canonical content.
+- d0ba2f9: Align C and C++ discovery, inventory, coverage, and explicit scope filtering across supported source extensions.
+- ac40338: Probe the complete declared adapter command by default so missing entrypoints are not reported as available.
+- c1e67ea: Reject context imports that name a missing investigation instead of reporting an unattached import as successful.
+- 1cb7340: Ignore directories and other non-file entries whose names resemble package manifests when building repository inventory.
+- 5de964f: Bound configuration and adapter-manifest reads before parsing repository-controlled JSON.
+- cbc9106: Reject malformed UTF-8 in textual configuration, adapter manifests, evidence imports, and investigation data instead of silently replacing input bytes.
+- 0673a1f: Block measurement promotion when baseline and candidate artifacts identify different benchmark subjects.
+- 2495e4f: Read comparison inputs through the bounded regular-file artifact boundary instead of loading arbitrary paths without a size limit.
+- f03713f: Validate complete adapter results and all inline artifacts before retaining any artifact bytes.
+- 1c00fbb: Allow auto-discovered user configuration to reference paths outside the XDG configuration directory.
+- 8bf9a50: Reject pprof sample values and identifiers outside JavaScript's exact integer range instead of silently normalizing them to zero.
+- bc9634a: Keep malformed and non-file SARIF artifact URIs from aborting an import or being mistaken for repository-relative paths.
+- 80f1464: Run Perfetto trace processing against the captured content-addressed artifact instead of the mutable input path.
+- 5b7a9f9: Reject non-canonical SCIP document paths instead of silently rewriting producer input.
+
 ## 4.0.0
 
 ### Major Changes
