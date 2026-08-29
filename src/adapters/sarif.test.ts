@@ -74,6 +74,50 @@ describe("SARIF import boundary", () => {
     expect("code" in malformed && malformed.code).toBe("invalid-sarif");
   });
 
+  it("isolates invalid and non-file artifact URIs without discarding valid results", () => {
+    const input = {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: {driver: {name: "tool"}},
+          results: [
+            {locations: [{physicalLocation: {artifactLocation: {uri: "src/valid.ts"}}}]},
+            {locations: [{physicalLocation: {artifactLocation: {uri: "file://remote-host/source.ts"}}}]},
+            {locations: [{physicalLocation: {artifactLocation: {uri: "file:///repo/src%2Fencoded.ts"}}}]},
+            {locations: [{physicalLocation: {artifactLocation: {uri: "https://example.com/source.ts"}}}]},
+          ],
+        },
+      ],
+    };
+
+    expect(() => importSarif(input, "/repo", "a".repeat(64))).not.toThrow();
+    const result = importSarif(input, "/repo", "a".repeat(64));
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    expect(result.findings.map((finding) => finding.location.path)).toEqual(["src/valid.ts"]);
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.code === "sarif-path-outside-root")).toHaveLength(3);
+  });
+
+  it("does not mistake Windows drive paths for URI schemes", () => {
+    const result = importSarif(
+      {
+        version: "2.1.0",
+        runs: [
+          {
+            tool: {driver: {name: "tool"}},
+            results: [{locations: [{physicalLocation: {artifactLocation: {uri: "C:\\repo\\src\\file.ts"}}}]}],
+          },
+        ],
+      },
+      "C:\\repo",
+      "a".repeat(64),
+    );
+
+    expect("code" in result).toBe(false);
+    if ("code" in result) return;
+    if (process.platform === "win32") expect(result.findings[0]?.location.path).toBe("src/file.ts");
+  });
+
   it("keeps result locations distinct from analyzed-file coverage", () => {
     const result = importSarif(
       {
