@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {readFile, realpath} from "node:fs/promises";
+import {realpath, stat} from "node:fs/promises";
 import {homedir} from "node:os";
 import {basename, dirname, isAbsolute, join, resolve} from "node:path";
 import {z} from "zod";
@@ -245,7 +245,7 @@ async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv):
   while (true) {
     const candidate = join(current, "smokinggun.config.json");
     try {
-      await readFile(candidate, "utf8");
+      await stat(candidate);
       return {path: candidate, scope: "project"};
     } catch (cause: unknown) {
       if (!isErrno(cause, "ENOENT")) throw cause;
@@ -256,7 +256,7 @@ async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv):
   }
   const userConfig = join(environment.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "smokinggun", "config.json");
   try {
-    await readFile(userConfig, "utf8");
+    await stat(userConfig);
     return {path: userConfig, scope: "user"};
   } catch (cause: unknown) {
     if (!isErrno(cause, "ENOENT")) throw cause;
