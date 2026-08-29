@@ -112,14 +112,14 @@ export async function runParsedSubprocessAdapter(
         "The adapter result requestId does not match the request.",
         "Run the adapter once per request and preserve requestId.",
       );
-    const artifacts = await captureArtifacts(adapterResult, manifest.limits.maxArtifactBytes, options);
-    if ("schemaVersion" in artifacts) return artifacts;
     const findingBoundaryProblem = checkFindingLocations(adapterResult, options.root, request.targets);
     if (findingBoundaryProblem !== undefined) return findingBoundaryProblem;
     const coverageBoundaryProblem = checkCoverageScope(adapterResult, request.targets);
     if (coverageBoundaryProblem !== undefined) return coverageBoundaryProblem;
     if (result.exitCode !== 0 && adapterResult.state === "complete")
       return failure("failed", "The adapter exited nonzero while claiming complete output.");
+    const artifacts = await captureArtifacts(adapterResult, manifest.limits.maxArtifactBytes, options);
+    if ("schemaVersion" in artifacts) return artifacts;
     const stderr = redactSensitive(result.stderr.trim()).slice(0, 8_192);
     return {
       ...normalizeAdapterEvidence(
@@ -178,6 +178,7 @@ async function captureArtifacts(
     );
   const references: string[] = [];
   const digests: Record<string, string> = {};
+  const validated: Array<{readonly path: string; readonly bytes: Buffer; readonly digest: string}> = [];
   let totalBytes = 0;
   for (const artifact of result.rawArtifacts) {
     if (isAbsolute(artifact) || artifact.split(/[\\/]/u).some((segment) => segment === ".." || segment === "."))
@@ -215,8 +216,11 @@ async function captureArtifacts(
         "An adapter artifact does not match its declared SHA-256 digest.",
         "Regenerate the artifact and return its exact digest.",
       );
-    const stored = await options.retainArtifact?.(artifact, bytes);
-    if (stored === undefined || stored.digest !== actualDigest)
+    validated.push({path: artifact, bytes, digest: actualDigest});
+  }
+  for (const artifact of validated) {
+    const stored = await options.retainArtifact?.(artifact.path, artifact.bytes);
+    if (stored === undefined || stored.digest !== artifact.digest)
       return problem(
         "artifact-retention-failed",
         "The host artifact store did not preserve the adapter's exact bytes.",

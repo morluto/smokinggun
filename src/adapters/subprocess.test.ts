@@ -202,18 +202,20 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
     const secondDigest = createHash("sha256").update("second").digest("hex");
     const script = `process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:['first.txt','second.txt'],rawArtifactDigests:{'first.txt':'${firstDigest}','second.txt':'${secondDigest}'},rawArtifactContents:{'first.txt':'${first}','second.txt':'${second}'}})));`;
     const limitedManifest = manifest([execPath, "-e", script]);
+    const retained: string[] = [];
     const result = await runSubprocessAdapter(
       {...limitedManifest, limits: {...limitedManifest.limits, maxArtifactBytes: 8}},
       request(),
       {
         root: process.cwd(),
-        retainArtifact: async (path, bytes) => ({
-          reference: path,
-          digest: createHash("sha256").update(bytes).digest("hex"),
-        }),
+        retainArtifact: async (path, bytes) => {
+          retained.push(path);
+          return {reference: path, digest: createHash("sha256").update(bytes).digest("hex")};
+        },
       },
     );
     expect(result).toMatchObject({code: "artifact-too-large"});
+    expect(retained).toEqual([]);
   });
 
   function manifest(command: ReadonlyArray<string>, timeoutMs = 2_000, maxOutputBytes = 10_000) {
