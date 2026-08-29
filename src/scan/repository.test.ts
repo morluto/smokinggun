@@ -175,6 +175,22 @@ describe("repository scan seam", () => {
     }
   });
 
+  it("does not report an unmatched scope when the runtime profile suppresses its auxiliary files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-filter-"));
+    try {
+      await writeFile(join(root, "only.test.ts"), "for (const value of values) values.includes(value);\n", "utf8");
+      const scope = parseScanScope([".ts"]);
+      if ("schemaVersion" in scope) throw new Error(scope.message);
+      const result = await scanRepository(root, {...defaultScanOptions, scope});
+
+      expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 0, parseStatus: "complete"});
+      expect(result.report.diagnostics).not.toContainEqual(expect.objectContaining({code: "scan-scope-unmatched"}));
+      expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "auxiliary-source-suppressed"}));
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("honors an explicitly selected auxiliary source file", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-profile-"));
     try {

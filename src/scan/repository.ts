@@ -282,7 +282,7 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
     discovered.traversalLimit === undefined &&
     hasUnmatchedExplicitScope(
       options.scope,
-      files.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
+      scopedFiles.length + skippedSourceSymlinks.length + skippedDirectorySymlinks.length,
     );
   const skippedSymlinkPaths = [...skippedSourceSymlinks, ...skippedDirectorySymlinks];
   const coverage: CoverageRecordV1 | undefined = runStructural

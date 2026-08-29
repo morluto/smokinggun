@@ -27,8 +27,10 @@ export function isAuxiliarySourcePath(path: string): boolean {
   const fileName = segments.at(-1) ?? "";
   const extension = fileName.match(/\.[^.]+$/u)?.[0] ?? "";
   const stem = extension.length === 0 ? fileName : fileName.slice(0, -extension.length);
+  const prefix = /^(?:test|spec)/iu.exec(stem)?.[0];
   return (
-    /^(?:test|spec)(?:[-_.]|[A-Z]|$)/iu.test(stem) ||
+    /^(?:test|spec)(?:[-_.]|$)/iu.test(stem) ||
+    (prefix !== undefined && /^[A-Z]/u.test(stem.slice(prefix.length))) ||
     /(?:^|[-_.])(?:test|spec)s?$/iu.test(stem) ||
     /(?:Test|Spec)s?$/u.test(stem)
   );
