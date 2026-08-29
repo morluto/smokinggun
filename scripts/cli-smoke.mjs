@@ -590,9 +590,9 @@ try {
 
   let rawTrace = false;
   if (process.platform !== "win32") {
-    const sandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-trace-"));
-    const trace = join(sandbox, "fixture.pftrace");
-    const processor = join(sandbox, "trace_processor");
+    const traceSandbox = await mkdtemp(join(tmpdir(), "smokinggun-cli-trace-"));
+    const trace = join(traceSandbox, "fixture.pftrace");
+    const processor = join(traceSandbox, "trace_processor");
     try {
       await writeFile(trace, "not-a-json-trace", "utf8");
       await writeFile(
@@ -613,9 +613,30 @@ try {
         traceValue.rows[0]?.pinned !== "true"
       )
         throw new Error("raw Perfetto trace report contract failed");
+      const invalidQueryTrace = join(traceSandbox, "invalid-query.pftrace");
+      await writeFile(invalidQueryTrace, "invalid-query-trace", "utf8");
+      const invalidQueryDigest = createHash("sha256")
+        .update(await readFile(invalidQueryTrace))
+        .digest("hex");
+      const invalidQueryResult = await run(
+        [entry, "report", invalidQueryTrace, "--profile", "perfetto", "--trace-query", "", "--format", "json"],
+        {SMOKINGGUN_TRACE_PROCESSOR: processor},
+      );
+      const invalidQueryValue = JSON.parse(invalidQueryResult.stdout);
+      const invalidQueryStored = await access(join(sandbox, "data", "artifacts", "sha256", invalidQueryDigest)).then(
+        () => true,
+        () => false,
+      );
+      if (
+        invalidQueryResult.code !== 2 ||
+        invalidQueryValue.code !== "invalid-perfetto-query" ||
+        invalidQueryStored ||
+        invalidQueryResult.stderr.length !== 0
+      )
+        throw new Error("invalid raw Perfetto queries must be rejected before artifact storage");
       rawTrace = true;
     } finally {
-      await rm(sandbox, {recursive: true, force: true});
+      await rm(traceSandbox, {recursive: true, force: true});
     }
   }
 

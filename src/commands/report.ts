@@ -6,7 +6,7 @@ import {parseScanReport} from "../protocol/index.js";
 import {writeResult, shouldPrint} from "../cli/output.js";
 import {importSarif} from "../adapters/sarif.js";
 import {importBenchmark, type BenchmarkTool} from "../adapters/benchmarks.js";
-import {importPerfettoSummary, importPerfettoTrace, importPprof} from "../adapters/profiles.js";
+import {importPerfettoSummary, importPerfettoTrace, importPprof, validatePerfettoQuery} from "../adapters/profiles.js";
 import {printResult} from "../cli/command-output.js";
 import {createHash} from "node:crypto";
 import type {RuntimeContext} from "../cli/context.js";
@@ -134,6 +134,8 @@ export default class Report extends BaseCommand {
           await recordReportedArtifact(context, parsed.flags.investigation, sourceArtifact, "profile");
         } else {
           const sourceDigest = createHash("sha256").update(artifactBytes).digest("hex");
+          const queryProblem = input === undefined ? validatePerfettoQuery(parsed.flags["trace-query"]) : undefined;
+          if (queryProblem !== undefined) this.emitProblem(queryProblem, 2, context);
           const storedTrace = input === undefined ? await storeValidatedArtifact() : undefined;
           const trace =
             storedTrace === undefined
