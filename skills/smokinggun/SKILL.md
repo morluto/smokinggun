@@ -72,4 +72,4 @@ smokinggun scan . --format markdown
 smokinggun scan . --format sarif --output smokinggun.sarif
 ```
 
-Diagnostics belong on stderr, and a JSON or SARIF result on stdout is one document. Preserve nonzero exit codes and incomplete coverage when deciding whether a result is usable.
+Operational CLI diagnostics belong on stderr. Evidence and coverage diagnostics remain fields in the single JSON or SARIF document on stdout. Preserve nonzero exit codes and incomplete coverage when deciding whether a result is usable.
