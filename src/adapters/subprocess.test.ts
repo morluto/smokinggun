@@ -218,6 +218,20 @@ describe.runIf(process.platform === "linux" && existsSync("/usr/bin/bwrap"))("su
     expect(retained).toEqual([]);
   });
 
+  it("preserves artifact validation errors before complete nonzero-exit failures", async () => {
+    const script =
+      "process.stdin.resume();process.stdin.on('end',()=>{process.stdout.write(JSON.stringify({schemaVersion:'smokinggun.adapter-result.v3',requestId:'req-1',state:'complete',findings:[],coverage:[],diagnostics:[],rawArtifacts:['evidence.txt'],rawArtifactDigests:{'evidence.txt':'" +
+      "0".repeat(64) +
+      "'},rawArtifactContents:{'evidence.txt':'ZXZpZGVuY2U='}}));process.exitCode=1;});";
+    const result = await runSubprocessAdapter(manifest([execPath, "-e", script]), request(), {
+      root: process.cwd(),
+      retainArtifact: async () => {
+        throw new Error("invalid artifacts must not be retained");
+      },
+    });
+    expect(result).toMatchObject({code: "artifact-digest-mismatch"});
+  });
+
   function manifest(command: ReadonlyArray<string>, timeoutMs = 2_000, maxOutputBytes = 10_000) {
     return {
       schemaVersion: "smokinggun.adapter-manifest.v1" as const,
