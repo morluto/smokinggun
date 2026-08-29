@@ -71,7 +71,8 @@ export function toSarif(report: ScanReportV2): Record<string, unknown> {
         })),
         invocations: [
           {
-            executionSuccessful: report.coverage.every((coverage) => coverage.parseStatus === "complete"),
+            executionSuccessful:
+              report.coverage.length > 0 && report.coverage.every((coverage) => coverage.parseStatus === "complete"),
             toolExecutionNotifications: report.diagnostics.map((diagnostic) => ({
               level: "warning",
               message: {text: diagnostic.message},

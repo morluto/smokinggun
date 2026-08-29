@@ -69,4 +69,10 @@ describe("report renderers", () => {
 
     expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: false}]}]});
   });
+
+  it("reports empty scan coverage as an unsuccessful invocation", () => {
+    const sarif = toSarif({...report, coverage: []});
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: false}]}]});
+  });
 });
