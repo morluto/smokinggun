@@ -10,7 +10,12 @@ import {
   pythonSemanticScannerId,
   pythonSemanticScannerVersion,
 } from "../scanners/python-semantic.js";
-import {isSupportedExtension, scannerId, scannerVersion} from "../scanners/structural-finding.js";
+import {
+  isSupportedExtension,
+  scannerId,
+  scannerVersion,
+  sourceLanguageForExtension,
+} from "../scanners/structural-finding.js";
 import {scanTypeScriptSnapshot, semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {buildRepositoryInventory} from "./inventory.js";
@@ -766,10 +771,7 @@ function extensionOf(path: string): string {
 
 function sourceLanguage(path: string): string {
   const extension = extensionOf(path).toLowerCase();
-  if (extension === ".py") return "python";
-  if ([".ts", ".tsx"].includes(extension)) return "typescript";
-  if ([".js", ".jsx", ".mjs", ".cjs"].includes(extension)) return "javascript";
-  return extension.slice(1);
+  return sourceLanguageForExtension(extension) ?? extension.slice(1);
 }
 
 function sourceCaptureReason(file: UnavailableSourceFile | undefined): string {

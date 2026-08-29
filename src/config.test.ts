@@ -1,4 +1,4 @@
-import {mkdir, mkdtemp, symlink, writeFile} from "node:fs/promises";
+import {mkdir, mkdtemp, symlink, truncate, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
@@ -11,6 +11,18 @@ describe("configuration", () => {
     await writeFile(config, JSON.stringify({wat: true}), "utf8");
     const result = await loadConfig({config, cwd: directory});
     expect(isConfigFailure(result)).toBe(true);
+  });
+
+  it("rejects oversized configuration before parsing it", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const config = join(directory, "smokinggun.config.json");
+    await writeFile(config, "{}", "utf8");
+    await truncate(config, 1024 * 1024 + 1);
+
+    const result = await loadConfig({config, cwd: directory});
+
+    expect(result).toMatchObject({_tag: "ConfigFailure", code: "config-read-failed"});
+    if (isConfigFailure(result)) expect(result.detail).toContain("1048576 byte limit");
   });
 
   it("normalizes a valid explicit configuration and computes a digest", async () => {

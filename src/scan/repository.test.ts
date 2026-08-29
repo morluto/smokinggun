@@ -49,6 +49,32 @@ describe("repository scan seam", () => {
     }
   }, 30_000);
 
+  it("discovers C++ source and header extensions supported by the pinned grammar", async () => {
+    const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-cpp-"));
+    try {
+      await writeFile(join(root, "example.cxx"), "int main() { return 0; }\n", "utf8");
+      await writeFile(join(root, "example.hh"), "int example();\n", "utf8");
+
+      const result = await scanRepository(root, {...defaultScanOptions, configDigest: "c".repeat(64)});
+
+      expect(result.report.inventory?.languages).toContainEqual({
+        language: "cpp",
+        files: 2,
+        extensions: [".cxx", ".hh"],
+      });
+      expect(result.report.coverage).toContainEqual(
+        expect.objectContaining({
+          scanner: "smokinggun.tree-sitter",
+          language: "cpp",
+          filesDiscovered: 2,
+          filesAnalyzed: 2,
+        }),
+      );
+    } finally {
+      await rm(root, {recursive: true, force: true});
+    }
+  });
+
   it("reports bounded findings while retaining the full policy set", async () => {
     const root = await mkdtemp(join(tmpdir(), "smokinggun-scan-limit-"));
     try {

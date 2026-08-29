@@ -256,6 +256,22 @@ describe("protocol contracts", () => {
     expect(Protocol.scalingPoint.safeParse({...point, status: "complete"}).success).toBe(false);
   });
 
+  it("accepts cancelled single-parameter scaling points", () => {
+    const point = {
+      value: 1,
+      status: "cancelled",
+      samplesMs: [],
+      medianMs: 0,
+      meanMs: 0,
+      quartiles: {q1Ms: 0, q3Ms: 0},
+      statisticalPolicy: {kind: "median-improvement", minimumRelativeImprovement: 0},
+      timedOut: false,
+      behaviorValidated: false,
+    };
+
+    expect(Protocol.scalingPoint.safeParse(point).success).toBe(true);
+  });
+
   it("binds multi-scaling coordinates to their declared parameters and digest", () => {
     const coordinates = [{paths: 1, terms: 2}];
     const point = {

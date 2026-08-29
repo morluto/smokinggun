@@ -1,6 +1,6 @@
 {
   "name": "smokinggun",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Evidence-bearing local complexity scanner and investigation tool for software-engineering agents.",
   "license": "MIT",
   "type": "module",
@@ -86,26 +86,26 @@
     "version:packages": "changeset version"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "2.13.0",
-    "@oclif/core": "4.13.3",
+    "@bufbuild/protobuf": "2.14.0",
+    "@oclif/core": "4.14.0",
     "@scip-code/scip": "0.9.0",
     "csv-parse": "7.0.2",
     "execa": "10.0.1",
-    "pprof-format": "2.3.0",
+    "pprof-format": "2.3.1",
     "typescript": "5.9.3",
-    "web-tree-sitter": "0.26.11",
+    "web-tree-sitter": "0.26.12",
     "zod": "4.4.3"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",
-    "@types/node": "24.13.3",
+    "@types/node": "26.2.0",
     "@vitest/coverage-v8": "3.2.7",
     "fast-check": "4.9.0",
     "knip": "6.31.0",
     "oxfmt": "0.62.0",
     "oxlint": "1.77.0",
     "simple-git-hooks": "2.13.1",
-    "verdaccio": "6.9.2",
+    "verdaccio": "6.10.0",
     "vite-plus": "0.2.8",
     "vitest": "3.2.7"
   },

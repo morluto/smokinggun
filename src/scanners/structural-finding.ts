@@ -9,7 +9,9 @@ const languageByExtension: Readonly<Record<string, string>> = {
   ".h": "c",
   ".cc": "cpp",
   ".cpp": "cpp",
+  ".cxx": "cpp",
   ".hpp": "cpp",
+  ".hh": "cpp",
   ".cs": "csharp",
   ".go": "go",
   ".java": "java",
@@ -28,7 +30,12 @@ const languageByExtension: Readonly<Record<string, string>> = {
 };
 
 export function isSupportedExtension(extension: string): boolean {
-  return extension.toLowerCase() in languageByExtension;
+  return sourceLanguageForExtension(extension) !== undefined;
+}
+
+/** Return the scanner language associated with one source extension. */
+export function sourceLanguageForExtension(extension: string): string | undefined {
+  return languageByExtension[extension.toLowerCase()];
 }
 
 export function makeFinding(
@@ -48,7 +55,7 @@ export function makeFinding(
     scanner: scannerId,
     scannerVersion,
     ruleId,
-    language: languageByExtension[extensionOf(path)] ?? "unknown",
+    language: sourceLanguageForExtension(extensionOf(path)) ?? "unknown",
     kind: ruleId,
     claimClass: "theoretical-estimate",
     severity,
