@@ -1,4 +1,4 @@
-import {access, mkdtemp, rm, writeFile} from "node:fs/promises";
+import {access, mkdtemp, rm, truncate, writeFile} from "node:fs/promises";
 import {execPath} from "node:process";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -118,6 +118,23 @@ it("identifies an unreadable manifest at the repository root", async () => {
     const diagnostic = result.diagnostics[0];
     expect(diagnostic).toMatchObject({code: "adapter-manifest-read-failed", path: "."});
     expect(Protocol.problem.safeParse(diagnostic).success).toBe(true);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+it("rejects oversized adapter manifests before parsing them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-adapter-policy-"));
+  try {
+    const manifest = join(root, "adapter.json");
+    await writeFile(manifest, "{}", "utf8");
+    await truncate(manifest, 1024 * 1024 + 1);
+
+    const result = await parseExternalAdapters([manifest], root);
+
+    expect(result.adapters).toEqual([]);
+    expect(result.diagnostics[0]).toMatchObject({code: "adapter-manifest-read-failed", path: "adapter.json"});
+    expect(result.diagnostics[0]?.detail).toContain("1048576 byte limit");
   } finally {
     await rm(root, {recursive: true, force: true});
   }
