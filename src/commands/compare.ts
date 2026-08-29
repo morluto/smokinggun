@@ -29,6 +29,7 @@ import {
   classifyComparableMeasurementArtifacts,
 } from "../measurements/compare.js";
 import {readArtifactBytes} from "../artifacts/store.js";
+import {decodeUtf8Bytes} from "../files.js";
 
 export default class Compare extends BaseCommand {
   static override description =
@@ -42,8 +43,8 @@ export default class Compare extends BaseCommand {
     try {
       const baselineBytes = await readArtifactBytes(parsed.args.baseline);
       const candidateBytes = await readArtifactBytes(parsed.args.candidate);
-      const baseline = parseMeasurementArtifact(JSON.parse(baselineBytes.toString("utf8")));
-      const candidate = parseMeasurementArtifact(JSON.parse(candidateBytes.toString("utf8")));
+      const baseline = parseMeasurementArtifact(JSON.parse(decodeUtf8Bytes(baselineBytes)));
+      const candidate = parseMeasurementArtifact(JSON.parse(decodeUtf8Bytes(candidateBytes)));
       if ("code" in baseline) this.emitProblem(baseline, 2, context);
       if ("code" in candidate) this.emitProblem(candidate, 2, context);
       const artifacts = classifyComparableMeasurementArtifacts(baseline, candidate);

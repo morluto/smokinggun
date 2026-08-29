@@ -19,6 +19,7 @@ import {
 } from "../investigations/store.js";
 import {z} from "zod";
 import {readArtifactBytes} from "../artifacts/store.js";
+import {decodeUtf8Bytes} from "../files.js";
 
 export default class Report extends BaseCommand {
   static override description = "Render a normalized scan artifact.";
@@ -79,7 +80,6 @@ export default class Report extends BaseCommand {
           context,
         );
       const artifactBytes = await readArtifactBytes(parsed.args.artifact);
-      const raw = artifactBytes.toString("utf8");
       const artifactDigest = createHash("sha256").update(artifactBytes).digest("hex");
       const artifactReference = `artifact://sha256/${artifactDigest}`;
       const storeValidatedArtifact = async () => {
@@ -89,9 +89,9 @@ export default class Report extends BaseCommand {
         return stored;
       };
       const input: unknown =
-        parsed.flags.profile === "pprof" || (parsed.flags.profile === "perfetto" && !looksLikeJson(raw))
+        parsed.flags.profile === "pprof" || (parsed.flags.profile === "perfetto" && !looksLikeJsonBytes(artifactBytes))
           ? undefined
-          : JSON.parse(raw);
+          : JSON.parse(decodeUtf8Bytes(artifactBytes));
       if (parsed.flags.benchmark !== undefined) {
         const tool = parsed.flags.benchmark;
         if (!isBenchmarkTool(tool))
@@ -202,9 +202,12 @@ function isSarifDocument(input: unknown): boolean {
   return value.success && value.data.version === "2.1.0" && Array.isArray(value.data.runs);
 }
 
-function looksLikeJson(input: string): boolean {
-  const trimmed = input.trimStart();
-  return trimmed.startsWith("{") || trimmed.startsWith("[");
+function looksLikeJsonBytes(input: Uint8Array): boolean {
+  for (const byte of input) {
+    if (byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0x20) continue;
+    return byte === 0x7b || byte === 0x5b;
+  }
+  return false;
 }
 
 function isBenchmarkTool(value: string): value is BenchmarkTool {
