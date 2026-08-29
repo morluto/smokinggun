@@ -64,3 +64,93 @@ it("makes depth-bounded traversal visible instead of reporting an unmatched clea
     await rm(root, {recursive: true, force: true});
   }
 });
+
+it("reserves the source-file bound for runtime files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-source-bounds-profile-"));
+  try {
+    await mkdir(join(root, "docs"));
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "docs", "guide.ts"), "export const guide = 1;\n", "utf8");
+    await writeFile(join(root, "src", "runtime.ts"), "for (const value of values) values.includes(value);\n", "utf8");
+
+    const result = await scanRepository(root, {
+      configDigest: "d".repeat(64),
+      selection: automaticScannerSelection(),
+      scope: entireScanRoot(),
+      adapters: noExternalAdapters(),
+      adapterAuthorization: adapterExecutionNotAuthorized,
+      sourceCaptureLimits: {
+        maxFiles: 1,
+        maxDirectories: 10,
+        maxDepth: 10,
+        maxFileBytes: 1_024,
+        maxTotalBytes: 4_096,
+      },
+    });
+
+    expect(result.report.findings.every((finding) => finding.location.path === "src/runtime.ts")).toBe(true);
+    expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+it("reserves the directory bound for runtime directories", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-source-bounds-profile-"));
+  try {
+    await mkdir(join(root, "docs"));
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "docs", "guide.ts"), "export const guide = 1;\n", "utf8");
+    await writeFile(join(root, "src", "runtime.ts"), "for (const value of values) values.includes(value);\n", "utf8");
+
+    const result = await scanRepository(root, {
+      configDigest: "d".repeat(64),
+      selection: automaticScannerSelection(),
+      scope: entireScanRoot(),
+      adapters: noExternalAdapters(),
+      adapterAuthorization: adapterExecutionNotAuthorized,
+      sourceCaptureLimits: {
+        maxFiles: 10,
+        maxDirectories: 2,
+        maxDepth: 10,
+        maxFileBytes: 1_024,
+        maxTotalBytes: 4_096,
+      },
+    });
+
+    expect(result.report.findings.every((finding) => finding.location.path === "src/runtime.ts")).toBe(true);
+    expect(result.report.coverage[0]).toMatchObject({filesDiscovered: 1, filesAnalyzed: 1});
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+it("keeps depth bounds local to an auxiliary branch", async () => {
+  const root = await mkdtemp(join(tmpdir(), "smokinggun-source-bounds-profile-"));
+  try {
+    await mkdir(join(root, "docs", "deep"), {recursive: true});
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "docs", "deep", "guide.ts"), "export const guide = 1;\n", "utf8");
+    await writeFile(join(root, "src", "runtime.ts"), "for (const value of values) values.includes(value);\n", "utf8");
+
+    const result = await scanRepository(root, {
+      configDigest: "d".repeat(64),
+      selection: automaticScannerSelection(),
+      scope: entireScanRoot(),
+      adapters: noExternalAdapters(),
+      adapterAuthorization: adapterExecutionNotAuthorized,
+      sourceCaptureLimits: {
+        maxFiles: 10,
+        maxDirectories: 10,
+        maxDepth: 1,
+        maxFileBytes: 1_024,
+        maxTotalBytes: 4_096,
+      },
+    });
+
+    expect(result.report.findings.every((finding) => finding.location.path === "src/runtime.ts")).toBe(true);
+    expect(result.report.diagnostics).toContainEqual(expect.objectContaining({code: "source-traversal-bounded"}));
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});

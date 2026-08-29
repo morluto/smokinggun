@@ -110,23 +110,37 @@ export async function scanRepository(inputRoot: string, options: ScanOptions): P
   const pathRoot = rootInfo.isDirectory() ? root : resolve(root, "..");
   const excludes = new Set([...defaultExcludes, ...(options.excludes ?? [])]);
   const sourceCaptureLimits = options.sourceCaptureLimits ?? defaultSourceCaptureLimits;
-  const discovered = await collectFiles(root, excludes, sourceCaptureLimits, options.signal);
-  const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
-  const scopedFiles = discovered.files.filter(inScope);
   const appliesRuntimeProfile = rootInfo.isDirectory() && (options.profile ?? "runtime") === "runtime";
+  const pathFilters =
+    options.scope._tag === "FilteredScanRoot"
+      ? options.scope.filters.filter((filter) => filter._tag === "PathFilter").map((filter) => filter.path)
+      : [];
   const hasPathOverride = (path: string): boolean =>
-    options.scope._tag === "FilteredScanRoot" &&
-    options.scope.filters.some(
-      (filter) => filter._tag === "PathFilter" && (path === filter.path || path.startsWith(`${filter.path}/`)),
-    );
+    pathFilters.some((filter) => path === filter || path.startsWith(`${filter}/`));
+  const hasPathOverrideInDirectory = (path: string): boolean =>
+    pathFilters.some((filter) => path === filter || filter.startsWith(`${path}/`));
   const isSuppressedAuxiliaryFile = (path: string): boolean => {
     const reportPath = portablePath(relative(pathRoot, path));
     return appliesRuntimeProfile && isAuxiliarySourcePath(reportPath) && !hasPathOverride(reportPath);
   };
   const isSuppressedAuxiliaryDirectory = (path: string): boolean => {
     const reportPath = portablePath(relative(pathRoot, path));
-    return appliesRuntimeProfile && isAuxiliarySourceDirectory(reportPath) && !hasPathOverride(reportPath);
+    return appliesRuntimeProfile && isAuxiliarySourceDirectory(reportPath) && !hasPathOverrideInDirectory(reportPath);
   };
+  const discovered = await collectFiles(
+    root,
+    excludes,
+    sourceCaptureLimits,
+    options.signal,
+    appliesRuntimeProfile
+      ? {
+          isAuxiliarySourcePath: isSuppressedAuxiliaryFile,
+          isAuxiliaryDirectory: isSuppressedAuxiliaryDirectory,
+        }
+      : undefined,
+  );
+  const inScope = (path: string): boolean => matchesScanScope(options.scope, portablePath(relative(pathRoot, path)));
+  const scopedFiles = discovered.files.filter(inScope);
   const auxiliaryFiles = appliesRuntimeProfile ? scopedFiles.filter((path) => isSuppressedAuxiliaryFile(path)) : [];
   const auxiliaryFileSet = new Set(auxiliaryFiles);
   const files = auxiliaryFiles.length === 0 ? scopedFiles : scopedFiles.filter((path) => !auxiliaryFileSet.has(path));
@@ -704,6 +718,10 @@ async function collectFiles(
   excludes: ReadonlySet<string>,
   limits: SourceCaptureLimits,
   signal?: AbortSignal,
+  profile?: {
+    readonly isAuxiliarySourcePath: (path: string) => boolean;
+    readonly isAuxiliaryDirectory: (path: string) => boolean;
+  },
 ): Promise<{
   readonly files: ReadonlyArray<string>;
   readonly sourceSymlinks: ReadonlyArray<string>;
@@ -714,27 +732,33 @@ async function collectFiles(
   const sourceSymlinks: string[] = [];
   const directorySymlinks: string[] = [];
   let directoriesVisited = 0;
+  let auxiliaryDirectoriesVisited = 0;
+  let sourceFilesVisited = 0;
+  let auxiliaryFilesVisited = 0;
   let traversalLimit: string | undefined;
+  const profileAware = profile !== undefined;
   const rootInfo = await stat(root);
   if (rootInfo.isFile())
     return {files: isSupportedExtension(extensionOf(root)) ? [root] : [], sourceSymlinks, directorySymlinks};
   if (!rootInfo.isDirectory()) return {files, sourceSymlinks, directorySymlinks};
   const visit = async (directory: string, depth: number): Promise<void> => {
-    if (traversalLimit !== undefined) return;
     signal?.throwIfAborted();
     if (depth > limits.maxDepth) {
-      traversalLimit = `Traversal exceeded the maximum depth of ${limits.maxDepth}.`;
+      traversalLimit ??= `Traversal exceeded the maximum depth of ${limits.maxDepth}.`;
       return;
     }
-    directoriesVisited += 1;
-    if (directoriesVisited > limits.maxDirectories) {
-      traversalLimit = `Traversal exceeded the maximum directory count of ${limits.maxDirectories}.`;
+    const isAuxiliaryDirectory = profile?.isAuxiliaryDirectory(directory) ?? false;
+    if (isAuxiliaryDirectory) auxiliaryDirectoriesVisited += 1;
+    else directoriesVisited += 1;
+    const directoryCount = isAuxiliaryDirectory ? auxiliaryDirectoriesVisited : directoriesVisited;
+    if (directoryCount > limits.maxDirectories) {
+      traversalLimit ??= `Traversal exceeded the maximum directory count of ${limits.maxDirectories}.`;
       return;
     }
     const entries = await readdir(directory, {withFileTypes: true});
     entries.sort((left, right) => comparePortable(left.name, right.name));
     for (const entry of entries) {
-      if (traversalLimit !== undefined) return;
+      if (!profileAware && traversalLimit !== undefined) return;
       signal?.throwIfAborted();
       if (excludes.has(entry.name)) continue;
       const path = resolve(directory, entry.name);
@@ -747,9 +771,14 @@ async function collectFiles(
       if (entry.isDirectory()) {
         await visit(path, depth + 1);
       } else if (entry.isFile() && isSupportedExtension(extensionOf(path))) {
-        if (files.length >= limits.maxFiles) {
-          traversalLimit = `Traversal exceeded the maximum source-file count of ${limits.maxFiles}.`;
-          return;
+        const isAuxiliarySource = profile?.isAuxiliarySourcePath(path) ?? false;
+        if (isAuxiliarySource) auxiliaryFilesVisited += 1;
+        else sourceFilesVisited += 1;
+        const sourceFileCount = isAuxiliarySource ? auxiliaryFilesVisited : sourceFilesVisited;
+        if (sourceFileCount > limits.maxFiles) {
+          traversalLimit ??= `Traversal exceeded the maximum source-file count of ${limits.maxFiles}.`;
+          if (!profileAware) return;
+          continue;
         }
         files.push(path);
       }
