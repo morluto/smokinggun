@@ -10,9 +10,9 @@ import {parseMeasurementArtifact} from "../measurements/artifacts.js";
 import {
   appendInvestigationEvidence,
   appendInvestigationReport,
-  loadLatestInvestigation,
   recordImportedInvestigationMeasurements,
   recordParsedInvestigationSnapshot,
+  requireLatestInvestigation,
   type InvestigationMeasurementImport,
 } from "../investigations/store.js";
 import {
@@ -297,8 +297,7 @@ export default class Compare extends BaseCommand {
     ];
     const pending = [];
     for (const investigationId of investigationIds) {
-      const investigation = await loadLatestInvestigation(context.artifacts, investigationId);
-      if (investigation === undefined) continue;
+      const investigation = await requireLatestInvestigation(context.artifacts, investigationId);
       const baselineInputDigest = "baselineDigest" in comparison ? comparison.baselineDigest : undefined;
       const candidateInputDigest = "candidateDigest" in comparison ? comparison.candidateDigest : undefined;
       const requiredInputDigests = [
@@ -389,7 +388,6 @@ export default class Compare extends BaseCommand {
       ),
     ];
     for (const investigationId of investigationIds) {
-      if ((await loadLatestInvestigation(context.artifacts, investigationId)) === undefined) continue;
       const imports: InvestigationMeasurementImport[] = [];
       const storedBaseline = await context.artifactStore.putBytes(inputs.baseline.path, inputs.baseline.bytes);
       if (storedBaseline.digest !== inputs.baseline.digest)

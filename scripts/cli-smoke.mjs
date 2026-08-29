@@ -294,6 +294,36 @@ try {
   )
     throw new Error("comparison SARIF stream contract failed");
 
+  const missingInvestigationId = "inv_2222222222222222";
+  const missingBaselineArtifact = join(sandbox, "missing-investigation-baseline.json");
+  const missingCandidateArtifact = join(sandbox, "missing-investigation-candidate.json");
+  await writeFile(
+    missingBaselineArtifact,
+    JSON.stringify({...measurement("e", 10), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  await writeFile(
+    missingCandidateArtifact,
+    JSON.stringify({...measurement("f", 8), investigation: missingInvestigationId}),
+    "utf8",
+  );
+  const missingInvestigationComparison = await run([
+    entry,
+    "compare",
+    missingBaselineArtifact,
+    missingCandidateArtifact,
+    "--format",
+    "json",
+  ]);
+  const missingInvestigationComparisonValue = JSON.parse(missingInvestigationComparison.stdout);
+  if (
+    missingInvestigationComparison.code !== 2 ||
+    missingInvestigationComparisonValue.code !== "comparison-failed" ||
+    !missingInvestigationComparisonValue.message.includes(`Investigation ${missingInvestigationId} does not exist.`) ||
+    missingInvestigationComparison.stderr.length !== 0
+  )
+    throw new Error("comparison must reject a measurement attachment to a missing investigation");
+
   if (process.platform !== "win32") {
     const linkedBaselineArtifact = join(sandbox, "linked-baseline.json");
     await symlink(baselineArtifact, linkedBaselineArtifact);
