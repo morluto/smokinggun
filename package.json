@@ -97,17 +97,17 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@changesets/cli": "2.31.1",
+    "@changesets/cli": "3.0.1",
     "@types/node": "26.2.0",
-    "@vitest/coverage-v8": "3.2.7",
+    "@vitest/coverage-v8": "4.1.11",
     "fast-check": "4.9.0",
-    "knip": "6.31.0",
-    "oxfmt": "0.62.0",
-    "oxlint": "1.77.0",
+    "knip": "6.32.2",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
     "simple-git-hooks": "2.13.1",
     "verdaccio": "6.10.0",
-    "vite-plus": "0.2.8",
-    "vitest": "3.2.7"
+    "vite-plus": "0.3.0",
+    "vitest": "4.1.11"
   },
   "author": ""
 }
