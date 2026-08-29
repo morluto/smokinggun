@@ -8,6 +8,8 @@ SmokingGun produces evidence about source and imports evidence produced by exter
 
 Source and imported artifacts are captured as exact bytes before derivation. Their identities are content digests over a canonical manifest or the exact retained bytes. Paths and Git revisions are annotations, never content identity.
 
+Text decoders are strict and fail closed: malformed UTF-8 is reported as unavailable evidence rather than replaced with U+FFFD and analyzed as different content. Binary inputs remain bytes until the decoder for their declared format consumes them.
+
 A producer that cannot capture an input within declared bounds returns visible incomplete evidence. It does not continue from a mutable pathname and later attach an unrelated digest.
 
 ### 2. The host owns scope and producer identity
