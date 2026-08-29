@@ -183,7 +183,13 @@ function occurrenceRange(occurrence: Occurrence): {readonly line: number; readon
 function portableRelative(path: string): string | undefined {
   if (path.length === 0 || isAbsolute(path) || path.includes("\\")) return undefined;
   const normalized = portablePath(normalize(path));
-  if (normalized === "." || normalized === ".." || normalized.startsWith("../") || normalized.includes("//"))
+  if (
+    normalized !== path ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized.includes("//")
+  )
     return undefined;
   return normalized;
 }
