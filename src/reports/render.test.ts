@@ -38,4 +38,20 @@ describe("report renderers", () => {
   it("keeps assumptions visible in human output", () => {
     expect(renderScanReport(report, "human")).toContain("static only");
   });
+
+  it("reports a completed scan invocation as successful when diagnostics are present", () => {
+    const sarif = toSarif({
+      ...report,
+      diagnostics: [
+        {
+          schemaVersion: "smokinggun.problem.v1",
+          code: "findings-truncated",
+          message: "Finding output was truncated.",
+          recovery: "Increase the finding limit.",
+        },
+      ],
+    });
+
+    expect(sarif).toMatchObject({runs: [{invocations: [{executionSuccessful: true}]}]});
+  });
 });
