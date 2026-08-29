@@ -62,6 +62,8 @@ export type RuntimeConfig = {
 
 export type ConfigFailure = ProblemV1 & {_tag: "ConfigFailure"};
 
+type ConfigLocation = {readonly path: string; readonly scope: "project" | "user"};
+
 const defaults: FileConfig = {
   format: "human",
   noColor: false,
@@ -84,10 +86,17 @@ export async function loadConfig(
   const cwdInput = overrides.cwd ?? environment.SMOKINGGUN_CWD ?? invocationCwd;
   const initialCwd = resolve(cwdInput);
   const explicitPath = overrides.config ?? environment.SMOKINGGUN_CONFIG;
+  let configScope: ConfigLocation["scope"] | "explicit" | undefined;
   let configPath: string | undefined;
   try {
-    configPath =
-      explicitPath === undefined ? await findNearestConfig(initialCwd, environment) : resolve(initialCwd, explicitPath);
+    if (explicitPath === undefined) {
+      const discovered = await findNearestConfig(initialCwd, environment);
+      configPath = discovered?.path;
+      configScope = discovered?.scope;
+    } else {
+      configPath = resolve(initialCwd, explicitPath);
+      configScope = "explicit";
+    }
   } catch (cause: unknown) {
     return configFailure(
       "config-discovery-failed",
@@ -132,7 +141,7 @@ export async function loadConfig(
   );
 
   // Validate auto-discovered config paths to prevent traversal attacks (#73)
-  if (configPath !== undefined && explicitPath === undefined) {
+  if (configPath !== undefined && configScope === "project") {
     const configRoot = await canonicalProspectivePath(dirname(configPath));
     const canonicalCwd = await canonicalProspectivePath(cwd);
     if (fileValues.cwd !== undefined && !isWithinRoot(configRoot, canonicalCwd)) {
@@ -229,13 +238,13 @@ async function readJsonConfig(
   }
 }
 
-async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv): Promise<string | undefined> {
+async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv): Promise<ConfigLocation | undefined> {
   let current = start;
   while (true) {
     const candidate = join(current, "smokinggun.config.json");
     try {
       await readFile(candidate, "utf8");
-      return candidate;
+      return {path: candidate, scope: "project"};
     } catch (cause: unknown) {
       if (!isErrno(cause, "ENOENT")) throw cause;
       const parent = dirname(current);
@@ -246,7 +255,7 @@ async function findNearestConfig(start: string, environment: NodeJS.ProcessEnv):
   const userConfig = join(environment.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "smokinggun", "config.json");
   try {
     await readFile(userConfig, "utf8");
-    return userConfig;
+    return {path: userConfig, scope: "user"};
   } catch (cause: unknown) {
     if (!isErrno(cause, "ENOENT")) throw cause;
     return undefined;

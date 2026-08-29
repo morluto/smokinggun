@@ -89,6 +89,33 @@ describe("configuration", () => {
     }
   });
 
+  it("allows user configuration to reference paths outside the XDG configuration directory", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
+    const xdg = join(parent, "xdg");
+    const userConfigDirectory = join(xdg, "smokinggun");
+    const repository = join(parent, "repository");
+    await mkdir(userConfigDirectory, {recursive: true});
+    await mkdir(repository);
+    await writeFile(
+      join(userConfigDirectory, "config.json"),
+      JSON.stringify({
+        cwd: repository,
+        output: join(repository, "report.json"),
+        adapters: [join(repository, "adapter.json")],
+      }),
+      "utf8",
+    );
+
+    const result = await loadConfig({}, {XDG_CONFIG_HOME: xdg}, repository);
+
+    expect(isConfigFailure(result)).toBe(false);
+    if (!isConfigFailure(result)) {
+      expect(result.cwd).toBe(repository);
+      expect(result.output).toBe(join(repository, "report.json"));
+      expect(result.adapters).toEqual([join(repository, "adapter.json")]);
+    }
+  });
+
   it("canonicalizes duplicate set-like configuration and rejects empty path entries", async () => {
     const directory = await mkdtemp(join(tmpdir(), "smokinggun-config-"));
     const duplicate = join(directory, "duplicate.json");
