@@ -4,29 +4,7 @@ import {readdir} from "node:fs/promises";
 import type {RepositoryInventoryV1} from "../protocol/index.js";
 import {comparePortable, portablePath} from "../paths.js";
 import {stableJson} from "../serialization.js";
-
-const languageByExtension: Readonly<Record<string, string>> = {
-  ".c": "c",
-  ".h": "c",
-  ".cc": "cpp",
-  ".cpp": "cpp",
-  ".hpp": "cpp",
-  ".cs": "csharp",
-  ".go": "go",
-  ".java": "java",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".kt": "kotlin",
-  ".php": "php",
-  ".py": "python",
-  ".rb": "ruby",
-  ".rs": "rust",
-  ".swift": "swift",
-  ".ts": "typescript",
-  ".tsx": "typescript",
-};
+import {sourceLanguageForExtension} from "../scanners/structural-finding.js";
 
 const manifestNames: Readonly<Record<string, string>> = {
   "package.json": "npm",
@@ -55,7 +33,7 @@ export async function buildRepositoryInventory(
   const languageCounts = new Map<string, {files: number; extensions: Set<string>}>();
   for (const file of relativeFiles) {
     const extension = extensionOf(file);
-    const language = languageByExtension[extension];
+    const language = sourceLanguageForExtension(extension);
     if (language === undefined) continue;
     const current = languageCounts.get(language) ?? {files: 0, extensions: new Set<string>()};
     current.files += 1;

@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {parseScannerSelection, parseScanScope} from "./selection.js";
+import {matchesScanScope, parseScannerSelection, parseScanScope} from "./selection.js";
 
 describe("scan selection boundary", () => {
   it("parses every advertised built-in scanner ID", () => {
@@ -27,5 +27,26 @@ describe("scan selection boundary", () => {
     expect(parseScanScope(["/outside"])).toMatchObject({code: "invalid-scan-scope"});
     expect(parseScanScope([".", ".ts"])).toMatchObject({code: "invalid-scan-scope"});
     expect("schemaVersion" in parseScanScope(["src/scan"])).toBe(false);
+  });
+
+  it("matches every supported C and C++ source extension", () => {
+    for (const extension of [".h", ".cc", ".cxx", ".hpp", ".hh"])
+      expect("schemaVersion" in parseScanScope([extension])).toBe(false);
+
+    const c = parseScanScope(["language:c"]);
+    const cpp = parseScanScope(["language:cpp"]);
+    expect("schemaVersion" in c).toBe(false);
+    expect("schemaVersion" in cpp).toBe(false);
+    if (!("schemaVersion" in c) && !("schemaVersion" in cpp)) {
+      expect(matchesScanScope(c, "include/example.h")).toBe(true);
+      for (const path of [
+        "src/example.cc",
+        "src/example.cpp",
+        "src/example.cxx",
+        "include/example.hpp",
+        "include/example.hh",
+      ])
+        expect(matchesScanScope(cpp, path)).toBe(true);
+    }
   });
 });

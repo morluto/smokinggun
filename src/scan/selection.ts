@@ -1,7 +1,12 @@
 import {extname, isAbsolute} from "node:path";
 import type {ProblemV1} from "../protocol/index.js";
 import {pythonSemanticScannerId, pythonSemanticScannerVersion} from "../scanners/python-semantic.js";
-import {scannerId, scannerVersion} from "../scanners/structural-finding.js";
+import {
+  isSupportedExtension,
+  scannerId,
+  scannerVersion,
+  sourceLanguageForExtension,
+} from "../scanners/structural-finding.js";
 import {semanticScannerId, semanticScannerVersion} from "../scanners/typescript-semantic.js";
 
 export type BuiltInScanBackend = "structural" | "typescript-semantic" | "python-semantic";
@@ -71,25 +76,6 @@ const supportedLanguages = new Set([
   "rust",
   "swift",
   "typescript",
-]);
-const supportedExtensions = new Set([
-  ".c",
-  ".cpp",
-  ".cs",
-  ".go",
-  ".java",
-  ".js",
-  ".jsx",
-  ".kt",
-  ".mjs",
-  ".cjs",
-  ".php",
-  ".py",
-  ".rb",
-  ".rs",
-  ".swift",
-  ".ts",
-  ".tsx",
 ]);
 
 export type ScannerSelection =
@@ -188,7 +174,7 @@ export function parseScanScope(values: ReadonlyArray<string> | undefined): ScanS
     }
     if (value.startsWith(".")) {
       const extension = value.toLowerCase();
-      if (!supportedExtensions.has(extension)) return invalidScope(`Unsupported extension filter: ${value}.`);
+      if (!isSupportedExtension(extension)) return invalidScope(`Unsupported extension filter: ${value}.`);
       filters.push({_tag: "ExtensionFilter", extension});
       continue;
     }
@@ -219,7 +205,7 @@ export function matchesScanScope(scope: ScanScope, rootRelativePath: string): bo
   if (scope._tag === "EntireScanRoot") return true;
   const path = rootRelativePath.replaceAll("\\", "/");
   const extension = extname(path).toLowerCase();
-  const language = languageForExtension(extension);
+  const language = sourceLanguageForExtension(extension);
   return scope.filters.some((filter) => {
     switch (filter._tag) {
       case "LanguageFilter":
@@ -235,13 +221,6 @@ export function matchesScanScope(scope: ScanScope, rootRelativePath: string): bo
 /** Whether an explicit scope selected no analyzable files or skipped source links. */
 export function hasUnmatchedExplicitScope(scope: ScanScope, selectedCount: number): boolean {
   return scope._tag === "FilteredScanRoot" && selectedCount === 0;
-}
-
-function languageForExtension(extension: string): string {
-  if (extension === ".py") return "python";
-  if ([".ts", ".tsx"].includes(extension)) return "typescript";
-  if ([".js", ".jsx", ".mjs", ".cjs"].includes(extension)) return "javascript";
-  return extension.slice(1);
 }
 
 function invalidSelection(detail: string): ProblemV1 {
