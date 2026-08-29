@@ -327,6 +327,7 @@ function executionInputIdentity(
     return "missing";
   return left.environmentDigest === right.environmentDigest &&
     stableJson(left.executable) === stableJson(right.executable) &&
+    left.subjectDigest === right.subjectDigest &&
     left.inputSetDigest === right.inputSetDigest
     ? "matching"
     : "mismatch";

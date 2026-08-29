@@ -743,7 +743,7 @@ function measurement(id, medianMs) {
       environmentKeys: [],
       environmentDigest: "b".repeat(64),
       executable: {path: "[HOST_PATH]/node", digest: "c".repeat(64)},
-      subjectDigest: id.repeat(64),
+      subjectDigest: "9".repeat(64),
       inputSetDigest: "d".repeat(64),
       timeoutMs: 1000,
       warmups: 0,
