@@ -15,6 +15,7 @@ it("stores regular artifacts by digest and rejects symlink inputs", async () => 
     const second = await storeArtifact(source, store);
     expect(first).toEqual(second);
     expect(first.reference).toBe(`artifact://sha256/${first.digest}`);
+    expect(first.path).toBe(join(store, "sha256", first.digest));
     expect(existsSync(join(store, "sha256", first.digest))).toBe(true);
     const link = join(root, "link.json");
     await symlink(source, link);

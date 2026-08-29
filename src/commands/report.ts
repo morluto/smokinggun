@@ -6,7 +6,7 @@ import {parseScanReport} from "../protocol/index.js";
 import {writeResult, shouldPrint} from "../cli/output.js";
 import {importSarif} from "../adapters/sarif.js";
 import {importBenchmark, type BenchmarkTool} from "../adapters/benchmarks.js";
-import {importPerfettoSummary, importPerfettoTrace, importPprof} from "../adapters/profiles.js";
+import {importPerfettoSummary, importPerfettoTrace, importPprof, validatePerfettoQuery} from "../adapters/profiles.js";
 import {printResult} from "../cli/command-output.js";
 import {createHash} from "node:crypto";
 import type {RuntimeContext} from "../cli/context.js";
@@ -17,7 +17,6 @@ import {
   loadLatestInvestigation,
   recordParsedInvestigationSnapshot,
 } from "../investigations/store.js";
-import {resolve} from "node:path";
 import {z} from "zod";
 import {readArtifactBytes} from "../artifacts/store.js";
 
@@ -83,10 +82,11 @@ export default class Report extends BaseCommand {
       const raw = artifactBytes.toString("utf8");
       const artifactDigest = createHash("sha256").update(artifactBytes).digest("hex");
       const artifactReference = `artifact://sha256/${artifactDigest}`;
-      const storeValidatedArtifact = async (): Promise<void> => {
+      const storeValidatedArtifact = async () => {
         const stored = await context.artifactStore.putBytes(parsed.args.artifact, artifactBytes);
         if (stored.reference !== artifactReference || stored.digest !== artifactDigest)
           throw new Error("The artifact store did not preserve the validated input bytes.");
+        return stored;
       };
       const input: unknown =
         parsed.flags.profile === "pprof" || (parsed.flags.profile === "perfetto" && !looksLikeJson(raw))
@@ -134,22 +134,25 @@ export default class Report extends BaseCommand {
           await recordReportedArtifact(context, parsed.flags.investigation, sourceArtifact, "profile");
         } else {
           const sourceDigest = createHash("sha256").update(artifactBytes).digest("hex");
+          const queryProblem = input === undefined ? validatePerfettoQuery(parsed.flags["trace-query"]) : undefined;
+          if (queryProblem !== undefined) this.emitProblem(queryProblem, 2, context);
+          const storedTrace = input === undefined ? await storeValidatedArtifact() : undefined;
           const trace =
-            input === undefined
-              ? await importPerfettoTrace({
+            storedTrace === undefined
+              ? importPerfettoSummary(input, {sourceArtifact, sourceDigest})
+              : await importPerfettoTrace({
                   sourceArtifact,
                   sourceDigest,
-                  tracePath: resolve(context.config.cwd, parsed.args.artifact),
+                  tracePath: storedTrace.path,
                   query: parsed.flags["trace-query"],
-                })
-              : importPerfettoSummary(input, {sourceArtifact, sourceDigest});
+                });
           if ("code" in trace)
             this.emitProblem(
               trace,
               trace.code === "trace-processor-unavailable" || trace.code === "trace-processor-timeout" ? 3 : 2,
               context,
             );
-          await storeValidatedArtifact();
+          if (storedTrace === undefined) await storeValidatedArtifact();
           await printResult(trace, `Imported Perfetto summary: ${trace.rows.length} rows`, context);
           await recordReportedArtifact(context, parsed.flags.investigation, sourceArtifact, "trace");
         }

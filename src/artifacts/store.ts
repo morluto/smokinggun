@@ -9,6 +9,7 @@ export type StoredArtifact = {
   readonly digest: string;
   readonly size: number;
   readonly name: string;
+  readonly path: string;
 };
 
 /** Copy a bounded local artifact into an immutable content-addressed store. */
@@ -65,7 +66,13 @@ export async function storeArtifactBytes(
       throw writeCause;
     }
   }
-  return {reference: `artifact://sha256/${digest}`, digest, size: bytes.byteLength, name: basename(sourcePath)};
+  return {
+    reference: `artifact://sha256/${digest}`,
+    digest,
+    size: bytes.byteLength,
+    name: basename(sourcePath),
+    path: destination,
+  };
 }
 
 /** Read a bounded regular, non-symlink artifact without persisting it. */
