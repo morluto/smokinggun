@@ -37,7 +37,7 @@ jobs:
       # merged), it no-ops and we publish below.
       - name: Version packages
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
